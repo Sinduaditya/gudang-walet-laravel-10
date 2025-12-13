@@ -1,0 +1,9 @@
+Tempat untuk meletakkan Service Service
+Auth\LoginService
+
+
+Sesuaikan Service yang lain
+Supplier\SupplierService
+Location\LocationService
+
+dst....

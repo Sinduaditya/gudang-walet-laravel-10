@@ -1,0 +1,5 @@
+Tempat meletakkan Folder Views admin seperti
+locations\index.blade.php
+locations\create.blade.php
+dst...
+
