@@ -43,7 +43,7 @@
             </div>
         </div>
 
-        <form action="{{ route('incoming-goods.store-step2') }}" method="POST">
+        <form action="{{ route('incoming-goods.store-step2') }}" method="POST" novalidate>
             @csrf
 
             <!-- Grade Cards -->

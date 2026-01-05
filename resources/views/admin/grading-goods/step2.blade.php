@@ -75,7 +75,7 @@
                 </dl>
             </div>
             <form method="POST" action="{{ route('grading-goods.store.step2', ['id' => $sortingResult->id]) }}"
-                id="gradingForm">
+                id="gradingForm" novalidate>
                 @csrf
 
                 <!-- Grading Results -->
@@ -166,149 +166,215 @@
         </div>
     </div>
 
-    @push('scripts')
-        <script>
-            let gradeIndex = {{ old('grades') ? count(old('grades')) : 1 }};
-            const originalWeight = {{ $sortingResult->receiptItem->warehouse_weight_grams ?? 0 }};
+@push('scripts')
+    <script>
+        let gradeIndex = {{ old('grades') ? count(old('grades')) : 1 }};
+        const originalWeight = {{ $sortingResult->receiptItem->warehouse_weight_grams ?? 0 }};
 
-            function addNewGrade() {
-                const container = document.getElementById('gradesContainer');
-                const newGradeHtml = `
-            <div class="grade-row border border-gray-200 rounded-lg p-4 mb-4" data-index="${gradeIndex}">
-                <div class="flex justify-between items-center mb-3">
-                    <h4 class="font-medium text-sm text-gray-700">Grade ${gradeIndex + 1}</h4>
-                    <button type="button" onclick="removeGrade(this)" 
-                        class="text-red-600 hover:text-red-800 text-sm">
-                        Hapus
-                    </button>
+        // ✅ Mutual Exclusivity Logic for Outgoing Type & Category Grade
+        function handleMutualExclusivity(containerContext) {
+            containerContext.addEventListener('change', function(e) {
+                if (e.target.matches('select[name*="[outgoing_type]"]')) {
+                    const outgoingSelect = e.target;
+                    const row = outgoingSelect.closest('.grade-row, .grade-form'); // Support both classes
+                    if (!row) return;
+                    
+                    const categorySelect = row.querySelector('select[name*="[category_grade]"]');
+                    
+                    if (outgoingSelect.value) {
+                        categorySelect.value = "";
+                        categorySelect.disabled = true;
+                    } else {
+                        categorySelect.disabled = false;
+                    }
+                }
+                
+                if (e.target.matches('select[name*="[category_grade]"]')) {
+                    const categorySelect = e.target;
+                    const row = categorySelect.closest('.grade-row, .grade-form');
+                    if (!row) return;
+
+                    const outgoingSelect = row.querySelector('select[name*="[outgoing_type]"]');
+                    
+                    if (categorySelect.value) {
+                        outgoingSelect.value = "";
+                        outgoingSelect.disabled = true;
+                    } else {
+                        outgoingSelect.disabled = false;
+                    }
+                }
+            });
+
+            // Initial check for existing values on load (or when row added)
+             const rows = containerContext.querySelectorAll('.grade-row, .grade-form');
+             rows.forEach(row => {
+                 const outgoingSelect = row.querySelector('select[name*="[outgoing_type]"]');
+                 const categorySelect = row.querySelector('select[name*="[category_grade]"]');
+
+                 if (outgoingSelect && categorySelect) {
+                     if (outgoingSelect.value) {
+                         categorySelect.disabled = true;
+                     } else if (categorySelect.value) {
+                         outgoingSelect.disabled = true;
+                     }
+                 }
+             });
+        }
+
+        // Apply to main container
+        document.addEventListener('DOMContentLoaded', function() {
+            const gradesContainer = document.getElementById('gradesContainer');
+            if (gradesContainer) {
+                handleMutualExclusivity(gradesContainer);
+            }
+            
+            updateGradeNumbers();
+            calculateTotalWeight();
+
+            // Add event listeners to existing weight inputs
+            document.querySelectorAll('.grade-weight').forEach(input => {
+                input.addEventListener('input', calculateTotalWeight);
+            });
+        });
+
+        function addNewGrade() {
+            const container = document.getElementById('gradesContainer');
+            const newGradeHtml = `
+        <div class="grade-row border border-gray-200 rounded-lg p-4 mb-4" data-index="${gradeIndex}">
+            <div class="flex justify-between items-center mb-3">
+                <h4 class="font-medium text-sm text-gray-700">Grade ${gradeIndex + 1}</h4>
+                <button type="button" onclick="removeGrade(this)" 
+                    class="text-red-600 hover:text-red-800 text-sm">
+                    Hapus
+                </button>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <!-- Grade Company Name -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Grade Perusahaan</label>
+                    <input type="text" name="grades[${gradeIndex}][grade_company_name]" required
+                        placeholder="Contoh: A, B, C, Super"
+                        class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        list="grade-company-options">
                 </div>
 
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <!-- Grade Company Name -->
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Grade Perusahaan</label>
-                        <input type="text" name="grades[${gradeIndex}][grade_company_name]" required
-                            placeholder="Contoh: A, B, C, Super"
-                            class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            list="grade-company-options">
-                    </div>
-
-                    <!-- Weight -->
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Berat (gram)</label>
-                        <input type="number" step="0.01" name="grades[${gradeIndex}][weight_grams]" required
-                            class="grade-weight w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            onchange="calculateTotalWeight()">
-                    </div>
-
-                    <!-- Quantity -->
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Jumlah Item</label>
-                        <input type="number" name="grades[${gradeIndex}][quantity]" required
-                            class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    </div>
+                <!-- Weight -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Berat (gram)</label>
+                    <input type="number" step="0.01" name="grades[${gradeIndex}][weight_grams]" required
+                        class="grade-weight w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        onchange="calculateTotalWeight()">
                 </div>
 
-                <!-- Notes for this grade -->
-                <div class="mt-3">
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Catatan Grade Ini</label>
-                    <input type="text" name="grades[${gradeIndex}][notes]"
-                        placeholder="Catatan khusus untuk grade ini (opsional)"
+                <!-- Quantity -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Jumlah Item</label>
+                    <input type="number" name="grades[${gradeIndex}][quantity]" required
                         class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
                 </div>
-
-        <div class="mt-3">
-            <label class="block text-sm font-medium text-gray-700 mb-1">Jenis Barang Keluar</label>
-            <select name="grades[${gradeIndex}][outgoing_type]" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                <option value="">Pilih Jenis Keluar</option>
-                <option value="penjualan_langsung">Penjualan Langsung</option>
-                <option value="internal">Internal</option>
-                <option value="external">External</option>
-            </select>
-        </div>
-        
-        <div class="mt-3">
-            <label class="block text-sm font-medium text-gray-700 mb-1">Kategori Grade</label>
-            <select name="grades[${gradeIndex}][category_grade]" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                <option value="">Pilih Kategori</option>
-                <option value="IDM A">IDM A</option>
-                <option value="IDM B">IDM B</option>
-            </select>
-        </div>
             </div>
-        `;
 
-                container.insertAdjacentHTML('beforeend', newGradeHtml);
-                gradeIndex++;
-                updateGradeNumbers();
-                calculateTotalWeight();
+            <!-- Notes for this grade -->
+            <div class="mt-3">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Catatan Grade Ini</label>
+                <input type="text" name="grades[${gradeIndex}][notes]"
+                    placeholder="Catatan khusus untuk grade ini (opsional)"
+                    class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+
+            <div class="mt-3">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Jenis Barang Keluar</label>
+                <select name="grades[${gradeIndex}][outgoing_type]" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-200 disabled:text-gray-500 bg-white">
+                    <option value="">Pilih Jenis Keluar</option>
+                    <option value="penjualan_langsung">Penjualan Langsung</option>
+                    <option value="internal">Internal</option>
+                    <option value="external">External</option>
+                </select>
+            </div>
+            
+            <div class="mt-3">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Kategori Grade</label>
+                <select name="grades[${gradeIndex}][category_grade]" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-200 disabled:text-gray-500 bg-white">
+                    <option value="">Pilih Kategori</option>
+                    <option value="IDM A">IDM A</option>
+                    <option value="IDM B">IDM B</option>
+                </select>
+            </div>
+        </div>
+    `;
+
+            container.insertAdjacentHTML('beforeend', newGradeHtml);
+            
+             // Re-run initial check for the newly added row to ensure correct state (though they start enabled)
+             // But since we use delegation on the container, we don't strictly need to re-attach listeners.
+             // However, triggering the 'initial sync' logic for the new row is good practice if we had default values.
+             // For blank new rows, disable logic isn't triggered yet, which is correct.
+            
+            gradeIndex++;
+            updateGradeNumbers();
+            calculateTotalWeight();
+        }
+
+        function removeGrade(button) {
+            if (document.querySelectorAll('.grade-row').length <= 1) {
+                alert('Harus ada minimal 1 grade hasil');
+                return;
             }
 
-            function removeGrade(button) {
-                if (document.querySelectorAll('.grade-row').length <= 1) {
-                    alert('Harus ada minimal 1 grade hasil');
-                    return;
-                }
+            button.closest('.grade-row').remove();
+            updateGradeNumbers();
+            calculateTotalWeight();
+        }
 
-                button.closest('.grade-row').remove();
-                updateGradeNumbers();
-                calculateTotalWeight();
-            }
+        function updateGradeNumbers() {
+            const grades = document.querySelectorAll('.grade-row');
+            const gradeCount = grades.length;
 
-            function updateGradeNumbers() {
-                const grades = document.querySelectorAll('.grade-row');
-                const gradeCount = grades.length;
-
-                grades.forEach((grade, index) => {
-                    const title = grade.querySelector('h4');
-                    title.textContent = `Grade ${index + 1}`;
-                });
-
-                document.getElementById('gradeCountDisplay').textContent = gradeCount;
-            }
-
-            function calculateTotalWeight() {
-                const weightInputs = document.querySelectorAll('.grade-weight');
-                let totalWeight = 0;
-
-                weightInputs.forEach(input => {
-                    const weight = parseFloat(input.value) || 0;
-                    totalWeight += weight;
-                });
-
-                const difference = totalWeight - originalWeight;
-
-                document.getElementById('totalWeightDisplay').textContent = totalWeight.toLocaleString('id-ID') + ' gram';
-
-                const differenceDisplay = document.getElementById('weightDifferenceDisplay');
-                let differenceText = '';
-                let colorClass = '';
-
-                if (difference < 0) {
-                    differenceText = `${difference.toLocaleString('id-ID')} gram (susut)`;
-                    colorClass = 'text-red-600';
-                } else if (difference > 0) {
-                    differenceText = `+${difference.toLocaleString('id-ID')} gram (bertambah)`;
-                    colorClass = 'text-green-600';
-                } else {
-                    differenceText = '0 gram (sama)';
-                    colorClass = 'text-gray-600';
-                }
-
-                differenceDisplay.textContent = differenceText;
-                differenceDisplay.className = `font-medium ${colorClass}`;
-            }
-
-            // Initial calculation
-            document.addEventListener('DOMContentLoaded', function() {
-                updateGradeNumbers();
-                calculateTotalWeight();
-
-                // Add event listeners to existing weight inputs
-                document.querySelectorAll('.grade-weight').forEach(input => {
-                    input.addEventListener('input', calculateTotalWeight);
-                });
+            grades.forEach((grade, index) => {
+                const title = grade.querySelector('h4');
+                title.textContent = `Grade ${index + 1}`;
             });
-        </script>
-    @endpush
+
+            document.getElementById('gradeCountDisplay').textContent = gradeCount;
+        }
+
+        function calculateTotalWeight() {
+            const weightInputs = document.querySelectorAll('.grade-weight');
+            let totalWeight = 0;
+
+            weightInputs.forEach(input => {
+                const weight = parseFloat(input.value) || 0;
+                totalWeight += weight;
+            });
+
+            // Format number to Indonesian locale
+            const formattedTotal = totalWeight.toLocaleString('id-ID'); // e.g., "1.234,56"
+            document.getElementById('totalWeightDisplay').textContent = formattedTotal + ' gram';
+
+            const difference = totalWeight - originalWeight;
+            const differenceDisplay = document.getElementById('weightDifferenceDisplay');
+            
+            let differenceText = '';
+            let colorClass = '';
+
+            // Format difference to Indonesian locale
+            const formattedDiff = Math.abs(difference).toLocaleString('id-ID');
+
+            if (difference < 0) {
+                differenceText = `${formattedDiff} gram (susut)`;
+                colorClass = 'text-red-600';
+            } else if (difference > 0) {
+                differenceText = `+${formattedDiff} gram (bertambah)`;
+                colorClass = 'text-green-600';
+            } else {
+                differenceText = '0 gram (sama)';
+                colorClass = 'text-gray-600';
+            }
+
+            differenceDisplay.textContent = differenceText;
+            differenceDisplay.className = `font-medium ${colorClass}`;
+        }
+    </script>
+@endpush
 @endsection
