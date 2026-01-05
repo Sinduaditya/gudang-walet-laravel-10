@@ -22,18 +22,18 @@ class GradingGoodsService
     public function getAllGrading($filters = [], $perPage = 15)
     {
         $query = ReceiptItem::select([
-                'receipt_items.id as receipt_item_id',
-                'receipt_items.warehouse_weight_grams',
-                'receipt_items.supplier_weight_grams',
-                'receipt_items.status',
-                'grades_supplier.name as grade_supplier_name',
-                'purchase_receipts.receipt_date',
-                'suppliers.name as supplier_name',
-                DB::raw('MIN(sorting_results.grading_date) as grading_date'),
-                DB::raw('COUNT(sorting_results.id) as total_grades'),
-                DB::raw('SUM(sorting_results.weight_grams) as total_grading_weight'),
-                DB::raw('MIN(sorting_results.id) as first_sorting_id')
-            ])
+            'receipt_items.id as receipt_item_id',
+            'receipt_items.warehouse_weight_grams',
+            'receipt_items.supplier_weight_grams',
+            'receipt_items.status',
+            'grades_supplier.name as grade_supplier_name',
+            'purchase_receipts.receipt_date',
+            'suppliers.name as supplier_name',
+            DB::raw('MIN(sorting_results.grading_date) as grading_date'),
+            DB::raw('COUNT(sorting_results.id) as total_grades'),
+            DB::raw('SUM(sorting_results.weight_grams) as total_grading_weight'),
+            DB::raw('MIN(sorting_results.id) as first_sorting_id')
+        ])
             ->join('sorting_results', 'receipt_items.id', '=', 'sorting_results.receipt_item_id')
             ->leftJoin('grades_supplier', 'receipt_items.grade_supplier_id', '=', 'grades_supplier.id')
             ->leftJoin('purchase_receipts', 'receipt_items.purchase_receipt_id', '=', 'purchase_receipts.id')
@@ -57,6 +57,14 @@ class GradingGoodsService
 
         if (!empty($filters['year'])) {
             $query->whereYear('sorting_results.grading_date', $filters['year']);
+        }
+
+        if (!empty($filters['supplier_name'])) {
+            $query->where('suppliers.name', $filters['supplier_name']);
+        }
+
+        if (!empty($filters['grading_date'])) {
+            $query->whereDate('sorting_results.grading_date', $filters['grading_date']);
         }
 
         $results = $query->paginate($perPage)->appends(request()->query());
@@ -75,18 +83,18 @@ class GradingGoodsService
     public function getAllGradingForExport($filters = [])
     {
         $query = ReceiptItem::select([
-                'receipt_items.id as receipt_item_id',
-                'receipt_items.warehouse_weight_grams',
-                'receipt_items.supplier_weight_grams',
-                'receipt_items.status',
-                'grades_supplier.name as grade_supplier_name',
-                'purchase_receipts.receipt_date',
-                'suppliers.name as supplier_name',
-                DB::raw('MIN(sorting_results.grading_date) as grading_date'),
-                DB::raw('COUNT(sorting_results.id) as total_grades'),
-                DB::raw('SUM(sorting_results.weight_grams) as total_grading_weight'),
-                DB::raw('MIN(sorting_results.id) as first_sorting_id')
-            ])
+            'receipt_items.id as receipt_item_id',
+            'receipt_items.warehouse_weight_grams',
+            'receipt_items.supplier_weight_grams',
+            'receipt_items.status',
+            'grades_supplier.name as grade_supplier_name',
+            'purchase_receipts.receipt_date',
+            'suppliers.name as supplier_name',
+            DB::raw('MIN(sorting_results.grading_date) as grading_date'),
+            DB::raw('COUNT(sorting_results.id) as total_grades'),
+            DB::raw('SUM(sorting_results.weight_grams) as total_grading_weight'),
+            DB::raw('MIN(sorting_results.id) as first_sorting_id')
+        ])
             ->join('sorting_results', 'receipt_items.id', '=', 'sorting_results.receipt_item_id')
             ->leftJoin('grades_supplier', 'receipt_items.grade_supplier_id', '=', 'grades_supplier.id')
             ->leftJoin('purchase_receipts', 'receipt_items.purchase_receipt_id', '=', 'purchase_receipts.id')
@@ -110,6 +118,14 @@ class GradingGoodsService
 
         if (!empty($filters['year'])) {
             $query->whereYear('sorting_results.grading_date', $filters['year']);
+        }
+
+        if (!empty($filters['supplier_name'])) {
+            $query->where('suppliers.name', $filters['supplier_name']);
+        }
+
+        if (!empty($filters['grading_date'])) {
+            $query->whereDate('sorting_results.grading_date', $filters['grading_date']);
         }
 
         $results = $query->get();
@@ -398,8 +414,10 @@ class GradingGoodsService
         // 1. CARI SUPPLIER ID
         // Alur: SortingResult -> ReceiptItem -> PurchaseReceipt -> Supplier
         $supplierId = null;
-        if ($sortingResult->receiptItem &&
-            $sortingResult->receiptItem->purchaseReceipt) {
+        if (
+            $sortingResult->receiptItem &&
+            $sortingResult->receiptItem->purchaseReceipt
+        ) {
             $supplierId = $sortingResult->receiptItem->purchaseReceipt->supplier_id;
         }
 
