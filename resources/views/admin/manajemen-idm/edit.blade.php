@@ -11,7 +11,7 @@
                     <h1 class="text-2xl font-semibold text-gray-900">Edit IDM</h1>
                     <p class="mt-1 text-sm text-gray-600">Edit data estimasi IDM.</p>
                 </div>
-                <a href="{{ route('manajemen-idm.index') }}"
+                <a href="{{ route('manajemen-idm.index', ['page' => $page, 'supplier_id' => $supplier_id, 'grade_company_id' => $grade_company_id, 'category_grade' => $category_grade]) }}"
                     class="inline-flex items-center px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 text-sm">
                     Kembali
                 </a>
@@ -46,6 +46,10 @@
             <form action="{{ route('manajemen-idm.update', $idmManagement->id) }}" method="POST" id="step2Form">
                 @csrf
                 @method('PUT')
+                <input type="hidden" name="page" value="{{ $page }}">
+                <input type="hidden" name="supplier_id" value="{{ $supplier_id }}">
+                <input type="hidden" name="grade_company_id" value="{{ $grade_company_id }}">
+                <input type="hidden" name="category_grade" value="{{ $category_grade }}">
 
                 <div class="bg-white shadow-sm border rounded-lg p-6">
                     <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
