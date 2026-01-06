@@ -77,6 +77,7 @@ class IncomingGoodsService
     {
         try {
             return DB::transaction(function () use ($step1Data, $step2Data, $step3Data) {
+
                 // Create parent record (Purchase Receipt)
                 $receipt = PurchaseReceipt::create([
                     'supplier_id' => $step1Data['supplier_id'],
@@ -165,9 +166,9 @@ class IncomingGoodsService
                         'supplier_weight_grams' => $supplierWeight,
                         'warehouse_weight_grams' => $warehouseWeight,
                         'difference_grams' => $difference,
-                        'percentage_difference' => $percentageDifference,  
+                        'percentage_difference' => $percentageDifference,
                         'moisture_percentage' => $itemData['moisture_percentage'] ?? null,
-                        'is_flagged_red' => $isFlagged,  
+                        'is_flagged_red' => $isFlagged,
                         'status' => ReceiptItem::STATUS_MENTAH,
                         'created_by' => auth()->id(),
                         'updated_by' => auth()->id(),

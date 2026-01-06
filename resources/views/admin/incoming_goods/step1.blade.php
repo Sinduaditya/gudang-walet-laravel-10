@@ -44,7 +44,7 @@
         <div class="grid grid-cols-1 lg:grid-cols-5 gap-6">
             <!-- Form Section -->
             <div class="lg:col-span-2 space-y-6">
-                <form action="{{ route('incoming-goods.store-step1') }}" method="POST" id="mainForm">
+                <form action="{{ route('incoming-goods.store-step1') }}" method="POST" id="mainForm" novalidate>
                     @csrf
                     
                     <!-- Data Penerimaan Card -->

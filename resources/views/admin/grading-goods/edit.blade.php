@@ -148,7 +148,7 @@
                                         <label class="block text-sm font-medium text-gray-700 mb-1">Jenis Barang
                                             Keluar</label>
                                         <select name="grades[{{ $index }}][outgoing_type]"
-                                            class="mt-1 block w-full sm:text-sm border rounded-md bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400">
+                                            class="mt-1 block w-full sm:text-sm border rounded-md bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400 disabled:bg-gray-200 disabled:text-gray-500">
                                             <option value="">Pilih Jenis Keluar</option>
                                             <option value="penjualan_langsung"
                                                 {{ old('grades.' . $index . '.outgoing_type', $result->outgoing_type) == 'penjualan_langsung' ? 'selected' : '' }}>
@@ -166,7 +166,7 @@
                                     <div>
                                         <label class="block text-sm font-medium text-gray-700 mb-1">Kategori Grade</label>
                                         <select name="grades[{{ $index }}][category_grade]"
-                                            class="mt-1 block w-full sm:text-sm border rounded-md bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400">
+                                            class="mt-1 block w-full sm:text-sm border rounded-md bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400 disabled:bg-gray-200 disabled:text-gray-500">
                                             <option value="">Pilih Kategori</option>
                                             <option value="IDM A"
                                                 {{ old('grades.' . $index . '.category_grade', $result->category_grade) == 'IDM A' ? 'selected' : '' }}>IDM A</option>
@@ -210,6 +210,63 @@
     @push('scripts')
         <script>
             let gradeIndex = {{ $allGradingResults->count() }};
+
+            // ✅ Mutual Exclusivity Logic for Outgoing Type & Category Grade
+            function handleMutualExclusivity(containerContext) {
+                containerContext.addEventListener('change', function(e) {
+                    if (e.target.matches('select[name*="[outgoing_type]"]')) {
+                        const outgoingSelect = e.target;
+                        const row = outgoingSelect.closest('.grade-form');
+                        if (!row) return;
+
+                        const categorySelect = row.querySelector('select[name*="[category_grade]"]');
+
+                        if (outgoingSelect.value) {
+                            categorySelect.value = "";
+                            categorySelect.disabled = true;
+                        } else {
+                            categorySelect.disabled = false;
+                        }
+                    }
+
+                    if (e.target.matches('select[name*="[category_grade]"]')) {
+                        const categorySelect = e.target;
+                        const row = categorySelect.closest('.grade-form');
+                        if (!row) return;
+
+                        const outgoingSelect = row.querySelector('select[name*="[outgoing_type]"]');
+
+                        if (categorySelect.value) {
+                            outgoingSelect.value = "";
+                            outgoingSelect.disabled = true;
+                        } else {
+                            outgoingSelect.disabled = false;
+                        }
+                    }
+                });
+
+                // Initial check for existing values on load
+                const rows = containerContext.querySelectorAll('.grade-form');
+                rows.forEach(row => {
+                    const outgoingSelect = row.querySelector('select[name*="[outgoing_type]"]');
+                    const categorySelect = row.querySelector('select[name*="[category_grade]"]');
+
+                    if (outgoingSelect && categorySelect) {
+                        if (outgoingSelect.value) {
+                            categorySelect.disabled = true;
+                        } else if (categorySelect.value) {
+                            outgoingSelect.disabled = true;
+                        }
+                    }
+                });
+            }
+
+            document.addEventListener('DOMContentLoaded', function() {
+                const gradesContainer = document.getElementById('grades-container');
+                if (gradesContainer) {
+                    handleMutualExclusivity(gradesContainer);
+                }
+            });
 
             function addGradeForm() {
                 const container = document.getElementById('grades-container');
@@ -257,9 +314,9 @@
 
                 <!-- ✅ Field Jenis Barang Keluar -->
                 <div>
-                    <label class="block text-sm font-medium text-gray-700">Jenis Barang Keluar</label>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Jenis Barang Keluar</label>
                     <select name="grades[${gradeIndex}][outgoing_type]" 
-                            class="mt-1 block w-full sm:text-sm border rounded-md bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400">
+                            class="mt-1 block w-full sm:text-sm border rounded-md bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400 disabled:bg-gray-200 disabled:text-gray-500">
                         <option value="">Pilih Jenis Keluar</option>
                         <option value="penjualan_langsung">Penjualan Langsung</option>
                         <option value="internal">Internal</option>
@@ -269,9 +326,9 @@
 
                 <!-- ✅ Field Kategori Grade -->
                 <div>
-                    <label class="block text-sm font-medium text-gray-700">Kategori Grade</label>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Kategori Grade</label>
                     <select name="grades[${gradeIndex}][category_grade]" 
-                            class="mt-1 block w-full sm:text-sm border rounded-md bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400">
+                            class="mt-1 block w-full sm:text-sm border rounded-md bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400 disabled:bg-gray-200 disabled:text-gray-500">
                         <option value="">Pilih Kategori</option>
                         <option value="IDM A">IDM A</option>
                         <option value="IDM B">IDM B</option>
