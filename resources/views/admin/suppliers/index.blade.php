@@ -209,7 +209,9 @@
         // Delete modal functions
         function confirmDelete(id, name) {
             document.getElementById('supplierName').textContent = name;
-            document.getElementById('deleteForm').action = `/suppliers/${id}`;
+            var url = '{{ route("suppliers.destroy", ":id") }}';
+            url = url.replace(':id', id);
+            document.getElementById('deleteForm').action = url;
             document.getElementById('deleteModal').classList.remove('hidden');
         }
 

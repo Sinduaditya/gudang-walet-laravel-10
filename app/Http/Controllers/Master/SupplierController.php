@@ -22,7 +22,8 @@ class SupplierController extends Controller
         return view('admin.suppliers.index', compact('suppliers', 'search'));
     }
 
-    public function export(){
+    public function export()
+    {
         try {
             return $this->supplierService->exportToExcel();
         } catch (\Exception $e) {
@@ -55,7 +56,11 @@ class SupplierController extends Controller
 
     public function destroy($id)
     {
-        $this->supplierService->delete($id);
-        return redirect()->route('suppliers.index')->with('success', 'Data supplier berhasil dihapus');
+        try {
+            $this->supplierService->delete($id);
+            return redirect()->route('suppliers.index')->with('success', 'Data supplier berhasil dihapus');
+        } catch (\Exception $e) {
+            return redirect()->route('suppliers.index')->with('error', $e->getMessage());
+        }
     }
 }
