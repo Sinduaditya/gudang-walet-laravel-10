@@ -180,9 +180,9 @@
                                     </td>
                                     <td class="px-6 py-4 text-sm text-gray-900">
                                         <div class="flex items-center gap-2">
-                                            <a href="{{ route('incoming-goods.show', $receipt->id) }}"
+                                            <a href="{{ route('incoming-goods.show', array_merge(['id' => $receipt->id], request()->query())) }}"
                                                 class="text-blue-600 hover:text-blue-800">Lihat</a>
-                                            <a href="{{ route('incoming-goods.edit', $receipt->id) }}"
+                                            <a href="{{ route('incoming-goods.edit', array_merge(['id' => $receipt->id], request()->query())) }}"
                                                 class="text-yellow-600 hover:text-yellow-800">Edit</a>
                                             <button onclick="confirmDelete({{ $receipt->id }})"
                                                 class="text-red-600 hover:text-red-800">Hapus</button>

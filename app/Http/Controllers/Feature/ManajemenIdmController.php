@@ -173,10 +173,16 @@ class ManajemenIdmController extends Controller
         }
     }
 
-    public function edit($id)
+    public function edit(Request $request, $id)
     {
         $idmManagement = \App\Models\IdmManagement::with(['supplier', 'gradeCompany', 'details', 'sourceItems'])->findOrFail($id);
-        return view('admin.manajemen-idm.edit', compact('idmManagement'));
+        
+        $page = $request->get('page');
+        $supplier_id = $request->get('supplier_id');
+        $grade_company_id = $request->get('grade_company_id');
+        $category_grade = $request->get('category_grade');
+
+        return view('admin.manajemen-idm.edit', compact('idmManagement', 'page', 'supplier_id', 'grade_company_id', 'category_grade'));
     }
 
     public function update(Request $request, $id)
@@ -223,7 +229,13 @@ class ManajemenIdmController extends Controller
 
             \Illuminate\Support\Facades\DB::commit();
 
-            return redirect()->route('manajemen-idm.index')->with('success', 'Data estimasi IDM berhasil diperbarui.');
+            $redirectParams = [];
+            if ($request->has('page')) $redirectParams['page'] = $request->page;
+            if ($request->has('supplier_id')) $redirectParams['supplier_id'] = $request->supplier_id;
+            if ($request->has('grade_company_id')) $redirectParams['grade_company_id'] = $request->grade_company_id;
+            if ($request->has('category_grade')) $redirectParams['category_grade'] = $request->category_grade;
+
+            return redirect()->route('manajemen-idm.show', array_merge(['id' => $id], $redirectParams))->with('success', 'Data estimasi IDM berhasil diperbarui.');
 
         } catch (\Exception $e) {
             \Illuminate\Support\Facades\DB::rollBack();
@@ -231,10 +243,16 @@ class ManajemenIdmController extends Controller
         }
     }
 
-    public function show($id)
+    public function show(Request $request, $id)
     {
         $idmManagement = \App\Models\IdmManagement::with(['supplier', 'gradeCompany', 'details'])->findOrFail($id);
-        return view('admin.manajemen-idm.show', compact('idmManagement'));
+
+        $page = $request->get('page');
+        $supplier_id = $request->get('supplier_id');
+        $grade_company_id = $request->get('grade_company_id');
+        $category_grade = $request->get('category_grade');
+
+        return view('admin.manajemen-idm.show', compact('idmManagement', 'page', 'supplier_id', 'grade_company_id', 'category_grade'));
     }
     public function destroy($id)
     {

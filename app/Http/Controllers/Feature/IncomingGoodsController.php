@@ -132,23 +132,31 @@ class IncomingGoodsController extends Controller
     /**
      * Show receipt details
      */
-    public function show($id)
+    public function show(Request $request, $id)
     {
         $receipt = \App\Models\PurchaseReceipt::with(['supplier', 'receiptItems.gradeSupplier'])->findOrFail($id);
 
-        return view('admin.incoming_goods.show', compact('receipt'));
+        $page = $request->get('page');
+        $month = $request->get('month');
+        $year = $request->get('year');
+
+        return view('admin.incoming_goods.show', compact('receipt', 'page', 'month', 'year'));
     }
 
     /**
      * Show edit form
      */
-    public function edit($id)
+    public function edit(Request $request, $id)
     {
         $receipt = $this->incomingGoodsService->getReceiptById($id);
         $suppliers = $this->incomingGoodsService->getSuppliers();
         $gradeSuppliers = $this->incomingGoodsService->getGradeSuppliers();
 
-        return view('admin.incoming_goods.edit', compact('receipt', 'suppliers', 'gradeSuppliers'));
+        $page = $request->get('page');
+        $month = $request->get('month');
+        $year = $request->get('year');
+
+        return view('admin.incoming_goods.edit', compact('receipt', 'suppliers', 'gradeSuppliers', 'page', 'month', 'year'));
     }
 
     /**
@@ -171,7 +179,14 @@ class IncomingGoodsController extends Controller
 
             $receipt = $this->incomingGoodsService->updateReceipt($id, $validated);
 
-            return redirect()->route('incoming-goods.show', $receipt->id)->with('success', 'Data barang masuk berhasil diperbarui!');
+
+
+            $redirectParams = [];
+            if ($request->has('page')) $redirectParams['page'] = $request->page;
+            if ($request->has('month')) $redirectParams['month'] = $request->month;
+            if ($request->has('year')) $redirectParams['year'] = $request->year;
+
+            return redirect()->route('incoming-goods.show', array_merge(['id' => $receipt->id], $redirectParams))->with('success', 'Data barang masuk berhasil diperbarui!');
         } catch (\Exception $e) {
             return back()->withInput()->with('error', $e->getMessage());
         }

@@ -32,7 +32,7 @@ class GradingGoodsController extends Controller
         return view('admin.grading-goods.index', compact('gradings'));
     }
 
-    public function show($receiptItemId)
+    public function show(Request $request, $receiptItemId)
     {
         $allGradingResults = $this->gradingGoodsService->getSortingResultsByReceiptItem($receiptItemId);
 
@@ -44,7 +44,11 @@ class GradingGoodsController extends Controller
 
         $notaWeight = $grading->receiptItem->supplier_weight_grams ?? 0;
 
-        return view('admin.grading-goods.show', compact('grading', 'allGradingResults', 'notaWeight'));
+        $page = $request->get('page');
+        $month = $request->get('month');
+        $year = $request->get('year');
+
+        return view('admin.grading-goods.show', compact('grading', 'allGradingResults', 'notaWeight', 'page', 'month', 'year'));
     }
 
     public function createStep1(Request $request)
@@ -121,7 +125,7 @@ class GradingGoodsController extends Controller
         return Excel::download($export, $fileName);
     }
 
-    public function edit($receiptItemId)
+    public function edit(Request $request, $receiptItemId)
     {
         $allGradingResults = $this->gradingGoodsService->getSortingResultsByReceiptItem($receiptItemId);
 
@@ -132,7 +136,11 @@ class GradingGoodsController extends Controller
         $receiptItem = $allGradingResults->first()->receiptItem;
         $allGradeCompanies = $this->gradingGoodsService->getAllGradeCompanies();
 
-        return view('admin.grading-goods.edit', compact('allGradingResults', 'receiptItem', 'allGradeCompanies'));
+        $page = $request->get('page');
+        $month = $request->get('month');
+        $year = $request->get('year');
+
+        return view('admin.grading-goods.edit', compact('allGradingResults', 'receiptItem', 'allGradeCompanies', 'page', 'month', 'year'));
     }
 
     public function update(Request $request, $receiptItemId)
@@ -168,7 +176,12 @@ class GradingGoodsController extends Controller
 
             $this->gradingGoodsService->updateMultipleSortingResults($receiptItemId, $processedGrades, $globalNotes);
 
-            return redirect()->route('grading-goods.index')->with('success', 'Data grading berhasil diperbarui.');
+            $redirectParams = [];
+            if ($request->has('page')) $redirectParams['page'] = $request->page;
+            if ($request->has('month')) $redirectParams['month'] = $request->month;
+            if ($request->has('year')) $redirectParams['year'] = $request->year;
+
+            return redirect()->route('grading-goods.show', array_merge(['receiptItemId' => $receiptItemId], $redirectParams))->with('success', 'Data grading berhasil diperbarui.');
         } catch (\Exception $e) {
             return back()
                 ->withInput()
