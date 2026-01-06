@@ -28,7 +28,8 @@ class SupplierService
      * 
      */
 
-    public function exportToExcel(){
+    public function exportToExcel()
+    {
         return Excel::download(new SuppliersExport, 'suppliers-' . date('Y-m-d') . '.xlsx');
     }
 
@@ -66,6 +67,11 @@ class SupplierService
     public function delete(int $id)
     {
         $supplier = $this->getById($id);
+
+        if ($supplier->purchaseReceipts()->exists()) {
+            throw new \Exception('Supplier tidak dapat dihapus karena memiliki data transaksi terkait.');
+        }
+
         $supplier->delete();
 
         return true;
