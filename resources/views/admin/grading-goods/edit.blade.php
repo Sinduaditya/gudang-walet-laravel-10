@@ -16,7 +16,7 @@
                     </p>
                 </div>
                 <div class="flex items-center space-x-3">
-                    <a href="{{ route('grading-goods.index') }}"
+                    <a href="{{ route('grading-goods.index', ['page' => $page, 'month' => $month, 'year' => $year]) }}"
                         class="inline-flex items-center px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-md hover:bg-gray-100 text-sm">
                         Kembali
                     </a>
@@ -62,6 +62,9 @@
                 class="space-y-6">
                 @csrf
                 @method('PUT')
+                <input type="hidden" name="page" value="{{ $page }}">
+                <input type="hidden" name="month" value="{{ $month }}">
+                <input type="hidden" name="year" value="{{ $year }}">
 
                 <!-- ✅ Global Notes -->
                 <div class="bg-white shadow-md border rounded-lg p-6">

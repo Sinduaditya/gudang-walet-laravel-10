@@ -101,7 +101,7 @@
                             @forelse($idmManagements ?? [] as $index => $item)
                                 <tr class="hover:bg-gray-50">
                                     <td class="px-6 py-4 text-sm text-gray-900">
-                                        {{ $loop->iteration }}
+                                        {{ $idmManagements->firstItem() + $loop->index }}
                                     </td>
                                     <td class="px-6 py-4 text-sm text-gray-900 font-medium">
                                         {{ $item->supplier->name ?? '-' }}
@@ -128,9 +128,9 @@
                                     </td>
                                     <td class="px-6 py-4 text-sm text-gray-900">
                                         <div class="flex items-center gap-2">
-                                            <a href="{{ Route::has('manajemen-idm.show') ? route('manajemen-idm.show', $item->id) : '#' }}"
+                                            <a href="{{ Route::has('manajemen-idm.show') ? route('manajemen-idm.show', array_merge(['id' => $item->id], request()->query())) : '#' }}"
                                                 class="text-blue-600 hover:text-blue-800 font-medium">Detail</a>
-                                            <a href="{{ Route::has('manajemen-idm.edit') ? route('manajemen-idm.edit', $item->id) : '#' }}"
+                                            <a href="{{ Route::has('manajemen-idm.edit') ? route('manajemen-idm.edit', array_merge(['id' => $item->id], request()->query())) : '#' }}"
                                                 class="text-yellow-600 hover:text-yellow-800 font-medium">Edit</a>
                                             <button onclick="confirmDelete({{ $item->id }})"
                                                 class="text-red-600 hover:text-red-800 font-medium">Hapus</button>

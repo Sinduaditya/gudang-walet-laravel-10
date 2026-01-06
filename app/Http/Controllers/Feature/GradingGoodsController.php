@@ -25,14 +25,18 @@ class GradingGoodsController extends Controller
         $filters = [
             'month' => $request->get('month'),
             'year' => $request->get('year'),
+            'supplier_name' => $request->get('supplier_name'),
+            'grading_date' => $request->get('grading_date'),
         ];
 
         $gradings = $this->gradingGoodsService->getAllGrading($filters);
 
-        return view('admin.grading-goods.index', compact('gradings'));
+        $suppliers = \App\Models\Supplier::orderBy('name')->get();
+
+        return view('admin.grading-goods.index', compact('gradings', 'suppliers'));
     }
 
-    public function show($receiptItemId)
+    public function show(Request $request, $receiptItemId)
     {
         $allGradingResults = $this->gradingGoodsService->getSortingResultsByReceiptItem($receiptItemId);
 
@@ -44,7 +48,11 @@ class GradingGoodsController extends Controller
 
         $notaWeight = $grading->receiptItem->supplier_weight_grams ?? 0;
 
-        return view('admin.grading-goods.show', compact('grading', 'allGradingResults', 'notaWeight'));
+        $page = $request->get('page');
+        $month = $request->get('month');
+        $year = $request->get('year');
+
+        return view('admin.grading-goods.show', compact('grading', 'allGradingResults', 'notaWeight', 'page', 'month', 'year'));
     }
 
     public function createStep1(Request $request)
@@ -101,12 +109,20 @@ class GradingGoodsController extends Controller
         $filters = [
             'month' => $request->get('month'),
             'year' => $request->get('year'),
+            'supplier_name' => $request->get('supplier_name'),
+            'grading_date' => $request->get('grading_date'),
         ];
 
         $fileName = 'laporan_grading_barang';
 
-        if (!empty($filters['month']) || !empty($filters['year'])) {
+        if (!empty($filters['month']) || !empty($filters['year']) || !empty($filters['supplier_name']) || !empty($filters['grading_date'])) {
             $fileName .= '_';
+            if (!empty($filters['supplier_name'])) {
+                $fileName .= 'supplier_' . \Illuminate\Support\Str::slug($filters['supplier_name']) . '_';
+            }
+            if (!empty($filters['grading_date'])) {
+                $fileName .= 'tgl_' . $filters['grading_date'] . '_';
+            }
             if (!empty($filters['month'])) {
                 $fileName .= 'bulan_' . $filters['month'];
             }
@@ -121,7 +137,7 @@ class GradingGoodsController extends Controller
         return Excel::download($export, $fileName);
     }
 
-    public function edit($receiptItemId)
+    public function edit(Request $request, $receiptItemId)
     {
         $allGradingResults = $this->gradingGoodsService->getSortingResultsByReceiptItem($receiptItemId);
 
@@ -132,7 +148,11 @@ class GradingGoodsController extends Controller
         $receiptItem = $allGradingResults->first()->receiptItem;
         $allGradeCompanies = $this->gradingGoodsService->getAllGradeCompanies();
 
-        return view('admin.grading-goods.edit', compact('allGradingResults', 'receiptItem', 'allGradeCompanies'));
+        $page = $request->get('page');
+        $month = $request->get('month');
+        $year = $request->get('year');
+
+        return view('admin.grading-goods.edit', compact('allGradingResults', 'receiptItem', 'allGradeCompanies', 'page', 'month', 'year'));
     }
 
     public function update(Request $request, $receiptItemId)
@@ -140,8 +160,8 @@ class GradingGoodsController extends Controller
         $request->validate([
             'grades.*.grading_date' => 'required|date',
             'grades.*.grade_company_name' => 'required|string|max:255',
-            'grades.*.quantity' => 'required|numeric|min:0', 
-            'grades.*.weight_grams' => 'required|numeric|min:0', 
+            'grades.*.quantity' => 'required|numeric|min:0',
+            'grades.*.weight_grams' => 'required|numeric|min:0',
             'grades.*.notes' => 'nullable|string',
             'grades.*.outgoing_type' => 'nullable|in:penjualan_langsung,internal,external',
             'grades.*.category_grade' => 'nullable|in:IDM A,IDM B',
@@ -157,18 +177,22 @@ class GradingGoodsController extends Controller
                 $processedGrades[] = [
                     'grading_date' => $grade['grading_date'],
                     'grade_company_name' => $grade['grade_company_name'],
-                    'quantity' => (int) $grade['quantity'], 
-                    'weight_grams' => (int) $grade['weight_grams'], 
+                    'quantity' => (int) $grade['quantity'],
+                    'weight_grams' => (int) $grade['weight_grams'],
                     'outgoing_type' => $grade['outgoing_type'] ?? null,
                     'category_grade' => $grade['category_grade'] ?? null,
                     'notes' => $grade['notes'] ?? null,
-
                 ];
             }
 
             $this->gradingGoodsService->updateMultipleSortingResults($receiptItemId, $processedGrades, $globalNotes);
 
-            return redirect()->route('grading-goods.index')->with('success', 'Data grading berhasil diperbarui.');
+            $redirectParams = [];
+            if ($request->has('page')) $redirectParams['page'] = $request->page;
+            if ($request->has('month')) $redirectParams['month'] = $request->month;
+            if ($request->has('year')) $redirectParams['year'] = $request->year;
+
+            return redirect()->route('grading-goods.show', array_merge(['receiptItemId' => $receiptItemId], $redirectParams))->with('success', 'Data grading berhasil diperbarui.');
         } catch (\Exception $e) {
             return back()
                 ->withInput()

@@ -13,7 +13,7 @@
                     <h1 class="text-2xl font-semibold text-gray-900">Edit Barang Masuk</h1>
                     <p class="mt-1 text-sm text-gray-600">Edit data penerimaan barang dari supplier</p>
                 </div>
-                <a href="{{ route('incoming-goods.index') }}" class="bg-gray-500 hover:bg-gray-700 text-white px-4 py-2 rounded-md text-sm">
+                <a href="{{ route('incoming-goods.index', ['page' => $page, 'month' => $month, 'year' => $year]) }}" class="bg-gray-500 hover:bg-gray-700 text-white px-4 py-2 rounded-md text-sm">
                     Kembali ke Daftar
                 </a>
             </div>
@@ -22,6 +22,9 @@
         <form action="{{ route('incoming-goods.update', $receipt->id) }}" method="POST" id="editForm">
             @csrf
             @method('PUT')
+            <input type="hidden" name="page" value="{{ $page }}">
+            <input type="hidden" name="month" value="{{ $month }}">
+            <input type="hidden" name="year" value="{{ $year }}">
             
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 

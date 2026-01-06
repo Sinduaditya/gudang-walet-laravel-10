@@ -12,7 +12,7 @@
                     <p class="text-sm text-gray-600">ID: #{{ $idmManagement->id }}</p>
                 </div>
                 <div class="flex gap-2">
-                    <a href="{{ route('manajemen-idm.index') }}"
+                    <a href="{{ route('manajemen-idm.index', ['page' => $page, 'supplier_id' => $supplier_id, 'grade_company_id' => $grade_company_id, 'category_grade' => $category_grade]) }}"
                         class="inline-flex items-center px-3 py-2 bg-gray-100 rounded hover:bg-gray-200 text-sm">
                         <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
