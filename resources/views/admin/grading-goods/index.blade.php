@@ -13,7 +13,12 @@
 
                 <div class="flex items-center gap-3">
                     <!-- Export Button - Using current filter -->
-                    <a href="{{ route('grading-goods.export', ['month' => request('month'), 'year' => request('year')]) }}"
+                    <a href="{{ route('grading-goods.export', [
+                        'month' => request('month'),
+                        'year' => request('year'),
+                        'supplier_name' => request('supplier_name'),
+                        'grading_date' => request('grading_date'),
+                    ]) }}"
                         class="flex items-center text-sm text-gray-600 hover:text-gray-800 bg-green-50 hover:bg-green-100 px-3 py-2 rounded-md border border-green-200">
                         <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
                             <path
@@ -35,17 +40,39 @@
 
             <!-- Filter Section -->
             <div class="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-6">
-                <form method="GET" action="{{ route('grading-goods.index') }}"
-                    class="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
-                    <div class="flex flex-col sm:flex-row gap-4">
+                <form method="GET" action="{{ route('grading-goods.index') }}" class="flex flex-col gap-4">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <!-- Filter Supplier -->
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Supplier</label>
+                            <select name="supplier_name"
+                                class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <option value="">Semua Supplier</option>
+                                @foreach ($suppliers as $supplier)
+                                    <option value="{{ $supplier->name }}"
+                                        {{ request('supplier_name') == $supplier->name ? 'selected' : '' }}>
+                                        {{ $supplier->name }}
+                                    </option>
+                                @endforeach
+                            </select>
+                        </div>
+
+                        <!-- Filter Tanggal Grading -->
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Tanggal Grading</label>
+                            <input type="date" name="grading_date" value="{{ request('grading_date') }}"
+                                class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+
                         <!-- Filter Bulan -->
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-1">Bulan</label>
                             <select name="month"
-                                class="border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
                                 <option value="">Semua Bulan</option>
                                 @for ($i = 1; $i <= 12; $i++)
-                                    <option value="{{ sprintf('%02d', $i) }}" {{ request('month') == sprintf('%02d', $i) ? 'selected' : '' }}>
+                                    <option value="{{ sprintf('%02d', $i) }}"
+                                        {{ request('month') == sprintf('%02d', $i) ? 'selected' : '' }}>
                                         {{ date('F', mktime(0, 0, 0, $i, 1)) }}
                                     </option>
                                 @endfor
@@ -56,7 +83,7 @@
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-1">Tahun</label>
                             <select name="year"
-                                class="border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
                                 <option value="">Semua Tahun</option>
                                 @for ($year = date('Y'); $year >= 2020; $year--)
                                     <option value="{{ $year }}" {{ request('year') == $year ? 'selected' : '' }}>
@@ -134,12 +161,14 @@
                                     <td class="px-6 py-4 text-sm">
                                         @if ($difference < 0)
                                             <div class="flex flex-col">
-                                                <span class="text-red-600 font-semibold font-mono">{{ number_format($difference, 0, ',', '.') }}</span>
+                                                <span
+                                                    class="text-red-600 font-semibold font-mono">{{ number_format($difference, 0, ',', '.') }}</span>
                                                 <span class="text-xs text-red-500">(susut)</span>
                                             </div>
                                         @elseif($difference > 0)
                                             <div class="flex flex-col">
-                                                <span class="text-green-600 font-semibold font-mono">+{{ number_format($difference, 0, ',', '.') }}</span>
+                                                <span
+                                                    class="text-green-600 font-semibold font-mono">+{{ number_format($difference, 0, ',', '.') }}</span>
                                                 <span class="text-xs text-green-500">(kelebihan)</span>
                                             </div>
                                         @else
@@ -151,13 +180,15 @@
                                     </td>
                                     <td class="px-6 py-4 text-sm">
                                         @php
-                                            $percentageFormatted = ($percentage == floor($percentage))
-                                                ? number_format($percentage, 0, ',', '.')
-                                                : number_format($percentage, 1, ',', '.');
-                                            
+                                            $percentageFormatted =
+                                                $percentage == floor($percentage)
+                                                    ? number_format($percentage, 0, ',', '.')
+                                                    : number_format($percentage, 1, ',', '.');
+
                                             $percentageClass = 'text-gray-600';
                                             if ($percentage > 5) {
-                                                $percentageClass = 'text-red-600 font-bold bg-red-50 px-1 py-0.5 rounded';
+                                                $percentageClass =
+                                                    'text-red-600 font-bold bg-red-50 px-1 py-0.5 rounded';
                                             } elseif ($percentage > 1) {
                                                 $percentageClass = 'text-orange-600 font-semibold';
                                             } elseif ($percentage > 0) {
@@ -166,7 +197,9 @@
                                         @endphp
                                         <span class="{{ $percentageClass }} font-semibold">
                                             {{ $percentageFormatted }}%
-                                            @if($percentage > 5) ⚠️ @endif
+                                            @if ($percentage > 5)
+                                                ⚠️
+                                            @endif
                                         </span>
                                     </td>
                                     <td class="px-6 py-4 text-sm text-gray-900">
@@ -184,7 +217,7 @@
                             @empty
                                 <tr>
                                     <td colspan="10" class="px-6 py-12 text-center text-gray-500">
-                                        @if(request('month') || request('year'))
+                                        @if (request('month') || request('year'))
                                             Tidak ada data grading untuk filter yang dipilih.
                                         @else
                                             Belum ada data grading barang.
