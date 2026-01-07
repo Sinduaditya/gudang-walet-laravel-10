@@ -17,19 +17,6 @@ class GradeCompany extends Model
         'description'
     ];
 
-    public function getImageUrlAttribute($value)
-    {
-        if (!$value) {
-            return null;
-        }
-
-        if (str_starts_with($value, 'http://') || str_starts_with($value, 'https://')) {
-            return $value;
-        }
-
-        return asset('storage/' . $value);
-    }
-
     public function sortingResults()
     {
         return $this->hasMany(SortingResult::class);

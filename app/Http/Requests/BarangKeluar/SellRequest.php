@@ -25,6 +25,7 @@ class SellRequest extends FormRequest
             'grade_company_id' => 'required|exists:sorting_results,id',
             'location_id' => 'required|exists:locations,id',
             'weight_grams' => 'required|numeric|min:0.01',
+            'transaction_date' => 'required|date',
             // 'price' => 'required|numeric|min:0',
         ];
     }
@@ -44,6 +45,8 @@ class SellRequest extends FormRequest
             'weight_grams.required' => 'Berat wajib diisi',
             'weight_grams.numeric' => 'Berat harus berupa angka',
             'weight_grams.min' => 'Berat minimal 0.01 gram',
+            'transaction_date.required' => 'Tanggal transaksi wajib diisi',
+            'transaction_date.date' => 'Format tanggal tidak valid',
             // 'price.required' => 'Harga wajib diisi',
             // 'price.numeric' => 'Harga harus berupa angka',
             // 'price.min' => 'Harga tidak boleh negatif',

@@ -29,12 +29,35 @@ class GradeCompanyService
 
     public function create(array $data)
     {
+        $image = $data['image_url'] ?? null;
+        if ($image instanceof \Illuminate\Http\UploadedFile) {
+            $data['image_url'] = $image->store('grade-company', 'public');
+        } elseif (isset($data['image']) && $data['image'] instanceof \Illuminate\Http\UploadedFile) {
+            $data['image_url'] = $data['image']->store('grade-company', 'public');
+        }
+
         return GradeCompany::create($data);
     }
 
     public function update(int $id, array $data)
     {
         $gradeCompany = $this->getById($id);
+
+        $image = $data['image_url'] ?? ($data['image'] ?? null);
+
+        if ($image instanceof \Illuminate\Http\UploadedFile) {
+            if ($gradeCompany->image_url && Storage::disk('public')->exists($gradeCompany->image_url)) {
+                Storage::disk('public')->delete($gradeCompany->image_url);
+            }
+            $data['image_url'] = $image->store('grade-company', 'public');
+        } else {
+            if (!array_key_exists('image_url', $data) && !array_key_exists('image', $data)) {
+                // do nothing
+            } else {
+                unset($data['image_url']);
+            }
+        }
+
         $gradeCompany->update($data);
         return $gradeCompany;
     }
@@ -51,7 +74,8 @@ class GradeCompanyService
         return true;
     }
 
-    public function exportToExcel(){
+    public function exportToExcel()
+    {
         return Excel::download(new GradeCompanyExport, 'grade-company-' . date('Y-m-d') . '.xlsx');
     }
 }

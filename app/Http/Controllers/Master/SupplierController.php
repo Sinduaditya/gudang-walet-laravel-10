@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Master;
 
 use App\Http\Controllers\Controller;
 use App\Services\Supplier\SupplierService;
+use App\Http\Requests\Supplier\SupplierRequest;
 use Illuminate\Http\Request;
 
 class SupplierController extends Controller
@@ -36,7 +37,7 @@ class SupplierController extends Controller
         return view('admin.suppliers.create');
     }
 
-    public function store(Request $request)
+    public function store(SupplierRequest $request)
     {
         $supplier = $this->supplierService->create($request->all());
         return redirect()->route('suppliers.index')->with('success', 'Data supplier berhasil ditambahkan');
@@ -48,7 +49,7 @@ class SupplierController extends Controller
         return view('admin.suppliers.edit', compact('supplier'));
     }
 
-    public function update(Request $request, $id)
+    public function update(SupplierRequest $request, $id)
     {
         $this->supplierService->update($id, $request->all());
         return redirect()->route('suppliers.index')->with('success', 'Data supplier berhasil diperbarui');

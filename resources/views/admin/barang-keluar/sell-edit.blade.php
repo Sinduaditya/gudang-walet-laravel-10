@@ -48,10 +48,9 @@
                         {{-- Date --}}
                         <div>
                             <label class="block font-semibold text-gray-700 mb-2">Tanggal Penjualan</label>
-                            <input type="date" name="transaction_date" disabled
-                                value="{{ \Carbon\Carbon::parse($tx->transaction_date)->format('Y-m-d') }}"
-                                class="w-full border border-gray-300 rounded-lg p-3 bg-gray-100 text-gray-500">
-                             <p class="mt-1 text-xs text-gray-500">Tanggal tidak dapat diubah saat edit.</p>
+                            <input type="date" name="transaction_date"
+                                value="{{ old('transaction_date', \Carbon\Carbon::parse($tx->transaction_date)->format('Y-m-d')) }}"
+                                class="w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                         </div>
                     </div>
 

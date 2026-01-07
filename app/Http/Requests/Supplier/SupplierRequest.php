@@ -22,7 +22,7 @@ class SupplierRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'name' => 'required|string|max:255',
+            'name' => 'required|string|max:255|unique:suppliers,name,' . $this->route('supplier'),
             'address' => 'nullable|string',
             'contact_person' => 'nullable|string|max:255',
         ];
@@ -40,6 +40,7 @@ class SupplierRequest extends FormRequest
             'address.string' => 'Alamat harus berupa teks.',
             'contact_person.string' => 'Nama kontak harus berupa teks.',
             'contact_person.max' => 'Nama kontak maksimal 255 karakter.',
+            'name.unique' => 'Nama supplier sudah ada. Harap gunakan nama lain.',
         ];
     }
 }

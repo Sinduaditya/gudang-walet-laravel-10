@@ -27,7 +27,8 @@ class GradeCompanyController extends Controller
         return view('admin.grade-company.index', compact('gradeCompany', 'search'));
     }
 
-    public function export(){
+    public function export()
+    {
         try {
             return $this->GradeCompanyService->exportToExcel();
         } catch (\Exception $e) {
@@ -42,14 +43,7 @@ class GradeCompanyController extends Controller
 
     public function store(GradeCompanyRequest $request)
     {
-        $data = $request->validated();
-
-        if ($request->hasFile('image_url')) {
-            $path = $request->file('image_url')->store('grade-company', 'public');
-            $data['image_url'] = $path;
-        }
-
-        $this->GradeCompanyService->create($data);
+        $this->GradeCompanyService->create($request->validated());
         return redirect()->route('grade-company.index')->with('success', 'Grade company berhasil ditambahkan.');
     }
 
@@ -61,19 +55,7 @@ class GradeCompanyController extends Controller
 
     public function update(GradeCompanyRequest $request, int $id)
     {
-        $data = $request->validated();
-        $gradeCompany = $this->GradeCompanyService->getById($id);
-
-        if ($request->hasFile('image_url')) {
-            if ($gradeCompany->image_url && Storage::disk('public')->exists($gradeCompany->image_url)) {
-                Storage::disk('public')->delete($gradeCompany->image_url);
-            }
-
-            $path = $request->file('image_url')->store('grade-company', 'public');
-            $data['image_url'] = $path;
-        }
-
-        $this->GradeCompanyService->update($id, $data);
+        $this->GradeCompanyService->update($id, $request->validated());
         return redirect()->route('grade-company.index')->with('success', 'Grade company berhasil diperbarui.');
     }
 

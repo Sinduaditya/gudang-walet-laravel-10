@@ -14,7 +14,7 @@ class GradeSupplierService
         if ($search) {
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('description', 'like', "%{$search}%");
+                    ->orWhere('description', 'like', "%{$search}%");
             });
         }
 
@@ -28,8 +28,14 @@ class GradeSupplierService
 
     public function create(array $data)
     {
-        if (isset($data['image_url'])) {
-            $data['image_url'] = $data['image_url']->store('grade-suppliers', 'public');
+        // Perbaikan: gunakan key yang sesuai dari request (bisa 'image_url' atau 'image')
+        // controller menggunakan $request->validated() yang mengembalikan array
+
+        $image = $data['image_url'] ?? null;
+        if ($image instanceof \Illuminate\Http\UploadedFile) {
+            $data['image_url'] = $image->store('grade-suppliers', 'public');
+        } elseif (isset($data['image']) && $data['image'] instanceof \Illuminate\Http\UploadedFile) {
+            $data['image_url'] = $data['image']->store('grade-suppliers', 'public');
         }
 
         return GradeSupplier::create($data);
@@ -39,14 +45,25 @@ class GradeSupplierService
     {
         $grade = GradeSupplier::findOrFail($id);
 
-        if (isset($data['image_url'])) {
+        $image = $data['image_url'] ?? ($data['image'] ?? null);
+
+        if ($image instanceof \Illuminate\Http\UploadedFile) {
             // Hapus gambar lama
             if ($grade->image_url && Storage::disk('public')->exists($grade->image_url)) {
                 Storage::disk('public')->delete($grade->image_url);
             }
 
             // Simpan gambar baru
-            $data['image_url'] = $data['image_url']->store('grade-suppliers', 'public');
+            $data['image_url'] = $image->store('grade-suppliers', 'public');
+        } else {
+            // Jika tidak ada gambar baru, jangan overwrite field image_url dengan null/string path
+            // Hapus dari array update agar tidak menimpa data lama dengan null jika tidak dikirim
+            if (!array_key_exists('image_url', $data) && !array_key_exists('image', $data)) {
+                // do nothing
+            } else {
+                // jika dikirim tapi null/bukan file (kecuali kita mau fitur hapus gambar), sebaiknya unset
+                unset($data['image_url']);
+            }
         }
 
         $grade->update($data);

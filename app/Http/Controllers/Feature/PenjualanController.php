@@ -37,7 +37,7 @@ class PenjualanController extends Controller
         $gradesWithStock = $gradingSources->map(function ($source) use ($defaultLocation) {
             // Calculate remaining stock for this specific batch
             $batchRemaining = $this->service->getBatchRemainingStock($source->id, $defaultLocation->id);
-            
+
             return [
                 'id' => $source->id, // Use SortingResult ID
                 'name' => $source->gradeCompany->name ?? 'Unknown',
@@ -89,8 +89,8 @@ class PenjualanController extends Controller
         $penjualanTransactions = $query->paginate(10)->withQueryString();
 
         return view('admin.barang-keluar.sell', compact(
-            'gradesWithStock', 
-            'penjualanTransactions', 
+            'gradesWithStock',
+            'penjualanTransactions',
             'defaultLocation',
             'suppliers',
             'grades',
@@ -102,7 +102,7 @@ class PenjualanController extends Controller
     {
         // This is now checking BATCH stock because grade_company_id param is actually sorting_result_id
         $sortingResultId = (int) $request->query('grade_company_id');
-        
+
         if (!$sortingResultId) {
             return response()->json(['ok' => false, 'message' => 'Batch required'], 400);
         }
@@ -120,9 +120,9 @@ class PenjualanController extends Controller
     public function sell(SellRequest $request)
     {
         $defaultLocation = Location::where('name', 'Gudang Utama')->first();
-        
+
         $data = $request->validated();
-        
+
         // Resolve SortingResult and GradeCompany
         $sortingResult = \App\Models\SortingResult::findOrFail($data['grade_company_id']);
         $data['sorting_result_id'] = $sortingResult->id;
@@ -131,7 +131,7 @@ class PenjualanController extends Controller
 
         // Check BATCH stock
         $batchRemaining = $this->service->getBatchRemainingStock($data['sorting_result_id'], $data['location_id']);
-        
+
         if ($batchRemaining < $data['weight_grams']) {
             return redirect()->back()
                 ->withInput()
@@ -153,8 +153,15 @@ class PenjualanController extends Controller
     public function update(\Illuminate\Http\Request $request, $id)
     {
         $tx = InventoryTransaction::findOrFail($id);
-        $request->validate(['weight_grams' => 'required|numeric|min:0.01']);
-        $tx->update(['quantity_change_grams' => -abs($request->input('weight_grams'))]);
+        $request->validate([
+            'weight_grams' => 'required|numeric|min:0.01',
+            'transaction_date' => 'required|date',
+        ]);
+
+        $tx->update([
+            'quantity_change_grams' => -abs($request->input('weight_grams')),
+            'transaction_date' => $request->input('transaction_date'),
+        ]);
         return redirect()->route('barang.keluar.sell.form')->with('success', 'Transaksi diperbarui.');
     }
 

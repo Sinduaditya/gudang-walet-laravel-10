@@ -86,49 +86,25 @@
                 </div>
             </div>
 
-            {{-- Success/Error Messages --}}
-            @if(session('success'))
-                <div id="alert-success" class="mb-4 bg-green-50 border-l-4 border-green-400 p-4 rounded-r-md">
-                    <div class="flex">
-                        <div class="flex-shrink-0">
-                            <svg class="h-5 w-5 text-green-400" fill="currentColor" viewBox="0 0 20 20">
-                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
-                            </svg>
-                        </div>
-                        <div class="ml-3">
-                            <p class="text-sm text-green-700 font-medium">{{ session('success') }}</p>
-                        </div>
-                    </div>
-                </div>
-            @endif
-
-            @if(session('error'))
-                <div id="alert-error" class="mb-4 bg-red-50 border-l-4 border-red-400 p-4 rounded-r-md">
-                    <div class="flex">
-                        <div class="flex-shrink-0">
-                            <svg class="h-5 w-5 text-red-400" fill="currentColor" viewBox="0 0 20 20">
-                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/>
-                            </svg>
-                        </div>
-                        <div class="ml-3">
-                            <p class="text-sm text-red-700 font-medium">{{ session('error') }}</p>
-                        </div>
-                    </div>
-                </div>
-            @endif
-
             <!-- Table -->
             <div class="bg-white border border-gray-200 rounded-lg overflow-hidden">
                 <div class="overflow-x-auto">
                     <table class="min-w-full divide-y divide-gray-200" id="gradeCompanyTable">
                         <thead class="bg-gray-50">
                             <tr>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">No</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nama Grade</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Gambar</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Deskripsi</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tanggal Dibuat</th>
-                                <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Aksi</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    No</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Nama Grade</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Gambar</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Deskripsi</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Tanggal Dibuat</th>
+                                <th
+                                    class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Aksi</th>
                             </tr>
                         </thead>
                         <tbody class="bg-white divide-y divide-gray-200">
@@ -141,26 +117,23 @@
                                         {{ $grade->name }}
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap">
-                                        @if($grade->image_url)
-                                            @if(Str::startsWith($grade->image_url, ['http://', 'https://']))
-                                                <img src="{{ $grade->image_url }}"
-                                                    alt="{{ $grade->name }}"
-                                                    class="w-12 h-12 object-cover rounded-lg border border-gray-200">
-                                            @else
-                                                <img src="{{ asset('storage/' . $grade->image_url) }}"
-                                                    alt="{{ $grade->name }}"
-                                                    class="w-12 h-12 object-cover rounded-lg border border-gray-200">
-                                            @endif
+                                        @if ($grade->image_url)
+                                            <img src="{{ asset('storage/' . $grade->image_url) }}" alt="{{ $grade->name }}"
+                                                class="w-12 h-12 object-cover rounded-lg border border-gray-200 cursor-pointer hover:opacity-75 transition"
+                                                onclick="window.open(this.src, '_blank')">
                                         @else
-                                            <div class="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center border border-gray-200">
-                                                <svg class="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                                            <div
+                                                class="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center border border-gray-200">
+                                                <svg class="w-6 h-6 text-gray-400" fill="none" stroke="currentColor"
+                                                    viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                        d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                                                 </svg>
                                             </div>
                                         @endif
                                     </td>
                                     <td class="px-6 py-4 text-sm text-gray-600 max-w-xs">
-                                        @if($grade->description)
+                                        @if ($grade->description)
                                             <span class="truncate block" title="{{ $grade->description }}">
                                                 {{ Str::limit($grade->description, 50) }}
                                             </span>
@@ -174,11 +147,11 @@
                                     <td class="px-6 py-4 whitespace-nowrap text-center text-sm">
                                         <div class="flex items-center justify-center space-x-2">
                                             <a href="{{ route('grade-company.edit', $grade->id) }}"
-                                               class="inline-flex items-center px-3 py-1 bg-blue-100 text-blue-600 rounded hover:bg-blue-200 transition duration-200">
+                                                class="inline-flex items-center px-3 py-1 bg-blue-100 text-blue-600 rounded hover:bg-blue-200 transition duration-200">
                                                 Edit
                                             </a>
                                             <button onclick="confirmDelete({{ $grade->id }}, '{{ $grade->name }}')"
-                                                    class="inline-flex items-center px-3 py-1 bg-red-100 text-red-600 rounded hover:bg-red-200 transition duration-200">
+                                                class="inline-flex items-center px-3 py-1 bg-red-100 text-red-600 rounded hover:bg-red-200 transition duration-200">
                                                 Hapus
                                             </button>
                                         </div>
@@ -187,8 +160,9 @@
                             @empty
                                 <tr>
                                     <td colspan="6" class="px-6 py-12 text-center text-sm text-gray-500">
-                                        @if(request('search'))
-                                            Tidak ada data Grade Company yang sesuai dengan pencarian "{{ request('search') }}".
+                                        @if (request('search'))
+                                            Tidak ada data Grade Company yang sesuai dengan pencarian
+                                            "{{ request('search') }}".
                                         @else
                                             Belum ada data Grade Company.
                                         @endif
@@ -200,11 +174,12 @@
                 </div>
 
                 {{-- Enhanced Pagination --}}
-                @if($gradeCompany->hasPages())
+                @if ($gradeCompany->hasPages())
                     <div class="bg-white px-6 py-4 border-t border-gray-200">
                         <div class="flex items-center justify-between">
                             <div class="text-sm text-gray-700">
-                                Showing {{ $gradeCompany->firstItem() }}-{{ $gradeCompany->lastItem() }} of {{ $gradeCompany->total() }} results
+                                Showing {{ $gradeCompany->firstItem() }}-{{ $gradeCompany->lastItem() }} of
+                                {{ $gradeCompany->total() }} results
                             </div>
                             <div>
                                 {{ $gradeCompany->appends(request()->query())->links() }}
@@ -228,19 +203,19 @@
                 </div>
                 <h3 class="text-lg font-medium text-gray-900 mt-4">Hapus Grade Company</h3>
                 <p class="text-sm text-gray-500 mt-2">
-                    Apakah Anda yakin ingin menghapus grade company 
-                    <span id="gradeName" class="font-semibold text-gray-900"></span>? 
+                    Apakah Anda yakin ingin menghapus grade company
+                    <span id="gradeName" class="font-semibold text-gray-900"></span>?
                     <span class="font-semibold text-gray-900">Tindakan ini tidak dapat dibatalkan.</span>
                 </p>
                 <form id="deleteForm" method="POST" class="mt-6">
                     @csrf
                     @method('DELETE')
                     <div class="flex gap-3 justify-center">
-                        <button type="button" onclick="closeDeleteModal()" 
+                        <button type="button" onclick="closeDeleteModal()"
                             class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-md text-sm font-medium transition duration-200">
                             Batal
                         </button>
-                        <button type="submit" 
+                        <button type="submit"
                             class="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-md text-sm font-medium transition duration-200">
                             Hapus
                         </button>
@@ -251,37 +226,37 @@
     </div>
 
     @push('scripts')
-    <script>
-        // Modal delete
-        function confirmDelete(id, name) {
-            const baseUrl = `{{ route('grade-company.destroy', ':id') }}`;
-            document.getElementById('gradeName').textContent = name;
-            document.getElementById('deleteForm').action = baseUrl.replace(':id', id);
-            document.getElementById('deleteModal').classList.remove('hidden');
-        }
-
-        function closeDeleteModal() {
-            document.getElementById('deleteModal').classList.add('hidden');
-        }
-
-        // Close modal when clicking outside
-        document.getElementById('deleteModal')?.addEventListener('click', function(event) {
-            if (event.target === this) {
-                closeDeleteModal();
+        <script>
+            // Modal delete
+            function confirmDelete(id, name) {
+                const baseUrl = `{{ route('grade-company.destroy', ':id') }}`;
+                document.getElementById('gradeName').textContent = name;
+                document.getElementById('deleteForm').action = baseUrl.replace(':id', id);
+                document.getElementById('deleteModal').classList.remove('hidden');
             }
-        });
 
-        // Auto hide alerts after 5 seconds
-        setTimeout(() => {
-            const alerts = document.querySelectorAll('[id^="alert-"]');
-            alerts.forEach(alert => {
-                if (alert) {
-                    alert.style.transition = 'opacity 0.5s ease-out';
-                    alert.style.opacity = '0';
-                    setTimeout(() => alert.remove(), 500);
+            function closeDeleteModal() {
+                document.getElementById('deleteModal').classList.add('hidden');
+            }
+
+            // Close modal when clicking outside
+            document.getElementById('deleteModal')?.addEventListener('click', function(event) {
+                if (event.target === this) {
+                    closeDeleteModal();
                 }
             });
-        }, 5000);
-    </script>
+
+            // Auto hide alerts after 5 seconds
+            setTimeout(() => {
+                const alerts = document.querySelectorAll('[id^="alert-"]');
+                alerts.forEach(alert => {
+                    if (alert) {
+                        alert.style.transition = 'opacity 0.5s ease-out';
+                        alert.style.opacity = '0';
+                        setTimeout(() => alert.remove(), 500);
+                    }
+                });
+            }, 5000);
+        </script>
     @endpush
 @endsection
