@@ -308,9 +308,16 @@
                 // Display x 1000 (likely per Kg)
                 recommendationDisplay.textContent = formatCurrency(recommendation * 1000);
 
-                // Calculate Estimated IDM Selling Price
-                // Formula: (Harga Jual IDM + Kenaikan Harga)
-                const estimatedIdmPrice = Math.ceil(pIdm + recommendation);
+                // Calculate Estimated IDM Selling Price (Break Even Price)
+                // Formula: (Total Cost - (Perut Sales + Kaki Sales)) / IDM Weight
+                let estimatedIdmPrice = 0;
+                if (wIdm > 0) {
+                    const otherSales = (wPerut * pPerut) + (wKakian * pKakian);
+                    estimatedIdmPrice = (totalInitialCost - otherSales) / wIdm;
+                }
+
+                // Ensure estimated price is not negative
+                estimatedIdmPrice = Math.max(0, estimatedIdmPrice);
                 estimatedPriceInput.value = estimatedIdmPrice;
                 estimatedPriceDisplay.value = formatCurrency(estimatedIdmPrice);
             }

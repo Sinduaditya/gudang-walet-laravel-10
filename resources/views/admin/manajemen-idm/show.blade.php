@@ -95,10 +95,10 @@
                                             {{ number_format($detail->weight, 2) }}
                                         </td>
                                         <td class="px-4 py-3 font-mono text-gray-700">
-                                            Rp {{ number_format($detail->price, 0, ',', '.') }}
+                                            Rp {{ number_format($detail->price, 2, ',', '.') }}
                                         </td>
                                         <td class="px-4 py-3 font-mono font-semibold text-gray-900">
-                                            Rp {{ number_format($detail->total_price, 0, ',', '.') }}
+                                            Rp {{ number_format($detail->total_price, 2, ',', '.') }}
                                         </td>
                                     </tr>
                                 @endforeach
@@ -121,7 +121,7 @@
                             <div>
                                 <div class="text-sm text-green-600 font-medium">Total Estimasi Harga Jual per Gram</div>
                                 <div class="text-2xl font-bold text-green-900">
-                                    Rp {{ number_format($idmManagement->estimated_selling_price, 0, ',', '.') }}
+                                    Rp {{ number_format($idmManagement->estimated_selling_price, 2, ',', '.') }}
                                 </div>
                             </div>
                         </div>
@@ -138,7 +138,8 @@
                                 <div class="text-2xl font-bold text-blue-900">
                                     @php
                                         $totalInitialCost = $idmManagement->initial_weight * $idmManagement->initial_price;
-                                        $profit = max(0, $idmManagement->estimated_selling_price - $totalInitialCost);
+                                        $totalSales = $idmManagement->details->sum('total_price');
+                                        $profit = $totalSales - $totalInitialCost;
                                     @endphp
                                     Rp {{ number_format($profit, 0, ',', '.') }}
                                 </div>
