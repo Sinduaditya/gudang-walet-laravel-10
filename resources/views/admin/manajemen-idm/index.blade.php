@@ -124,7 +124,7 @@
                                         {{ number_format($item->shrinkage ?? 0, 2) }} gr
                                     </td>
                                     <td class="px-6 py-4 text-sm text-gray-900 font-mono">
-                                        Rp {{ number_format($item->estimated_selling_price ?? 0, 0, ',', '.') }}
+                                        Rp {{ number_format($item->estimated_selling_price ?? 0, 2, ',', '.') }}
                                     </td>
                                     <td class="px-6 py-4 text-sm text-gray-900">
                                         <div class="flex items-center gap-2">

@@ -310,7 +310,11 @@
 
                 // Calculate Estimated IDM Selling Price
                 // Formula: (Harga Jual IDM + Kenaikan Harga)
-                const estimatedIdmPrice = Math.ceil(pIdm + recommendation);
+                const estimatedIdmPrice = pIdm + recommendation;
+
+                // Ensure estimated price is not negative
+                // estimatedIdmPrice = Math.max(0, estimatedIdmPrice); // pIdm + recommendation is always >= break even
+                
                 estimatedPriceInput.value = estimatedIdmPrice;
                 estimatedPriceDisplay.value = formatCurrency(estimatedIdmPrice);
             }
