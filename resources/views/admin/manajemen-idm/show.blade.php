@@ -35,7 +35,8 @@
                     </div>
                     <div>
                         <p class="text-sm text-gray-500 font-medium">Kategori IDM</p>
-                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-sm font-medium {{ ($idmManagement->sourceItems->first()->category_grade ?? '') == 'IDM A' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800' }}">
+                        <span
+                            class="inline-flex items-center px-2.5 py-0.5 rounded-full text-sm font-medium {{ ($idmManagement->sourceItems->first()->category_grade ?? '') == 'IDM A' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800' }}">
                             {{ $idmManagement->sourceItems->first()->category_grade ?? '-' }}
                         </span>
                     </div>
@@ -115,8 +116,10 @@
                     <!-- Total Estimasi Harga Jual -->
                     <div class="bg-gradient-to-r from-green-50 to-green-100 p-4 rounded-lg border border-green-200">
                         <div class="flex items-center">
-                            <svg class="w-8 h-8 text-green-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            <svg class="w-8 h-8 text-green-600 mr-3" fill="none" stroke="currentColor"
+                                viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
                             <div>
                                 <div class="text-sm text-green-600 font-medium">Total Estimasi Harga Jual per Gram</div>
@@ -130,18 +133,21 @@
                     <!-- Keuntungan -->
                     <div class="bg-gradient-to-r from-blue-50 to-blue-100 p-4 rounded-lg border border-blue-200">
                         <div class="flex items-center">
-                            <svg class="w-8 h-8 text-blue-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                            <svg class="w-8 h-8 text-blue-600 mr-3" fill="none" stroke="currentColor"
+                                viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
                             </svg>
                             <div>
                                 <div class="text-sm text-blue-600 font-medium">Keuntungan</div>
                                 <div class="text-2xl font-bold text-blue-900">
                                     @php
-                                        $totalInitialCost = $idmManagement->initial_weight * $idmManagement->initial_price;
+                                        $totalInitialCost =
+                                            $idmManagement->initial_weight * $idmManagement->initial_price;
                                         $totalSales = $idmManagement->details->sum('total_price');
                                         $profit = $totalSales - $totalInitialCost;
                                     @endphp
-                                    Rp {{ number_format($profit, 0, ',', '.') }}
+                                    Rp {{ number_format($profit, 2, ',', '.') }}
                                 </div>
                             </div>
                         </div>

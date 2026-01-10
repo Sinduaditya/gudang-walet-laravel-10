@@ -21,23 +21,28 @@
             <div class="mb-8 bg-white rounded-lg shadow-sm border p-6">
                 <div class="flex items-center justify-between max-w-2xl mx-auto">
                     <div class="flex flex-col items-center flex-1">
-                        <div class="w-10 h-10 flex items-center justify-center rounded-full bg-green-100 text-green-600 font-semibold text-sm">
+                        <div
+                            class="w-10 h-10 flex items-center justify-center rounded-full bg-green-100 text-green-600 font-semibold text-sm">
                             <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                                <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+                                <path fill-rule="evenodd"
+                                    d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                                    clip-rule="evenodd" />
                             </svg>
                         </div>
                         <span class="mt-2 text-xs sm:text-sm font-medium text-green-600">Pilih Item</span>
                     </div>
                     <div class="flex-1 h-0.5 bg-blue-200 mx-2 sm:mx-4 -mt-6"></div>
                     <div class="flex flex-col items-center flex-1">
-                        <div class="w-10 h-10 flex items-center justify-center rounded-full bg-blue-500 text-white font-semibold text-sm shadow-sm">
+                        <div
+                            class="w-10 h-10 flex items-center justify-center rounded-full bg-blue-500 text-white font-semibold text-sm shadow-sm">
                             2
                         </div>
                         <span class="mt-2 text-xs sm:text-sm font-medium text-blue-600">Masukkan Harga</span>
                     </div>
                     <div class="flex-1 h-0.5 bg-gray-200 mx-2 sm:mx-4 -mt-6"></div>
                     <div class="flex flex-col items-center flex-1">
-                        <div class="w-10 h-10 flex items-center justify-center rounded-full bg-gray-100 text-gray-400 font-semibold text-sm">
+                        <div
+                            class="w-10 h-10 flex items-center justify-center rounded-full bg-gray-100 text-gray-400 font-semibold text-sm">
                             3
                         </div>
                         <span class="mt-2 text-xs sm:text-sm font-medium text-gray-400">Konfirmasi</span>
@@ -50,30 +55,35 @@
                 <dl class="grid grid-cols-1 md:grid-cols-4 gap-4">
                     <div>
                         <dt class="text-sm font-medium text-gray-500">Grade</dt>
-                        <dd class="mt-1 text-sm text-gray-900 font-semibold">{{ $firstItem->gradeCompany->name ?? '-' }}</dd>
+                        <dd class="mt-1 text-sm text-gray-900 font-semibold">{{ $firstItem->gradeCompany->name ?? '-' }}
+                        </dd>
                     </div>
                     <div>
                         <dt class="text-sm font-medium text-gray-500">Kategori IDM</dt>
                         <dd class="mt-1">
-                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {{ ($firstItem->category_grade ?? '') == 'IDM A' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800' }}">
+                            <span
+                                class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {{ ($firstItem->category_grade ?? '') == 'IDM A' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800' }}">
                                 {{ $firstItem->category_grade ?? '-' }}
                             </span>
                         </dd>
                     </div>
                     <div>
                         <dt class="text-sm font-medium text-gray-500">Supplier</dt>
-                        <dd class="mt-1 text-sm text-gray-900">{{ $firstItem->receiptItem->purchaseReceipt->supplier->name ?? '-' }}</dd>
+                        <dd class="mt-1 text-sm text-gray-900">
+                            {{ $firstItem->receiptItem->purchaseReceipt->supplier->name ?? '-' }}</dd>
                     </div>
                     <div>
                         <dt class="text-sm font-medium text-gray-500">Tanggal Grading</dt>
-                        <dd class="mt-1 text-sm text-gray-900">{{ $firstItem->grading_date ? \Carbon\Carbon::parse($firstItem->grading_date)->format('d/m/Y') : '-' }}</dd>
+                        <dd class="mt-1 text-sm text-gray-900">
+                            {{ $firstItem->grading_date ? \Carbon\Carbon::parse($firstItem->grading_date)->format('d/m/Y') : '-' }}
+                        </dd>
                     </div>
                 </dl>
             </div>
 
             <form action="{{ route('manajemen-idm.store-step2') }}" method="POST" id="step2Form">
                 @csrf
-                @foreach($itemIds as $id)
+                @foreach ($itemIds as $id)
                     <input type="hidden" name="item_ids[]" value="{{ $id }}">
                 @endforeach
 
@@ -86,9 +96,11 @@
                             <div class="border border-gray-200 rounded-lg p-4">
                                 <div class="grid grid-cols-1 md:grid-cols-4 gap-6 items-center">
                                     <label class="block text-sm font-medium text-gray-700">Berat & Harga Awal</label>
-                                    <input type="number" name="total_weight" id="total_weight" value="{{ $totalWeight }}" readonly placeholder="Berat"
+                                    <input type="number" name="total_weight" id="total_weight" value="{{ $totalWeight }}"
+                                        readonly placeholder="Berat"
                                         class="block w-full rounded-md border-gray-300 bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 text-base py-2.5 px-4">
-                                    <input type="number" name="initial_price" id="initial_price" placeholder="Harga Awal" required
+                                    <input type="number" name="initial_price" id="initial_price" placeholder="Harga Awal"
+                                        required
                                         class="block w-full rounded-md border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 text-base py-2.5 px-4 calc-input">
                                     <input type="text" id="total_initial" placeholder="Total" readonly
                                         class="block w-full rounded-md border-gray-300 bg-gray-100 shadow-sm text-base py-2.5 px-4">
@@ -99,9 +111,11 @@
                             <div class="border border-gray-200 rounded-lg p-4">
                                 <div class="grid grid-cols-1 md:grid-cols-4 gap-6 items-center">
                                     <label class="block text-sm font-medium text-gray-700">Berat Perut</label>
-                                    <input type="number" step="0.01" name="details[perutan][weight]" id="weight_perutan" placeholder="Berat" required
+                                    <input type="number" step="0.01" name="details[perutan][weight]" id="weight_perutan"
+                                        placeholder="Berat" required
                                         class="block w-full rounded-md border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 text-base py-2.5 px-4 calc-input">
-                                    <input type="number" step="0.01" name="details[perutan][price]" id="price_perutan" placeholder="Harga" required
+                                    <input type="number" step="0.01" name="details[perutan][price]" id="price_perutan"
+                                        placeholder="Harga" required
                                         class="block w-full rounded-md border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 text-base py-2.5 px-4 calc-input">
                                     <input type="text" id="total_perutan" placeholder="Total" readonly
                                         class="block w-full rounded-md border-gray-300 bg-gray-100 shadow-sm text-base py-2.5 px-4">
@@ -112,9 +126,11 @@
                             <div class="border border-gray-200 rounded-lg p-4">
                                 <div class="grid grid-cols-1 md:grid-cols-4 gap-6 items-center">
                                     <label class="block text-sm font-medium text-gray-700">Berat Kakian</label>
-                                    <input type="number" step="0.01" name="details[kakian][weight]" id="weight_kakian" placeholder="Berat" required
+                                    <input type="number" step="0.01" name="details[kakian][weight]" id="weight_kakian"
+                                        placeholder="Berat" required
                                         class="block w-full rounded-md border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 text-base py-2.5 px-4 calc-input">
-                                    <input type="number" step="0.01" name="details[kakian][price]" id="price_kakian" placeholder="Harga" required
+                                    <input type="number" step="0.01" name="details[kakian][price]" id="price_kakian"
+                                        placeholder="Harga" required
                                         class="block w-full rounded-md border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 text-base py-2.5 px-4 calc-input">
                                     <input type="text" id="total_kakian" placeholder="Total" readonly
                                         class="block w-full rounded-md border-gray-300 bg-gray-100 shadow-sm text-base py-2.5 px-4">
@@ -125,9 +141,11 @@
                             <div class="border border-gray-200 rounded-lg p-4">
                                 <div class="grid grid-cols-1 md:grid-cols-4 gap-6 items-center">
                                     <label class="block text-sm font-medium text-gray-700">Berat IDM</label>
-                                    <input type="number" step="0.01" name="details[idm][weight]" id="weight_idm" placeholder="Berat" required
+                                    <input type="number" step="0.01" name="details[idm][weight]" id="weight_idm"
+                                        placeholder="Berat" required
                                         class="block w-full rounded-md border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 text-base py-2.5 px-4 calc-input">
-                                    <input type="number" step="0.01" name="details[idm][price]" id="price_idm" placeholder="Harga" required
+                                    <input type="number" step="0.01" name="details[idm][price]" id="price_idm"
+                                        placeholder="Harga" required
                                         class="block w-full rounded-md border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 text-base py-2.5 px-4 calc-input">
                                     <input type="text" id="total_idm" placeholder="Total" readonly
                                         class="block w-full rounded-md border-gray-300 bg-gray-100 shadow-sm text-base py-2.5 px-4">
@@ -139,7 +157,8 @@
                                 <div class="grid grid-cols-1 md:grid-cols-4 gap-6 items-center">
                                     <label class="block text-sm font-medium text-gray-700">Susut (Shrinkage)</label>
                                     <div class="relative rounded-md shadow-sm">
-                                        <input type="number" step="0.01" name="shrinkage" id="shrinkage" placeholder="0" required readonly
+                                        <input type="number" step="0.01" name="shrinkage" id="shrinkage"
+                                            placeholder="0" required readonly
                                             class="block w-full rounded-md border-gray-300 bg-gray-100 pr-10 focus:outline-none focus:ring-2 focus:ring-blue-500 text-base py-2.5 px-4">
                                         <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
                                             <span class="text-gray-500 sm:text-sm">gr</span>
@@ -148,8 +167,8 @@
                                 </div>
                             </div>
 
-                             <!-- Total Harga Jual -->
-                             <div class="grid grid-cols-1 md:grid-cols-2 gap-6 items-center pt-4 border-t">
+                            <!-- Total Harga Jual -->
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 items-center pt-4 border-t">
                                 <label class="block text-sm font-bold text-gray-900">Total Harga Jual</label>
                                 <div>
                                     <input type="text" id="total_selling_price_display" readonly
@@ -157,8 +176,8 @@
                                 </div>
                             </div>
 
-                             <!-- Keuntungan -->
-                             <div class="grid grid-cols-1 md:grid-cols-2 gap-6 items-center pt-4 border-t border-gray-100">
+                            <!-- Keuntungan -->
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 items-center pt-4 border-t border-gray-100">
                                 <label class="block text-sm font-bold text-gray-900">Keuntungan</label>
                                 <div>
                                     <input type="text" id="profit_display" readonly
@@ -180,23 +199,30 @@
 
                                 <div>
                                     <label class="block text-sm font-medium text-gray-500">Rekomendasi Kenaikan</label>
-                                    <div class="mt-1 text-lg font-semibold text-blue-600" id="recommendation_display">Rp 0</div>
+                                    <div class="mt-1 text-lg font-semibold text-blue-600" id="recommendation_display">Rp 0
+                                    </div>
                                 </div>
 
                                 <div class="pt-4 border-t border-gray-200">
-                                    <label class="block text-sm font-medium text-gray-900">Estimasi Harga Jual IDM (per Gram)</label>
+                                    <label class="block text-sm font-medium text-gray-900">Rekomendasi Harga Jual (Target
+                                        BEP)</label>
                                     <input type="hidden" name="estimated_selling_price" id="estimated_selling_price">
-                                    <div class="mt-1 text-2xl font-bold text-green-600" id="estimated_price_display">Rp 0</div>
-                                    <button type="button" onclick="useRecommendedPrice()" class="mt-2 text-sm text-blue-600 hover:text-blue-800 underline focus:outline-none">
+                                    <div class="mt-1 text-2xl font-bold text-green-600" id="estimated_price_display">Rp 0
+                                    </div>
+                                    <p class="mt-2 mb-3 text-xs text-gray-500">Klik tombol di bawah untuk menggunakan harga
+                                        rekomendasi agar mendapat keuntungan.</p>
+
+                                    <button type="button" onclick="useRecommendedPrice()"
+                                        class="w-full flex justify-center py-2 px-4 border border-blue-600 rounded-md shadow-sm text-sm font-medium text-blue-600 bg-white hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors">
                                         Gunakan Harga Rekomendasi
                                     </button>
                                 </div>
-                            </div>
-
-                            <div class="mt-8">
-                                <button type="button" onclick="showConfirmationModal()" class="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                                    Lanjut ke Konfirmasi
-                                </button>
+                                <div class="mt-4"> <!-- Added spacing here -->
+                                    <button type="button" onclick="showConfirmationModal()"
+                                        class="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                                        Lanjut ke Konfirmasi
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -206,16 +232,20 @@
     </div>
 
     <!-- Confirmation Modal -->
-    <div id="confirmationModal" class="fixed inset-0 z-50 hidden overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+    <div id="confirmationModal" class="fixed inset-0 z-50 hidden overflow-y-auto" aria-labelledby="modal-title"
+        role="dialog" aria-modal="true">
         <div class="flex items-center justify-center min-h-screen px-4 text-center">
-            <div class="fixed inset-0 bg-gray-500 bg-opacity-50 transition-opacity" aria-hidden="true" onclick="closeConfirmationModal()"></div>
+            <div class="fixed inset-0 bg-gray-500 bg-opacity-50 transition-opacity" aria-hidden="true"
+                onclick="closeConfirmationModal()"></div>
 
-            <div class="relative inline-block w-full max-w-md overflow-hidden text-left align-middle transition-all transform bg-white shadow-xl rounded-2xl">
+            <div
+                class="relative inline-block w-full max-w-md overflow-hidden text-left align-middle transition-all transform bg-white shadow-xl rounded-2xl">
                 <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
                     <div class="w-full">
                         <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-blue-100">
                             <svg class="h-6 w-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
                         </div>
                         <div class="mt-3 text-center w-full">
@@ -258,10 +288,12 @@
                     </div>
                 </div>
                 <div class="bg-gray-50 px-4 py-3 sm:px-6 flex flex-row justify-between gap-3">
-                    <button type="button" onclick="closeConfirmationModal()" class="w-full inline-flex justify-center rounded-lg border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:w-auto sm:text-sm">
+                    <button type="button" onclick="closeConfirmationModal()"
+                        class="w-full inline-flex justify-center rounded-lg border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:w-auto sm:text-sm">
                         Batal
                     </button>
-                    <button type="button" onclick="submitForm()" class="w-full inline-flex justify-center rounded-lg border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:w-auto sm:text-sm">
+                    <button type="button" onclick="submitForm()"
+                        class="w-full inline-flex justify-center rounded-lg border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:w-auto sm:text-sm">
                         Simpan Data
                     </button>
                 </div>
@@ -270,124 +302,158 @@
     </div>
 
     @push('scripts')
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            const inputs = document.querySelectorAll('.calc-input');
-            const totalWeightInput = document.getElementById('total_weight');
-            const initialPriceInput = document.getElementById('initial_price');
-            const shrinkageInput = document.getElementById('shrinkage');
-            const totalSellingPriceDisplay = document.getElementById('total_selling_price_display');
-            const shortageDisplay = document.getElementById('shortage_display');
-            const recommendationDisplay = document.getElementById('recommendation_display');
-            const estimatedPriceDisplay = document.getElementById('estimated_price_display');
-            const estimatedPriceInput = document.getElementById('estimated_selling_price');
+        <script>
+            document.addEventListener('DOMContentLoaded', function() {
+                const inputs = document.querySelectorAll('.calc-input');
+                const totalWeightInput = document.getElementById('total_weight');
+                const initialPriceInput = document.getElementById('initial_price');
+                const shrinkageInput = document.getElementById('shrinkage');
+                const totalSellingPriceDisplay = document.getElementById('total_selling_price_display');
+                const shortageDisplay = document.getElementById('shortage_display');
+                const recommendationDisplay = document.getElementById('recommendation_display');
+                const estimatedPriceDisplay = document.getElementById('estimated_price_display');
+                const estimatedPriceInput = document.getElementById('estimated_selling_price');
 
-            function formatCurrency(amount) {
-                return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR' }).format(amount);
-            }
-
-            function calculate() {
-                const totalWeight = parseFloat(totalWeightInput.value) || 0;
-                const initialPrice = parseFloat(initialPriceInput.value) || 0;
-
-                // Update Initial Total
-                document.getElementById('total_initial').value = formatCurrency(totalWeight * initialPrice);
-
-                const wPerut = parseFloat(document.getElementById('weight_perutan').value) || 0;
-                const pPerut = parseFloat(document.getElementById('price_perutan').value) || 0;
-
-                const wKakian = parseFloat(document.getElementById('weight_kakian').value) || 0;
-                const pKakian = parseFloat(document.getElementById('price_kakian').value) || 0;
-
-                const wIdm = parseFloat(document.getElementById('weight_idm').value) || 0;
-                const pIdm = parseFloat(document.getElementById('price_idm').value) || 0;
-
-                // Update Row Totals
-                document.getElementById('total_perutan').value = formatCurrency(wPerut * pPerut);
-                document.getElementById('total_kakian').value = formatCurrency(wKakian * pKakian);
-                document.getElementById('total_idm').value = formatCurrency(wIdm * pIdm);
-
-                // Calculate Shrinkage
-                const currentTotalWeight = wPerut + wKakian + wIdm;
-                const shrinkage = totalWeight - currentTotalWeight;
-                shrinkageInput.value = shrinkage.toFixed(2);
-
-                // Calculate Total Selling Price
-                const totalSellingPrice = (wPerut * pPerut) + (wKakian * pKakian) + (wIdm * pIdm);
-                totalSellingPriceDisplay.value = formatCurrency(totalSellingPrice);
-                estimatedPriceInput.value = totalSellingPrice;
-                estimatedPriceDisplay.textContent = formatCurrency(totalSellingPrice);
-
-                // Calculate Shortage (Kekurangan)
-                // Shortage = Total Initial Cost - Total Selling Price
-                const totalInitialCost = totalWeight * initialPrice;
-                const shortage = Math.max(0, totalInitialCost - totalSellingPrice);
-
-                shortageDisplay.textContent = formatCurrency(shortage);
-
-                // Calculate Profit (Keuntungan)
-                // Profit = Total Selling Price - Total Initial Cost
-                const profit = Math.max(0, totalSellingPrice - totalInitialCost);
-                document.getElementById('profit_display').value = formatCurrency(profit);
-
-                // Calculate Recommendation (Kenaikan Harga)
-                // Formula: (Kekurangan) / Berat IDM
-                let recommendation = 0;
-                if (wIdm > 0) {
-                    recommendation = shortage / wIdm;
-                }
-                // Display per Gram
-                recommendationDisplay.textContent = formatCurrency(recommendation);
-
-                // Calculate Estimated IDM Selling Price (Break Even Price)
-                // Formula: (Total Cost - (Perut Sales + Kaki Sales)) / IDM Weight
-                let estimatedIdmPrice = 0;
-                if (wIdm > 0) {
-                    const otherSales = (wPerut * pPerut) + (wKakian * pKakian);
-                    estimatedIdmPrice = (totalInitialCost - otherSales) / wIdm;
+                function formatCurrency(amount) {
+                    return new Intl.NumberFormat('id-ID', {
+                        style: 'currency',
+                        currency: 'IDR'
+                    }).format(amount);
                 }
 
-                // Ensure estimated price is not negative
-                estimatedIdmPrice = Math.max(0, estimatedIdmPrice);
+                function calculate() {
+                    const totalWeight = parseFloat(totalWeightInput.value) || 0;
+                    const initialPrice = parseFloat(initialPriceInput.value) || 0;
 
-                estimatedPriceInput.value = estimatedIdmPrice;
-                estimatedPriceDisplay.textContent = formatCurrency(estimatedIdmPrice);
-            }
+                    // Update Initial Total
+                    document.getElementById('total_initial').value = formatCurrency(totalWeight * initialPrice);
 
-            window.useRecommendedPrice = function() {
-                const estimatedPrice = parseFloat(estimatedPriceInput.value) || 0;
-                if (estimatedPrice > 0) {
-                    document.getElementById('price_idm').value = Math.ceil(estimatedPrice); // Round up to nearest integer
-                    calculate(); // Recalculate to update totals and shortage
+                    const wPerut = parseFloat(document.getElementById('weight_perutan').value) || 0;
+                    const pPerut = parseFloat(document.getElementById('price_perutan').value) || 0;
+
+                    const wKakian = parseFloat(document.getElementById('weight_kakian').value) || 0;
+                    const pKakian = parseFloat(document.getElementById('price_kakian').value) || 0;
+
+                    const wIdm = parseFloat(document.getElementById('weight_idm').value) || 0;
+                    const pIdm = parseFloat(document.getElementById('price_idm').value) || 0;
+
+                    // Update Row Totals
+                    document.getElementById('total_perutan').value = formatCurrency(wPerut * pPerut);
+                    document.getElementById('total_kakian').value = formatCurrency(wKakian * pKakian);
+                    document.getElementById('total_idm').value = formatCurrency(wIdm * pIdm);
+
+                    // Calculate Shrinkage
+                    const currentTotalWeight = wPerut + wKakian + wIdm;
+                    const shrinkage = totalWeight - currentTotalWeight;
+                    shrinkageInput.value = shrinkage.toFixed(2);
+
+                    // Calculate Total Selling Price
+                    const totalSellingPrice = (wPerut * pPerut) + (wKakian * pKakian) + (wIdm * pIdm);
+                    totalSellingPriceDisplay.value = formatCurrency(totalSellingPrice);
+                    estimatedPriceInput.value = totalSellingPrice;
+                    estimatedPriceDisplay.textContent = formatCurrency(totalSellingPrice);
+
+                    // Calculate Shortage (Kekurangan)
+                    // Shortage = Total Initial Cost - Total Selling Price
+                    const totalInitialCost = totalWeight * initialPrice;
+                    const shortage = Math.max(0, totalInitialCost - totalSellingPrice);
+
+                    shortageDisplay.textContent = formatCurrency(shortage);
+
+                    // Calculate Profit (Keuntungan)
+                    // Profit = Total Selling Price - Total Initial Cost
+                    // ALLOW NEGATIVE PROFIT (Real Profit)
+                    const realProfit = totalSellingPrice - totalInitialCost;
+
+                    // Update Display with Colors
+                    const profitDisplay = document.getElementById('profit_display');
+                    profitDisplay.value = formatCurrency(realProfit);
+
+                    if (realProfit < 0) {
+                        profitDisplay.classList.add('text-red-600');
+                        profitDisplay.classList.remove('text-green-600', 'text-blue-600');
+                    } else {
+                        profitDisplay.classList.add('text-green-600');
+                        profitDisplay.classList.remove('text-red-600', 'text-blue-600');
+                    }
+
+                    // Calculate Recommendation (Kenaikan Harga)
+                    // Formula: (Kekurangan) / Berat IDM
+                    let recommendation = 0;
+                    if (wIdm > 0) {
+                        recommendation = shortage / wIdm;
+                    }
+                    // Display per Gram
+                    recommendationDisplay.textContent = formatCurrency(recommendation);
+
+                    // Calculate BEP (Break Even Price) for IDM
+                    let bepIdmPrice = 0;
+                    if (wIdm > 0) {
+                        const otherSales = (wPerut * pPerut) + (wKakian * pKakian);
+                        bepIdmPrice = (totalInitialCost - otherSales) / wIdm;
+                    }
+                    // Ensure BEP is not negative
+                    bepIdmPrice = Math.max(0, bepIdmPrice);
+
+                    // LOGIC UPDATE: Display Recommended Price (Ceiling) 
+                    // Because user wants to know "How much to sell to accept profit/break even"
+                    // 5.36 -> Show 6
+                    const recommendedPrice = Math.ceil(bepIdmPrice);
+
+                    // Save User Input (pIdm) to the hidden field for database
+                    estimatedPriceInput.value = pIdm;
+
+                    // Display the RECOMMENDED Price (6) so user knows the target
+                    estimatedPriceDisplay.textContent = formatCurrency(recommendedPrice);
+
+                    // Also show exact BEP small below if needed, or just keep it simple as User requested
+                    // "estimasinya langsung 6 lah"
+
+                    // Store EXACT BEP for internal ref if needed, but button should use recommended
+                    estimatedPriceDisplay.dataset.bep = bepIdmPrice;
+                    estimatedPriceDisplay.dataset.recommended = recommendedPrice;
                 }
-            }
 
-            inputs.forEach(input => {
-                input.addEventListener('input', calculate);
+                window.useRecommendedPrice = function() {
+                    const recommended = parseFloat(estimatedPriceDisplay.dataset.recommended) || 0;
+                    if (recommended > 0) {
+                        document.getElementById('price_idm').value = recommended;
+                        calculate(); // Recalculate
+                    }
+                }
+
+                inputs.forEach(input => {
+                    input.addEventListener('input', calculate);
+                });
+
+                // Modal Functions
+                window.showConfirmationModal = function() {
+                    // Populate Modal Data
+                    document.getElementById('modal-total-weight').textContent = totalWeightInput.value + ' gr';
+
+                    document.getElementById('modal-weight-perutan').textContent = (document.getElementById(
+                        'weight_perutan').value || 0) + ' gr';
+                    document.getElementById('modal-weight-kakian').textContent = (document.getElementById(
+                        'weight_kakian').value || 0) + ' gr';
+                    document.getElementById('modal-weight-idm').textContent = (document.getElementById('weight_idm')
+                        .value || 0) + ' gr';
+                    document.getElementById('modal-shrinkage').textContent = shrinkageInput.value + ' gr';
+
+                    // Show USER INPUT Price in Modal, not the Recommendation
+                    const pIdm = parseFloat(document.getElementById('price_idm').value) || 0;
+                    document.getElementById('modal-total-price').textContent = formatCurrency(pIdm);
+
+                    document.getElementById('confirmationModal').classList.remove('hidden');
+                }
+
+                window.closeConfirmationModal = function() {
+                    document.getElementById('confirmationModal').classList.add('hidden');
+                }
+
+                window.submitForm = function() {
+                    document.getElementById('step2Form').submit();
+                }
             });
-
-            // Modal Functions
-            window.showConfirmationModal = function() {
-                // Populate Modal Data
-                document.getElementById('modal-total-weight').textContent = totalWeightInput.value + ' gr';
-
-                document.getElementById('modal-weight-perutan').textContent = (document.getElementById('weight_perutan').value || 0) + ' gr';
-                document.getElementById('modal-weight-kakian').textContent = (document.getElementById('weight_kakian').value || 0) + ' gr';
-                document.getElementById('modal-weight-idm').textContent = (document.getElementById('weight_idm').value || 0) + ' gr';
-                document.getElementById('modal-shrinkage').textContent = shrinkageInput.value + ' gr';
-                document.getElementById('modal-total-price').textContent = estimatedPriceDisplay.textContent;
-
-                document.getElementById('confirmationModal').classList.remove('hidden');
-            }
-
-            window.closeConfirmationModal = function() {
-                document.getElementById('confirmationModal').classList.add('hidden');
-            }
-
-            window.submitForm = function() {
-                document.getElementById('step2Form').submit();
-            }
-        });
-    </script>
+        </script>
     @endpush
 @endsection
