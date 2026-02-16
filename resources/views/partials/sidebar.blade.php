@@ -13,18 +13,19 @@
     <nav class="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
 
         @php
-        // Helper untuk active state
-        $isDashboard = request()->routeIs('dashboard');
-        $isBarangMasuk = request()->routeIs('incoming-goods.*');
-        $isGrading = request()->routeIs('grading-goods.*');
-        $isManajemenIdm = request()->routeIs('manajemen-idm.*');
-        $isTransferIdm = request()->routeIs('transfer-idm.*');
-        $isBarangKeluar = request()->routeIs('barang.keluar.*');
-        $isTrackingStock = request()->routeIs('tracking-stock.*');
-        $isMasterGradeCompany = request()->routeIs('grade-company.*');
-        $isMasterSupplier = request()->routeIs('suppliers.*');
-        $isMasterGradeSupplier = request()->routeIs('grade-supplier.*');
-        $isMasterLokasi = request()->routeIs('locations.*');
+            // Helper untuk active state
+            $isDashboard = request()->routeIs('dashboard');
+            $isBarangMasuk = request()->routeIs('incoming-goods.*');
+            $isGrading = request()->routeIs('grading-goods.*');
+            $isManajemenIdm = request()->routeIs('manajemen-idm.*');
+            $isTransferIdm = request()->routeIs('transfer-idm.*');
+            $isBarangKeluar = request()->routeIs('barang.keluar.*');
+            $isTrackingStock = request()->routeIs('tracking-stock.*');
+            $isMasterGradeCompany = request()->routeIs('grade-company.*');
+            $isMasterSupplier = request()->routeIs('suppliers.*');
+            $isMasterGradeSupplier = request()->routeIs('grade-supplier.*');
+            $isMasterLokasi = request()->routeIs('locations.*');
+            $isMasterParentGradeCompany = request()->routeIs('parent-grade-companies.*');
         @endphp
 
         <a href="{{ route('dashboard') }}"
@@ -146,11 +147,21 @@
                     <span class="font-medium">Data Lokasi</span>
                 </a>
 
+                <a href="{{ route('parent-grade-companies.index') }}"
+                    class="flex items-center px-4 py-3 rounded-lg transition-all duration-200 group
+                    {{ $isMasterParentGradeCompany ? 'bg-blue-50 text-blue-600 font-semibold shadow-sm' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-800' }}">
+                    <svg class="w-5 h-5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4">
+                        </path>
+                    </svg>
+                    <span class="font-medium">Parent Grade Company</span>
+                </a>
+
                 <a href="{{ route('logout') }}"
                     onclick="event.preventDefault(); document.getElementById('logout-form').submit();"
                     class="flex items-center px-4 py-3 rounded-lg transition-all duration-200 group text-red-600 hover:bg-red-50 hover:text-red-700">
-                    <svg class="w-5 h-5 mr-3 flex-shrink-0" fill="none" stroke="currentColor"
-                        viewBox="0 0 24 24">
+                    <svg class="w-5 h-5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                             d="M17 16l4-4m0 0l-4-4m4 4H3"></path>
                     </svg>
@@ -176,13 +187,13 @@
 </div>
 
 @push('scripts')
-<script>
-    function toggleSubmenu(submenuId, arrowId) {
-        const submenu = document.getElementById(submenuId);
-        const arrow = document.getElementById(arrowId);
+    <script>
+        function toggleSubmenu(submenuId, arrowId) {
+            const submenu = document.getElementById(submenuId);
+            const arrow = document.getElementById(arrowId);
 
-        submenu.classList.toggle('hidden');
-        arrow.classList.toggle('rotate-90');
-    }
-</script>
+            submenu.classList.toggle('hidden');
+            arrow.classList.toggle('rotate-90');
+        }
+    </script>
 @endpush
