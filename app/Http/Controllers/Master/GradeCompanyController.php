@@ -23,8 +23,9 @@ class GradeCompanyController extends Controller
     {
         $search = $request->input('search');
         $gradeCompany = $this->GradeCompanyService->getAll($search);
+        $parentGradeCompanies = \App\Models\ParentGradeCompany::all();
 
-        return view('admin.grade-company.index', compact('gradeCompany', 'search'));
+        return view('admin.grade-company.index', compact('gradeCompany', 'search', 'parentGradeCompanies'));
     }
 
     public function export()
@@ -58,6 +59,10 @@ class GradeCompanyController extends Controller
         $this->GradeCompanyService->update($id, $request->validated());
         return redirect()->route('grade-company.index')->with('success', 'Grade company berhasil diperbarui.');
     }
+
+
+
+
 
     public function destroy(int $id)
     {

@@ -14,6 +14,17 @@ class ParentGradeCompany extends Model
     protected $fillable = [
         'name',
         'image_url',
-        'description'
+        'description',
+        'stock',
     ];
+
+    public function sortMaterials()
+    {
+        return $this->hasMany(SortMaterial::class);
+    }
+
+    public function gradeCompanies()
+    {
+        return $this->hasMany(GradeCompany::class);
+    }
 }

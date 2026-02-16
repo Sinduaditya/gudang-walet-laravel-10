@@ -13,6 +13,34 @@
             {{-- Menu Cards Grid --}}
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
 
+                {{-- Card 0: Sortir Bahan --}}
+                <a href="{{ route('sort-materials.index') }}"
+                    class="group bg-white rounded-xl shadow-md p-8 border-2 border-transparent hover:border-orange-500 hover:shadow-xl transition-all duration-300">
+                    <div class="flex items-center mb-4">
+                        <div
+                            class="w-14 h-14 bg-orange-100 rounded-lg flex items-center justify-center group-hover:bg-orange-500 transition-all duration-300">
+                            <svg class="w-8 h-8 text-orange-600 group-hover:text-white transition-all duration-300"
+                                fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                            </svg>
+                        </div>
+                        <h3
+                            class="ml-4 text-xl font-bold text-gray-800 group-hover:text-orange-600 transition-all duration-300">
+                            Sortir Bahan
+                        </h3>
+                    </div>
+                    <p class="text-gray-600 mb-4">Input hasil sortir bahan dari gudang.</p>
+                    <div
+                        class="flex items-center text-orange-600 font-medium group-hover:translate-x-2 transition-all duration-300">
+                        Kelola Sortir
+                        <svg class="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                        </svg>
+                    </div>
+                </a>
+
                 {{-- Card 1: Penjualan Langsung --}}
                 <a href="{{ route('barang.keluar.sell.form') }}"
                     class="group bg-white rounded-xl shadow-md p-8 border-2 border-transparent hover:border-blue-500 hover:shadow-xl transition-all duration-300">
@@ -97,29 +125,33 @@
                     </div>
                 </a>
 
-            {{-- Card 4: Terima Barang Internal (dari DMK)
-            <a href="{{ route('barang.keluar.receive-internal.step1') }}"
-            class="group bg-white rounded-xl shadow-md p-8 border-2 border-transparent hover:border-indigo-500 hover:shadow-xl transition-all duration-300">
-                <div class="flex items-center mb-4">
-                    <div class="w-14 h-14 bg-indigo-100 rounded-lg flex items-center justify-center group-hover:bg-indigo-500 transition-all duration-300">
-                        <svg class="w-8 h-8 text-indigo-600 group-hover:text-white transition-all duration-300"
-                            fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                {{-- Card 4: Terima Barang Internal (dari DMK)
+                <a href="{{ route('barang.keluar.receive-internal.step1') }}"
+                    class="group bg-white rounded-xl shadow-md p-8 border-2 border-transparent hover:border-indigo-500 hover:shadow-xl transition-all duration-300">
+                    <div class="flex items-center mb-4">
+                        <div
+                            class="w-14 h-14 bg-indigo-100 rounded-lg flex items-center justify-center group-hover:bg-indigo-500 transition-all duration-300">
+                            <svg class="w-8 h-8 text-indigo-600 group-hover:text-white transition-all duration-300"
+                                fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                            </svg>
+                        </div>
+                        <h3
+                            class="ml-4 text-xl font-bold text-gray-800 kgroup-hover:text-indigo-600 transition-all duration-300">
+                            Terima Internal
+                        </h3>
+                    </div>
+                    <p class="text-gray-600 mb-4">Terima barang dari lokasi internal (IDM/DMK).</p>
+                    <div
+                        class="flex items-center text-indigo-600 font-medium group-hover:translate-x-2 transition-all duration-300">
+                        Terima Barang
+                        <svg class="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                 d="M13 7l5 5m0 0l-5 5m5-5H6" />
                         </svg>
                     </div>
-                    <h3 class="ml-4 text-xl font-bold text-gray-800 kgroup-hover:text-indigo-600 transition-all duration-300">
-                        Terima Internal
-                    </h3>
-                </div>
-                <p class="text-gray-600 mb-4">Terima barang dari lokasi internal (IDM/DMK).</p>
-                <div class="flex items-center text-indigo-600 font-medium group-hover:translate-x-2 transition-all duration-300">
-                    Terima Barang
-                    <svg class="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6" />
-                    </svg>
-                </div>
-            </a> --}}
+                </a> --}}
 
                 {{-- Card 5: Terima Barang Eksternal (dari Jasa Cuci) --}}
                 <a href="{{ route('barang.keluar.receive-external.step1') }}"
@@ -159,7 +191,7 @@
                                 fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                     d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
+                            </svg>
                         </div>
                         <h3
                             class="ml-4 text-xl font-bold text-gray-800 group-hover:text-blue-600 transition-all duration-300">
@@ -181,5 +213,5 @@
 
         </div>
     </div>
-</div>
+    </div>
 @endsection

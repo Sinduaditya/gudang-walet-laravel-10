@@ -38,7 +38,7 @@
                 {{-- Kartu Stok Total --}}
                 <div class="flex-1 w-full flex flex-col gap-4">
                     <div class="bg-blue-500 rounded-2xl p-6 text-white shadow-md flex flex-col justify-center h-40">
-                        <span class="text-sm font-bold tracking-widest uppercase mb-2">TOTAL STOK GLOBAL</span>
+                        <span class="text-sm font-bold tracking-widest uppercase mb-2">TOTAL STOK</span>
                         <div class="flex items-baseline">
                             <span class="text-5xl font-bold">{{ number_format($globalStock, 0, ',', '.') }}</span>
                             <span class="ml-3 text-xl font-medium text-blue-100">Gr</span>
@@ -113,7 +113,8 @@
                                     data-supplier="{{ strtolower($supplierName) }}">
 
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 row-number">
-                                        {{ $loop->iteration }}</td>
+                                        {{ $loop->iteration }}
+                                    </td>
 
                                     {{-- Lokasi --}}
                                     <td class="px-6 py-4 whitespace-nowrap">
@@ -164,7 +165,7 @@
     </div>
 
     <script>
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', function () {
             const supplierFilter = document.getElementById('supplierFilter');
             const rows = document.querySelectorAll('.location-row');
             const filterNoData = document.getElementById('filterNoData');
@@ -186,7 +187,7 @@
             }
 
             // 2. Filter Logic
-            supplierFilter.addEventListener('change', function() {
+            supplierFilter.addEventListener('change', function () {
                 const selectedSupplier = this.value.toLowerCase();
                 let visibleCount = 0;
 

@@ -5,6 +5,7 @@ namespace App\Services\Stock;
 use App\Models\Location;
 use App\Models\GradeCompany;
 use App\Models\StockTransfer;
+use App\Models\SortMaterial;
 use App\Models\InventoryTransaction;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
@@ -21,6 +22,47 @@ class TrackingStockService
             ->withQueryString();
     }
 
+    public function getParentGradeCompany(?string $search = null): LengthAwarePaginator
+    {
+        return \App\Models\ParentGradeCompany::query()
+            ->withCount(['gradeCompanies', 'sortMaterials'])
+            ->when($search, function ($query) use ($search) {
+                $query->where('name', 'like', "%{$search}%");
+            })
+            ->orderBy('name')
+            ->paginate(15)
+            ->withQueryString();
+    }
+
+    public function getParentGradeById(int $id): \App\Models\ParentGradeCompany
+    {
+        return \App\Models\ParentGradeCompany::findOrFail($id);
+    }
+
+    public function getChildGrades(int $parentId, ?string $search = null): LengthAwarePaginator
+    {
+        return GradeCompany::query()
+            ->where('parent_grade_company_id', $parentId)
+            ->when($search, function ($query) use ($search) {
+                $query->where('name', 'like', "%{$search}%")->orWhere('description', 'like', "%{$search}%");
+            })
+            ->latest()
+            ->paginate(15)
+            ->withQueryString();
+    }
+
+    public function getSortMaterials(int $parentId, ?string $search = null): LengthAwarePaginator
+    {
+        return \App\Models\SortMaterial::query()
+            ->where('parent_grade_company_id', $parentId)
+            // ->when($search, function ($query) use ($search) {
+            //     // Add search logic if needed for sort materials
+            // })
+            ->latest('sort_date')
+            ->paginate(15)
+            ->withQueryString();
+    }
+
     public function getGradeById(int $id): GradeCompany
     {
         return GradeCompany::findOrFail($id);
@@ -29,6 +71,20 @@ class TrackingStockService
     public function calculateGlobalStock(int $gradeId): int
     {
         return (int) round(InventoryTransaction::where('grade_company_id', $gradeId)->sum('quantity_change_grams'));
+    }
+
+    public function calculateParentGlobalStock(int $parentId): int
+    {
+        // Get all grade company IDs belonging to this parent
+        $gradeIds = GradeCompany::where('parent_grade_company_id', $parentId)->pluck('id');
+
+        // Sum quantity changes for all these grades
+        return (int) round(InventoryTransaction::whereIn('grade_company_id', $gradeIds)->sum('quantity_change_grams'));
+    }
+
+    public function calculateParentSortStock(int $parentId): int
+    {
+        return (int) round(SortMaterial::where('parent_grade_company_id', $parentId)->sum('weight'));
     }
 
     // public function getStockPerLocation(int $gradeId, ?string $search = null): Collection
@@ -90,8 +146,8 @@ class TrackingStockService
         // Eager load relasi untuk ditampilkan di View
         // Mengembalikan Collection of InventoryTransaction objects
         return $query->with(['location', 'supplier'])
-                     ->orderBy('location_id') // Optional sorting
-                     ->get();
+            ->orderBy('location_id') // Optional sorting
+            ->get();
     }
 
     public function getAllLocations(): Collection

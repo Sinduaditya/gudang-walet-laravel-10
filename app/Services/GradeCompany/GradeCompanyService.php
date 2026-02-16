@@ -74,6 +74,11 @@ class GradeCompanyService
         return true;
     }
 
+    public function bulkAssign(int $parentGradeId, array $gradeCompanyIds)
+    {
+        return GradeCompany::whereIn('id', $gradeCompanyIds)->update(['parent_grade_company_id' => $parentGradeId]);
+    }
+
     public function exportToExcel()
     {
         return Excel::download(new GradeCompanyExport, 'grade-company-' . date('Y-m-d') . '.xlsx');
