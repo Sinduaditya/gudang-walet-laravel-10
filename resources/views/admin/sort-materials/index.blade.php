@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'Manajemen Grade Company')
+@section('title', 'Sortir Bahan')
 
 @section('content')
     <div class="bg-white min-h-screen">
@@ -8,22 +8,14 @@
 
             <!-- Header -->
             <div class="flex justify-between items-center mb-6">
-                <h1 class="text-2xl font-semibold text-gray-800">Manajemen Grade Perusahaan</h1>
-                <a href="{{ route('grade-company.export') }}"
-                    class="flex items-center text-sm text-gray-600 hover:text-gray-800">
-                    <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                        <path
-                            d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" />
-                    </svg>
-                    Download as Excel
-                </a>
+                <h1 class="text-2xl font-semibold text-gray-800">Sortir Bahan</h1>
             </div>
 
             <!-- Search Section -->
             <div class="mb-6">
                 <!-- Search Form -->
                 <div class="bg-gray-50 border border-gray-200 rounded-lg p-4">
-                    <form method="GET" action="{{ route('grade-company.index') }}">
+                    <form method="GET" action="{{ route('sort-materials.index') }}">
                         <div class="flex flex-col lg:flex-row gap-4">
                             <!-- Search Input -->
                             <div class="flex-1">
@@ -32,10 +24,10 @@
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                             d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                                     </svg>
-                                    Cari Grade Perusahaan
+                                    Cari Sortir Bahan
                                 </label>
                                 <input type="text" name="search" value="{{ request('search') }}"
-                                    placeholder="Cari berdasarkan nama atau deskripsi..."
+                                    placeholder="Cari berdasarkan nama Parent Grade..."
                                     class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm">
                             </div>
 
@@ -52,106 +44,96 @@
                                 </button>
 
                                 <!-- Reset Button -->
-                                <a href="{{ route('grade-company.index') }}"
+                                <a href="{{ route('sort-materials.index') }}"
                                     class="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 text-sm font-medium transition duration-200 whitespace-nowrap">
                                     Reset
                                 </a>
 
                                 <!-- Add Button -->
-                                <a href="{{ route('grade-company.create') }}"
+                                <a href="{{ route('sort-materials.create') }}"
                                     class="flex items-center bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium transition duration-200 whitespace-nowrap">
                                     <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                             d="M12 4v16m8-8H4" />
                                     </svg>
-                                    Tambah Grade Company
-                                </a>
-
-                                <!-- Bulk Assign Button -->
-                                <a href="{{ route('bulk-assignments.index') }}"
-                                    class="flex items-center bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded-md text-sm font-medium transition duration-200 whitespace-nowrap ml-2">
-                                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                            d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                                    </svg>
-                                    Bulk Assign Parent
+                                    Tambah Sortir Bahan
                                 </a>
                             </div>
                         </div>
                     </form>
+
+                    <!-- Active Search Display -->
+                    @if (request('search'))
+                        <div class="mt-3 pt-3 border-t border-gray-200">
+                            <div class="flex flex-wrap gap-2 items-center">
+                                <span class="text-sm text-gray-600">Pencarian aktif:</span>
+                                <span
+                                    class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                    "{{ request('search') }}"
+                                </span>
+                            </div>
+                        </div>
+                    @endif
                 </div>
             </div>
 
             <!-- Table -->
             <div class="bg-white border border-gray-200 rounded-lg overflow-hidden">
                 <div class="overflow-x-auto">
-                    <table class="min-w-full divide-y divide-gray-200" id="gradeCompanyTable">
+                    <table class="min-w-full divide-y divide-gray-200">
                         <thead class="bg-gray-50">
                             <tr>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                     No</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Nama Grade</th>
+                                    Tanggal</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                     Parent Grade</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Gambar</th>
+                                    Grade Company</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Berat (Gram)</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                     Deskripsi</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Tanggal Dibuat</th>
                                 <th
                                     class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                                     Aksi</th>
                             </tr>
                         </thead>
                         <tbody class="bg-white divide-y divide-gray-200">
-                            @forelse($gradeCompany as $index => $grade)
+                            @forelse($sortMaterials as $index => $item)
                                 <tr class="hover:bg-gray-50 transition-colors duration-150">
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                        {{ $gradeCompany->firstItem() + $index }}
+                                        {{ $sortMaterials->firstItem() + $index }}
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                        {{ $item->sort_date->format('d M Y') }}
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                                        {{ $grade->name }}
+                                        {{ $item->parentGradeCompany->name }}
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                                        {{ $grade->parentGradeCompany ? $grade->parentGradeCompany->name : '-' }}
+                                        {{ $item->gradeCompany ? $item->gradeCompany->name : '-' }}
                                     </td>
-                                    <td class="px-6 py-4 whitespace-nowrap">
-                                        @if ($grade->image_url)
-                                            <img src="{{ asset('storage/' . $grade->image_url) }}" alt="{{ $grade->name }}"
-                                                class="w-12 h-12 object-cover rounded-lg border border-gray-200 cursor-pointer hover:opacity-75 transition"
-                                                onclick="window.open(this.src, '_blank')">
-                                        @else
-                                            <div
-                                                class="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center border border-gray-200">
-                                                <svg class="w-6 h-6 text-gray-400" fill="none" stroke="currentColor"
-                                                    viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                        d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                                </svg>
-                                            </div>
-                                        @endif
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                        {{ number_format($item->weight, 0, ',', '.') }}
                                     </td>
                                     <td class="px-6 py-4 text-sm text-gray-600 max-w-xs">
-                                        @if ($grade->description)
-                                            <span class="truncate block" title="{{ $grade->description }}">
-                                                {{ Str::limit($grade->description, 50) }}
+                                        @if ($item->description)
+                                            <span class="truncate block" title="{{ $item->description }}">
+                                                {{ Str::limit($item->description, 50) }}
                                             </span>
                                         @else
                                             <span class="text-gray-400 italic">Tidak ada deskripsi</span>
                                         @endif
                                     </td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                                        {{ $grade->created_at?->format('d M Y') ?? '-' }}
-                                    </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-center text-sm">
                                         <div class="flex items-center justify-center space-x-2">
-                                            <a href="{{ route('grade-company.edit', $grade->id) }}"
+                                            <a href="{{ route('sort-materials.edit', $item->id) }}"
                                                 class="inline-flex items-center px-3 py-1 bg-blue-100 text-blue-600 rounded hover:bg-blue-200 transition duration-200">
                                                 Edit
                                             </a>
-                                            <button onclick="confirmDelete({{ $grade->id }}, '{{ $grade->name }}')"
+                                            <button onclick="confirmDelete({{ $item->id }})"
                                                 class="inline-flex items-center px-3 py-1 bg-red-100 text-red-600 rounded hover:bg-red-200 transition duration-200">
                                                 Hapus
                                             </button>
@@ -160,12 +142,12 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="7" class="px-6 py-12 text-center text-sm text-gray-500">
+                                    <td colspan="6" class="px-6 py-12 text-center text-sm text-gray-500">
                                         @if (request('search'))
-                                            Tidak ada data Grade Company yang sesuai dengan pencarian
+                                            Tidak ada data yang sesuai dengan pencarian
                                             "{{ request('search') }}".
                                         @else
-                                            Belum ada data Grade Company.
+                                            Belum ada data Sortir Bahan.
                                         @endif
                                     </td>
                                 </tr>
@@ -174,16 +156,16 @@
                     </table>
                 </div>
 
-                {{-- Enhanced Pagination --}}
-                @if ($gradeCompany->hasPages())
+                {{-- Pagination --}}
+                @if ($sortMaterials->hasPages())
                     <div class="bg-white px-6 py-4 border-t border-gray-200">
                         <div class="flex items-center justify-between">
                             <div class="text-sm text-gray-700">
-                                Showing {{ $gradeCompany->firstItem() }}-{{ $gradeCompany->lastItem() }} of
-                                {{ $gradeCompany->total() }} results
+                                Showing {{ $sortMaterials->firstItem() }}-{{ $sortMaterials->lastItem() }} of
+                                {{ $sortMaterials->total() }} results
                             </div>
                             <div>
-                                {{ $gradeCompany->appends(request()->query())->links() }}
+                                {{ $sortMaterials->appends(request()->query())->links() }}
                             </div>
                         </div>
                     </div>
@@ -192,7 +174,7 @@
         </div>
     </div>
 
-    <!-- Enhanced Delete Modal -->
+    <!-- Delete Modal -->
     <div id="deleteModal" class="hidden fixed inset-0 bg-black bg-opacity-50 overflow-y-auto h-full w-full z-50">
         <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
             <div class="mt-3 text-center">
@@ -202,11 +184,10 @@
                             d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                     </svg>
                 </div>
-                <h3 class="text-lg font-medium text-gray-900 mt-4">Hapus Grade Company</h3>
+                <h3 class="text-lg font-medium text-gray-900 mt-4">Hapus Data Sortir</h3>
                 <p class="text-sm text-gray-500 mt-2">
-                    Apakah Anda yakin ingin menghapus grade company
-                    <span id="gradeName" class="font-semibold text-gray-900"></span>?
-                    <span class="font-semibold text-gray-900">Tindakan ini tidak dapat dibatalkan.</span>
+                    Apakah Anda yakin ingin menghapus data ini?
+                    <span class="font-semibold text-gray-900">Stok Parent Grade akan dikembalikan.</span>
                 </p>
                 <form id="deleteForm" method="POST" class="mt-6">
                     @csrf
@@ -226,13 +207,10 @@
         </div>
     </div>
 
-
     @push('scripts')
         <script>
-            // Modal delete
-            function confirmDelete(id, name) {
-                const baseUrl = `{{ route('grade-company.destroy', ':id') }}`;
-                document.getElementById('gradeName').textContent = name;
+            function confirmDelete(id) {
+                const baseUrl = "{{ route('sort-materials.destroy', ':id') }}";
                 document.getElementById('deleteForm').action = baseUrl.replace(':id', id);
                 document.getElementById('deleteModal').classList.remove('hidden');
             }
@@ -242,23 +220,12 @@
             }
 
             // Close modal when clicking outside
-            document.getElementById('deleteModal')?.addEventListener('click', function (event) {
-                if (event.target === this) {
+            window.onclick = function (event) {
+                let deleteModal = document.getElementById('deleteModal');
+                if (event.target == deleteModal) {
                     closeDeleteModal();
                 }
-            });
-
-            // Auto hide alerts after 5 seconds
-            setTimeout(() => {
-                const alerts = document.querySelectorAll('[id^="alert-"]');
-                alerts.forEach(alert => {
-                    if (alert) {
-                        alert.style.transition = 'opacity 0.5s ease-out';
-                        alert.style.opacity = '0';
-                        setTimeout(() => alert.remove(), 500);
-                    }
-                });
-            }, 5000);
+            }
         </script>
     @endpush
 @endsection

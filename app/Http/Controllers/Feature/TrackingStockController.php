@@ -20,12 +20,34 @@ class TrackingStockController extends Controller
     {
         $search = $request->input('search');
 
-        $trackingStocks = $this->trackingStockService->getGradeCompany($search);
+        // Now fetching Parent Grades instead of all Grade Companies
+        $parentGrades = $this->trackingStockService->getParentGradeCompany($search);
 
         return view('admin.stock.index', compact(
-            'trackingStocks',
+            'parentGrades',
             'search'
         ));
+    }
+
+    public function parentGrades(Request $request, $id)
+    {
+        $parentGrade = $this->trackingStockService->getParentGradeById($id);
+        $search = $request->input('search');
+        $gradeCompanies = $this->trackingStockService->getChildGrades($id, $search);
+        $globalStock = $this->trackingStockService->calculateParentGlobalStock($id);
+
+        return view('admin.stock.parent-grades', compact('parentGrade', 'gradeCompanies', 'search', 'globalStock'));
+    }
+
+    public function parentSorts(Request $request, $id)
+    {
+        $parentGrade = $this->trackingStockService->getParentGradeById($id);
+        $search = $request->input('search');
+        $sortMaterials = $this->trackingStockService->getSortMaterials($id, $search);
+        $globalStock = $this->trackingStockService->calculateParentGlobalStock($id);
+        $sortStock = $this->trackingStockService->calculateParentSortStock($id);
+
+        return view('admin.stock.parent-sorts', compact('parentGrade', 'sortMaterials', 'search', 'globalStock', 'sortStock'));
     }
 
     public function detail(Request $request, $id)
@@ -33,11 +55,11 @@ class TrackingStockController extends Controller
         $grade = $this->trackingStockService->getGradeById($id);
         $search = $request->input('search');
         $locationStocks = $this->trackingStockService->getStockPerLocation($id, $search);
-        
+
         // Calculate global stock from the retrieved location stocks to ensure consistency
         $globalStock = $locationStocks->sum('total_stock');
 
-        Log::info('Location Stocks:', $locationStocks->toArray());
+        // Log::info('Location Stocks:', $locationStocks->toArray());
         return view('admin.stock.detail', compact('grade', 'globalStock', 'locationStocks', 'search'));
     }
 

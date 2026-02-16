@@ -22,6 +22,8 @@ use App\Http\Controllers\Feature\TransferExternalController;
 use App\Http\Controllers\Feature\ManajemenIdmController;
 use App\Http\Controllers\Feature\TransferIdmController;
 use App\Http\Controllers\Feature\TransferInternalController;
+use App\Http\Controllers\SortMaterial\SortMaterialController;
+use App\Http\Controllers\Master\BulkAssignmentController;
 
 // Authentication Routes
 Route::middleware('guest')->group(function () {
@@ -197,6 +199,11 @@ Route::middleware(['auth'])->group(function () {
             ->name('tracking-stock.')
             ->group(function () {
                 Route::get('/', [TrackingStockController::class, 'index'])->name('get.grade.company');
+
+                // New routes for hierarchy
+                Route::get('/parent/{id}/grades', [TrackingStockController::class, 'parentGrades'])->name('parent-grades');
+                Route::get('/parent/{id}/sorts', [TrackingStockController::class, 'parentSorts'])->name('parent-sorts');
+
                 Route::get('/{id}', [TrackingStockController::class, 'detail'])->name('detail');
                 Route::get('/{id}/susut', [TrackingStockController::class, 'susut'])->name('susut');
             });
@@ -204,8 +211,12 @@ Route::middleware(['auth'])->group(function () {
         // Master Route
         Route::resource('locations', LocationController::class);
         Route::resource('grade-supplier', GradeSupplierController::class);
+
+        Route::resource('bulk-assignments', BulkAssignmentController::class);
         Route::resource('grade-company', GradeCompanyController::class);
+
         Route::resource('parent-grade-companies', ParentGradeCompanyController::class);
+        Route::resource('sort-materials', SortMaterialController::class);
         Route::resource('suppliers', SupplierController::class);
     });
 
