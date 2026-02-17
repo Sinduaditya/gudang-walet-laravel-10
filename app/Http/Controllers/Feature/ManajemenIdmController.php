@@ -40,7 +40,18 @@ class ManajemenIdmController extends Controller
         // Default category to IDM A if not specified
         $category = $request->input('category', 'IDM A');
 
-        $query = \App\Models\SortingResult::with(['receiptItem.purchaseReceipt.supplier', 'gradeCompany'])
+        $query = \App\Models\SortingResult::with([
+            'receiptItem' => function ($q) {
+                $q->withTrashed();
+            },
+            'receiptItem.purchaseReceipt' => function ($q) {
+                $q->withTrashed();
+            },
+            'receiptItem.purchaseReceipt.supplier' => function ($q) {
+                $q->withTrashed();
+            },
+            'gradeCompany'
+        ])
             ->where('category_grade', $category)
             ->whereNull('idm_management_id');
 
@@ -54,8 +65,10 @@ class ManajemenIdmController extends Controller
 
         // Filter Supplier
         if ($request->has('supplier_id') && $request->supplier_id != '') {
-            $query->whereHas('receiptItem.purchaseReceipt', function($q) use ($request) {
-                $q->where('supplier_id', $request->supplier_id);
+            $query->whereHas('receiptItem', function ($q) use ($request) {
+                $q->withTrashed()->whereHas('purchaseReceipt', function ($q2) use ($request) {
+                    $q2->withTrashed()->where('supplier_id', $request->supplier_id);
+                });
             });
         }
 
@@ -91,7 +104,18 @@ class ManajemenIdmController extends Controller
         }
 
         // Fetch selected items (SortingResult)
-        $items = \App\Models\SortingResult::with(['receiptItem.purchaseReceipt.supplier', 'gradeCompany'])
+        $items = \App\Models\SortingResult::with([
+            'receiptItem' => function ($q) {
+                $q->withTrashed();
+            },
+            'receiptItem.purchaseReceipt' => function ($q) {
+                $q->withTrashed();
+            },
+            'receiptItem.purchaseReceipt.supplier' => function ($q) {
+                $q->withTrashed();
+            },
+            'gradeCompany'
+        ])
             ->whereIn('id', $itemIds)
             ->get();
 
@@ -134,12 +158,23 @@ class ManajemenIdmController extends Controller
             \Illuminate\Support\Facades\DB::beginTransaction();
 
             // Fetch items to get supplier and grade info
-            $items = \App\Models\SortingResult::whereIn('id', $request->item_ids)->get();
+            $items = \App\Models\SortingResult::with([
+                'receiptItem' => function ($q) {
+                    $q->withTrashed();
+                },
+                'receiptItem.purchaseReceipt' => function ($q) {
+                    $q->withTrashed();
+                }
+            ])->whereIn('id', $request->item_ids)->get();
             $firstItem = $items->first();
+
+            if (!$firstItem->receiptItem) {
+                 throw new \Exception('Data Receipt Item tidak ditemukan (mungkin terhapus permanen).');
+            }
 
             // Create IdmManagement record
             $idmManagement = \App\Models\IdmManagement::create([
-                'supplier_id' => $firstItem->receiptItem->purchaseReceipt->supplier_id,
+                'supplier_id' => optional($firstItem->receiptItem->purchaseReceipt)->supplier_id,
                 'grade_company_id' => $firstItem->grade_company_id,
                 'initial_weight' => $request->total_weight,
                 'shrinkage' => $request->shrinkage,
@@ -215,7 +250,9 @@ class ManajemenIdmController extends Controller
             ]);
 
             // Update Details (Delete and Recreate)
-            $idmManagement->details()->delete();
+            $idmManagement->details()->get()->each(function ($detail) {
+                $detail->delete();
+            });
 
             foreach ($request->details as $type => $detail) {
                 \App\Models\IdmDetail::create([
@@ -264,6 +301,11 @@ class ManajemenIdmController extends Controller
             // Revert SortingResult items (set idm_management_id to null)
             \App\Models\SortingResult::where('idm_management_id', $idmManagement->id)
                 ->update(['idm_management_id' => null]);
+
+            // Delete details
+            $idmManagement->details()->get()->each(function ($detail) {
+                $detail->delete();
+            });
 
             // Delete the record
             $idmManagement->delete();

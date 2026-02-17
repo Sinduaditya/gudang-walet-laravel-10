@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class IdmManagement extends Model
 {
-    use HasFactory;
+    use HasFactory, \Illuminate\Database\Eloquent\SoftDeletes;
 
     protected $table = 'idm_managements';
 
@@ -39,5 +39,10 @@ class IdmManagement extends Model
     public function sourceItems()
     {
         return $this->hasMany(SortingResult::class, 'idm_management_id');
+    }
+
+    public function deletedBy()
+    {
+        return $this->belongsTo(User::class, 'deleted_by');
     }
 }

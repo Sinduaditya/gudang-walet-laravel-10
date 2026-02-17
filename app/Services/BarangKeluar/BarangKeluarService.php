@@ -179,7 +179,7 @@ class BarangKeluarService
         // TRANSFER_IN ke lokasi tujuan (quantity positif = berat bersih)
         // KECUALI jika tujuan adalah DMK, maka barang dianggap hilang/keluar dari tracking (seperti penjualan)
         $toLocation = Location::find($data['to_location_id']);
-        
+
         if ($toLocation && stripos($toLocation->name, 'DMK') === false) {
             InventoryTransaction::create([
                 'transaction_date' => $data['transfer_date'] ?? now(),
