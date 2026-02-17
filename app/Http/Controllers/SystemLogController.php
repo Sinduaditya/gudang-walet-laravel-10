@@ -60,7 +60,6 @@ class SystemLogController extends Controller
                 $data = $query->latest('deleted_at')->paginate(10);
                 break;
 
-
             default:
                 abort(404);
         }
