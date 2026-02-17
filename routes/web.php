@@ -218,6 +218,9 @@ Route::middleware(['auth'])->group(function () {
         Route::resource('parent-grade-companies', ParentGradeCompanyController::class);
         Route::resource('sort-materials', SortMaterialController::class);
         Route::resource('suppliers', SupplierController::class);
+
+        // System Log
+        Route::get('system-log', [\App\Http\Controllers\SystemLogController::class, 'index'])->name('system-log.index');
     });
 
     Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
