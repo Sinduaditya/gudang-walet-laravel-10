@@ -5,9 +5,11 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
+use Illuminate\Database\Eloquent\SoftDeletes;
+
 class SortMaterial extends Model
 {
-    use HasFactory;
+    use HasFactory, SoftDeletes;
 
     protected $fillable = [
         'weight',
@@ -27,8 +29,14 @@ class SortMaterial extends Model
         return $this->belongsTo(ParentGradeCompany::class);
     }
 
+
     public function gradeCompany()
     {
         return $this->belongsTo(GradeCompany::class);
+    }
+
+    public function deletedBy()
+    {
+        return $this->belongsTo(User::class, 'deleted_by');
     }
 }
