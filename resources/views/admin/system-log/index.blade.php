@@ -46,6 +46,36 @@
                             Parent Grade Companies
                         </a>
                     </li>
+                    <li class="mr-2">
+                        <a href="{{ route('system-log.index', ['type' => 'purchase_receipts']) }}"
+                            class="inline-block p-4 border-b-2 rounded-t-lg {{ $type == 'purchase_receipts' ? 'text-blue-600 border-blue-600 active' : 'border-transparent hover:text-gray-600 hover:border-gray-300' }}">
+                            Purchase Receipts
+                        </a>
+                    </li>
+                    <li class="mr-2">
+                        <a href="{{ route('system-log.index', ['type' => 'receipt_items']) }}"
+                            class="inline-block p-4 border-b-2 rounded-t-lg {{ $type == 'receipt_items' ? 'text-blue-600 border-blue-600 active' : 'border-transparent hover:text-gray-600 hover:border-gray-300' }}">
+                            Receipt Items
+                        </a>
+                    </li>
+                    <li class="mr-2">
+                        <a href="{{ route('system-log.index', ['type' => 'sorting_results']) }}"
+                            class="inline-block p-4 border-b-2 rounded-t-lg {{ $type == 'sorting_results' ? 'text-blue-600 border-blue-600 active' : 'border-transparent hover:text-gray-600 hover:border-gray-300' }}">
+                            Sorting Results
+                        </a>
+                    </li>
+                    <li class="mr-2">
+                        <a href="{{ route('system-log.index', ['type' => 'idm_managements']) }}"
+                            class="inline-block p-4 border-b-2 rounded-t-lg {{ $type == 'idm_managements' ? 'text-blue-600 border-blue-600 active' : 'border-transparent hover:text-gray-600 hover:border-gray-300' }}">
+                            IDM Managements
+                        </a>
+                    </li>
+                    <li class="mr-2">
+                        <a href="{{ route('system-log.index', ['type' => 'idm_details']) }}"
+                            class="inline-block p-4 border-b-2 rounded-t-lg {{ $type == 'idm_details' ? 'text-blue-600 border-blue-600 active' : 'border-transparent hover:text-gray-600 hover:border-gray-300' }}">
+                            IDM Details
+                        </a>
+                    </li>
                 </ul>
             </div>
 
@@ -113,7 +143,20 @@
                                 <tr class="hover:bg-gray-50 transition duration-150">
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                                         {{ $data->firstItem() + $index }}</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ $item->name }}
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                        @if($type == 'purchase_receipts')
+                                            {{ $item->supplier->name ?? 'Unknown Supplier' }} ({{ $item->receipt_date ? $item->receipt_date->format('d/m/Y') : '-' }})
+                                        @elseif($type == 'receipt_items')
+                                            {{ $item->gradeSupplier->name ?? 'Unknown Grade' }} ({{ $item->supplier_weight_grams }}g)
+                                        @elseif($type == 'sorting_results')
+                                            {{ $item->gradeCompany->name ?? 'Unknown Grade' }} ({{ $item->weight_grams }}g)
+                                        @elseif($type == 'idm_managements')
+                                            {{ $item->gradeCompany->name ?? 'Unknown Grade' }} ({{ $item->initial_weight }}g)
+                                        @elseif($type == 'idm_details')
+                                            {{ $item->grade_idm_name }} ({{ $item->weight }}g)
+                                        @else
+                                            {{ $item->name }}
+                                        @endif
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                                         <div class="flex flex-col">

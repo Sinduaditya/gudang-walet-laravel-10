@@ -67,6 +67,8 @@ class GradingGoodsService
             $query->whereDate('sorting_results.grading_date', $filters['grading_date']);
         }
 
+        $query->whereNull('sorting_results.deleted_at');
+
         $results = $query->paginate($perPage)->appends(request()->query());
 
         $results->getCollection()->transform(function ($item) {
@@ -127,6 +129,8 @@ class GradingGoodsService
         if (!empty($filters['grading_date'])) {
             $query->whereDate('sorting_results.grading_date', $filters['grading_date']);
         }
+
+        $query->whereNull('sorting_results.deleted_at');
 
         $results = $query->get();
 
@@ -208,7 +212,9 @@ class GradingGoodsService
                 foreach ($oldSortingResults as $oldResult) {
                     $this->deleteInventoryFromGrading($oldResult->id);
                 }
-                SortingResult::where('receipt_item_id', $receiptItemId)->delete();
+                SortingResult::where('receipt_item_id', $receiptItemId)->get()->each(function ($item) {
+                    $item->delete();
+                });
 
                 $createdResults = [];
 
@@ -283,7 +289,10 @@ class GradingGoodsService
                 $originalWeight = $receiptItem->warehouse_weight_grams;
 
                 // Hapus sorting result yang existing
-                SortingResult::where('id', $sortingResultId)->delete();
+                $existingResult = SortingResult::find($sortingResultId);
+                if ($existingResult) {
+                    $existingResult->delete();
+                }
 
                 $createdResults = [];
 
