@@ -195,9 +195,13 @@ class IncomingGoodsService
 
                 // delete related items (trigger observer)
                 $receipt->receiptItems()->get()->each(function ($item) {
-                     $item->delete();
+                    $item->deleted_by = auth()->id();
+                    $item->save();
+                    $item->delete();
                 });
 
+                $receipt->deleted_by = auth()->id();
+                $receipt->save();
                 $receipt->delete();
 
                 return true;

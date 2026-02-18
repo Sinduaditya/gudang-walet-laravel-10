@@ -78,7 +78,7 @@ class TransferIdmService
         $carbonDate = Carbon::parse($date);
         $month = strtolower($carbonDate->format('M')); // jan
         $dayYear = $carbonDate->format('dy'); // 1025 (day 10, year 25)
-        
+
         $baseCode = "{$month}-{$dayYear}";
         $code = $baseCode;
         $counter = 1;
@@ -131,11 +131,11 @@ class TransferIdmService
                 if ($sourceLocationId) {
                     // Need to fetch details to get relations for Inventory Transaction
                     $detailModel = IdmDetail::with(['idmManagement.sourceItems'])->find($item['id']);
-                    
+
                     if ($detailModel) {
                         $sortingResult = $detailModel->idmManagement->sourceItems->first();
                         $management = $detailModel->idmManagement;
-                        
+
                         // Calculate Proportional Weight (Item Weight + Share of Shrinkage)
                         // Formula: Item Weight * (Initial Weight / Sum of Details Weight)
                         $totalOutputWeight = $management->details->sum('weight');
@@ -153,7 +153,7 @@ class TransferIdmService
                             'location_id' => $sourceLocationId,
                             'supplier_id' => $detailModel->idmManagement->supplier_id,
                             // Deduct weight in grams (proportional)
-                            'quantity_change_grams' => -($deductionWeight), 
+                            'quantity_change_grams' => -($deductionWeight),
                             'transaction_type' => 'IDM_TRANSFER_OUT',
                             'reference_id' => $transfer->id,
                             'sorting_result_id' => $sortingResult->id ?? null,
@@ -171,7 +171,7 @@ class TransferIdmService
     {
         return DB::transaction(function () use ($id, $data) {
             $transfer = IdmTransfer::findOrFail($id);
-            
+
             // Check if date changed to regenerate code
             if ($transfer->transfer_date != $data['transfer_date']) {
                 $transfer->transfer_code = $this->generateTransferCode($data['transfer_date']);
@@ -211,7 +211,7 @@ class TransferIdmService
                 // Record Inventory Transaction
                 if ($gudangUtama) {
                     $detailModel = IdmDetail::with(['idmManagement.sourceItems'])->find($item['id']);
-                    
+
                     if ($detailModel) {
                         $sortingResult = $detailModel->idmManagement->sourceItems->first();
                         $management = $detailModel->idmManagement;
@@ -224,13 +224,13 @@ class TransferIdmService
                             $factor = $management->initial_weight / $totalOutputWeight;
                             $deductionWeight = round($item['weight'] * $factor);
                         }
-                        
+
                         InventoryTransaction::create([
                             'transaction_date' => $transfer->transfer_date,
                             'grade_company_id' => $detailModel->idmManagement->grade_company_id,
                             'location_id' => $gudangUtama->id,
                             'supplier_id' => $detailModel->idmManagement->supplier_id,
-                            'quantity_change_grams' => -($deductionWeight), 
+                            'quantity_change_grams' => -($deductionWeight),
                             'transaction_type' => 'IDM_TRANSFER_OUT',
                             'reference_id' => $transfer->id,
                             'sorting_result_id' => $sortingResult->id ?? null,
@@ -248,12 +248,20 @@ class TransferIdmService
     {
         return DB::transaction(function () use ($id) {
             $transfer = IdmTransfer::findOrFail($id);
-            
+
             // Revert Inventory Transactions
-            InventoryTransaction::where('transaction_type', 'IDM_TRANSFER_OUT')
+            $transactions = InventoryTransaction::where('transaction_type', 'IDM_TRANSFER_OUT')
                 ->where('reference_id', $transfer->id)
-                ->delete();
-                
+                ->get();
+
+            foreach ($transactions as $transaction) {
+                $transaction->deleted_by = Auth::id();
+                $transaction->save();
+                $transaction->delete();
+            }
+
+            $transfer->deleted_by = Auth::id();
+            $transfer->save();
             $transfer->delete();
             return true;
         });

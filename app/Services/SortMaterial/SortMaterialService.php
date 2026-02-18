@@ -70,6 +70,8 @@ class SortMaterialService
             // Decrease stock before deleting
             $sortMaterial->parentGradeCompany->decrement('stock', $sortMaterial->weight);
 
+            $sortMaterial->deleted_by = auth()->id();
+            $sortMaterial->save();
             $sortMaterial->delete();
             return true;
         });

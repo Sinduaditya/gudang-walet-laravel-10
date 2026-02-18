@@ -74,35 +74,46 @@ class SystemLogController extends Controller
                 $query = SortMaterial::onlyTrashed()->with('deletedBy');
                 if ($search) {
                     $query->where('description', 'like', "%{$search}%");
-
+                }
+                $data = $query->latest('deleted_at')->paginate(10);
+                break;
             case 'purchase_receipts':
-                $query = PurchaseReceipt::onlyTrashed()->with(['deletedBy', 'supplier' => function ($query) {
-                    $query->withTrashed();
-                }]);
+                $query = PurchaseReceipt::onlyTrashed()->with([
+                    'deletedBy',
+                    'supplier' => function ($query) {
+                        $query->withTrashed();
+                    }
+                ]);
                 if ($search) {
-                     $query->where('id', 'like', "%{$search}%")
-                           ->orWhereHas('supplier', function ($q) use ($search) {
-                               $q->where('name', 'like', "%{$search}%");
-                           });
+                    $query->where('id', 'like', "%{$search}%")
+                        ->orWhereHas('supplier', function ($q) use ($search) {
+                            $q->where('name', 'like', "%{$search}%");
+                        });
 
                 }
                 $data = $query->latest('deleted_at')->paginate(10);
                 break;
 
             case 'stock_transfers':
-                $query = StockTransfer::onlyTrashed()->with('deletedBy');
+                $query = StockTransfer::onlyTrashed()->with(['deletedBy', 'gradeCompany', 'fromLocation', 'toLocation']);
                 if ($search) {
                     $query->where('notes', 'like', "%{$search}%");
+                }
+                $data = $query->latest('deleted_at')->paginate(10);
+                break;
 
             case 'receipt_items':
-                $query = ReceiptItem::onlyTrashed()->with(['deletedBy', 'gradeSupplier' => function ($query) {
-                    $query->withTrashed();
-                }]);
+                $query = ReceiptItem::onlyTrashed()->with([
+                    'deletedBy',
+                    'gradeSupplier' => function ($query) {
+                        $query->withTrashed();
+                    }
+                ]);
                 if ($search) {
-                     $query->where('id', 'like', "%{$search}%")
-                           ->orWhereHas('gradeSupplier', function ($q) use ($search) {
-                               $q->where('name', 'like', "%{$search}%");
-                           });
+                    $query->where('id', 'like', "%{$search}%")
+                        ->orWhereHas('gradeSupplier', function ($q) use ($search) {
+                            $q->where('name', 'like', "%{$search}%");
+                        });
 
                 }
                 $data = $query->latest('deleted_at')->paginate(10);
@@ -113,16 +124,22 @@ class SystemLogController extends Controller
                 $query = IdmTransfer::onlyTrashed()->with('deletedBy');
                 if ($search) {
                     $query->where('transfer_code', 'like', "%{$search}%");
+                }
+                $data = $query->latest('deleted_at')->paginate(10);
+                break;
 
             case 'sorting_results':
-                $query = SortingResult::onlyTrashed()->with(['deletedBy', 'gradeCompany' => function ($query) {
-                    $query->withTrashed();
-                }]);
+                $query = SortingResult::onlyTrashed()->with([
+                    'deletedBy',
+                    'gradeCompany' => function ($query) {
+                        $query->withTrashed();
+                    }
+                ]);
                 if ($search) {
-                     $query->where('id', 'like', "%{$search}%")
-                           ->orWhereHas('gradeCompany', function ($q) use ($search) {
-                               $q->where('name', 'like', "%{$search}%");
-                           });
+                    $query->where('id', 'like', "%{$search}%")
+                        ->orWhereHas('gradeCompany', function ($q) use ($search) {
+                            $q->where('name', 'like', "%{$search}%");
+                        });
                 }
                 $data = $query->latest('deleted_at')->paginate(10);
                 break;
@@ -132,28 +149,38 @@ class SystemLogController extends Controller
                 $query = IdmTransferDetail::onlyTrashed()->with('deletedBy');
                 if ($search) {
                     $query->where('item_name', 'like', "%{$search}%");
+                }
+                $data = $query->latest('deleted_at')->paginate(10);
+                break;
 
             case 'idm_managements':
-                $query = IdmManagement::onlyTrashed()->with(['deletedBy', 'gradeCompany' => function ($query) {
-                    $query->withTrashed();
-                }, 'supplier' => function ($query) {
-                    $query->withTrashed();
-                }]);
-                 if ($search) {
-                     $query->where('id', 'like', "%{$search}%");
+                $query = IdmManagement::onlyTrashed()->with([
+                    'deletedBy',
+                    'gradeCompany' => function ($query) {
+                        $query->withTrashed();
+                    },
+                    'supplier' => function ($query) {
+                        $query->withTrashed();
+                    }
+                ]);
+                if ($search) {
+                    $query->where('id', 'like', "%{$search}%");
                 }
                 $data = $query->latest('deleted_at')->paginate(10);
                 break;
 
             case 'inventory_transactions':
-                $query = InventoryTransaction::onlyTrashed()->with('deletedBy');
+                $query = InventoryTransaction::onlyTrashed()->with(['deletedBy', 'gradeCompany', 'location', 'supplier']);
                 if ($search) {
                     $query->where('transaction_type', 'like', "%{$search}%");
+                }
+                $data = $query->latest('deleted_at')->paginate(10);
+                break;
 
             case 'idm_details':
                 $query = IdmDetail::onlyTrashed()->with('deletedBy');
-                 if ($search) {
-                     $query->where('grade_idm_name', 'like', "%{$search}%");
+                if ($search) {
+                    $query->where('grade_idm_name', 'like', "%{$search}%");
                 }
                 $data = $query->latest('deleted_at')->paginate(10);
                 break;
