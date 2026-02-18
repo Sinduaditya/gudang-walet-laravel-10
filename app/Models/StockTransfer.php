@@ -5,9 +5,11 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 
+use Illuminate\Database\Eloquent\SoftDeletes;
+
 class StockTransfer extends Model
 {
-    use HasFactory;
+    use HasFactory, SoftDeletes;
 
     protected $table = 'stock_transfers';
 
@@ -75,5 +77,10 @@ class StockTransfer extends Model
     {
         return $this->hasOne(InventoryTransaction::class, 'reference_id')
             ->where('transaction_type', 'TRANSFER_IN');
+    }
+
+    public function deletedBy()
+    {
+        return $this->belongsTo(User::class, 'deleted_by');
     }
 }
