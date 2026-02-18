@@ -145,7 +145,9 @@ class IncomingGoodsService
                 ]);
 
                 // Delete existing items
-                $receipt->receiptItems()->delete();
+                $receipt->receiptItems()->get()->each(function ($item) {
+                    $item->delete();
+                });
 
                 // Create new items
                 foreach ($data['items'] as $itemData) {
@@ -191,8 +193,10 @@ class IncomingGoodsService
             return DB::transaction(function () use ($id) {
                 $receipt = PurchaseReceipt::findOrFail($id);
 
-                // delete related items (if cascade not configured)
-                $receipt->receiptItems()->delete();
+                // delete related items (trigger observer)
+                $receipt->receiptItems()->get()->each(function ($item) {
+                     $item->delete();
+                });
 
                 $receipt->delete();
 

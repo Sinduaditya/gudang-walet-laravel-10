@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class IdmDetail extends Model
 {
-    use HasFactory;
+    use HasFactory, \Illuminate\Database\Eloquent\SoftDeletes;
 
     protected $table = 'idm_details';
 
@@ -27,5 +27,10 @@ class IdmDetail extends Model
     public function transferDetails()
     {
         return $this->hasMany(IdmTransferDetail::class, 'idm_detail_id');
+    }
+
+    public function deletedBy()
+    {
+        return $this->belongsTo(User::class, 'deleted_by');
     }
 }

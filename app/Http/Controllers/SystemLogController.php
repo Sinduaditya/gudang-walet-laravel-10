@@ -9,6 +9,11 @@ use App\Models\Location;
 use App\Models\GradeCompany;
 use App\Models\ParentGradeCompany;
 use App\Models\User;
+use App\Models\PurchaseReceipt;
+use App\Models\ReceiptItem;
+use App\Models\SortingResult;
+use App\Models\IdmManagement;
+use App\Models\IdmDetail;
 
 class SystemLogController extends Controller
 {
@@ -56,6 +61,65 @@ class SystemLogController extends Controller
                 $query = ParentGradeCompany::onlyTrashed()->with('deletedBy');
                 if ($search) {
                     $query->where('name', 'like', "%{$search}%");
+                }
+                $data = $query->latest('deleted_at')->paginate(10);
+                break;
+
+            case 'purchase_receipts':
+                $query = PurchaseReceipt::onlyTrashed()->with(['deletedBy', 'supplier' => function ($query) {
+                    $query->withTrashed();
+                }]);
+                if ($search) {
+                     $query->where('id', 'like', "%{$search}%")
+                           ->orWhereHas('supplier', function ($q) use ($search) {
+                               $q->where('name', 'like', "%{$search}%");
+                           });
+                }
+                $data = $query->latest('deleted_at')->paginate(10);
+                break;
+
+            case 'receipt_items':
+                $query = ReceiptItem::onlyTrashed()->with(['deletedBy', 'gradeSupplier' => function ($query) {
+                    $query->withTrashed();
+                }]);
+                if ($search) {
+                     $query->where('id', 'like', "%{$search}%")
+                           ->orWhereHas('gradeSupplier', function ($q) use ($search) {
+                               $q->where('name', 'like', "%{$search}%");
+                           });
+                }
+                $data = $query->latest('deleted_at')->paginate(10);
+                break;
+
+            case 'sorting_results':
+                $query = SortingResult::onlyTrashed()->with(['deletedBy', 'gradeCompany' => function ($query) {
+                    $query->withTrashed();
+                }]);
+                if ($search) {
+                     $query->where('id', 'like', "%{$search}%")
+                           ->orWhereHas('gradeCompany', function ($q) use ($search) {
+                               $q->where('name', 'like', "%{$search}%");
+                           });
+                }
+                $data = $query->latest('deleted_at')->paginate(10);
+                break;
+
+            case 'idm_managements':
+                $query = IdmManagement::onlyTrashed()->with(['deletedBy', 'gradeCompany' => function ($query) {
+                    $query->withTrashed();
+                }, 'supplier' => function ($query) {
+                    $query->withTrashed();
+                }]);
+                 if ($search) {
+                     $query->where('id', 'like', "%{$search}%");
+                }
+                $data = $query->latest('deleted_at')->paginate(10);
+                break;
+
+            case 'idm_details':
+                $query = IdmDetail::onlyTrashed()->with('deletedBy');
+                 if ($search) {
+                     $query->where('grade_idm_name', 'like', "%{$search}%");
                 }
                 $data = $query->latest('deleted_at')->paginate(10);
                 break;
