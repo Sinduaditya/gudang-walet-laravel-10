@@ -213,6 +213,8 @@ class GradingGoodsService
                     $this->deleteInventoryFromGrading($oldResult->id);
                 }
                 SortingResult::where('receipt_item_id', $receiptItemId)->get()->each(function ($item) {
+                    $item->deleted_by = auth()->id();
+                    $item->save();
                     $item->delete();
                 });
 
@@ -291,6 +293,8 @@ class GradingGoodsService
                 // Hapus sorting result yang existing
                 $existingResult = SortingResult::find($sortingResultId);
                 if ($existingResult) {
+                    $existingResult->deleted_by = auth()->id();
+                    $existingResult->save();
                     $existingResult->delete();
                 }
 
@@ -395,6 +399,8 @@ class GradingGoodsService
 
                 foreach ($sortingResults as $sorting) {
                     $this->deleteInventoryFromGrading($sorting->id);
+                    $sorting->deleted_by = auth()->id();
+                    $sorting->save();
                     $sorting->delete();
                 }
 
@@ -435,7 +441,7 @@ class GradingGoodsService
             'grade_company_id' => $sortingResult->grade_company_id,
             'location_id' => $defaultLocation->id,
             'supplier_id' => $supplierId, // <--- SIMPAN ID SUPPLIER DISINI
-            'quantity_change_grams' => abs($sortingResult->weight_grams),
+            'quantity_change_grams' => abs((float) $sortingResult->weight_grams),
             'transaction_type' => 'GRADING_IN',
             'reference_id' => $sortingResult->id,
             'sorting_result_id' => $sortingResult->id,
@@ -457,7 +463,7 @@ class GradingGoodsService
             $inventoryTx->update([
                 'transaction_date' => $sortingResult->grading_date,
                 'grade_company_id' => $sortingResult->grade_company_id,
-                'quantity_change_grams' => abs($sortingResult->weight_grams),
+                'quantity_change_grams' => abs((float) $sortingResult->weight_grams),
             ]);
         } else {
             $this->createInventoryFromGrading($sortingResult);
@@ -466,8 +472,14 @@ class GradingGoodsService
 
     private function deleteInventoryFromGrading($sortingResultId)
     {
-        InventoryTransaction::where('transaction_type', 'GRADING_IN')
-            ->where('reference_id', $sortingResultId)
-            ->delete();
+        $transactions = InventoryTransaction::where('transaction_type', 'GRADING_IN')
+            ->where('reference_id', (string) $sortingResultId)
+            ->get();
+
+        foreach ($transactions as $transaction) {
+            $transaction->deleted_by = auth()->id();
+            $transaction->save();
+            $transaction->delete();
+        }
     }
 }

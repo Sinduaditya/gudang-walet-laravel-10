@@ -10,6 +10,7 @@ use App\Services\BarangKeluar\BarangKeluarService;
 use App\Http\Requests\BarangKeluar\TransferRequest;
 use App\Models\StockTransfer;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class TransferInternalController extends Controller
 {
@@ -36,7 +37,7 @@ class TransferInternalController extends Controller
         $gradesWithStock = $gradingSources->map(function ($source) use ($gudangUtama) {
             // Calculate remaining stock for this specific batch
             $batchRemaining = $this->service->getBatchRemainingStock($source->id, $gudangUtama->id);
-            
+
             return [
                 'id' => $source->id, // Use SortingResult ID
                 'name' => $source->gradeCompany->name ?? 'Unknown',
@@ -58,8 +59,8 @@ class TransferInternalController extends Controller
 
         // History Transactions (Internal Transfer Out)
         $query = StockTransfer::whereHas('transactions', function ($q) {
-                $q->where('transaction_type', 'TRANSFER_OUT');
-            })
+            $q->where('transaction_type', 'TRANSFER_OUT');
+        })
             ->with(['gradeCompany', 'fromLocation', 'toLocation', 'sortingResult.receiptItem.purchaseReceipt.supplier'])
             ->orderBy('transfer_date', 'desc');
 
@@ -90,9 +91,9 @@ class TransferInternalController extends Controller
         $transferInternalTransactions = $query->paginate(10)->withQueryString();
 
         return view('admin.barang-keluar.transfer-step1', compact(
-            'gradesWithStock', 
-            'dmkLocation', 
-            'transferInternalTransactions', 
+            'gradesWithStock',
+            'dmkLocation',
+            'transferInternalTransactions',
             'gudangUtama',
             'suppliers',
             'grades',
@@ -129,7 +130,7 @@ class TransferInternalController extends Controller
 
         // PENTING: Paksa from_location_id selalu Gudang Utama untuk keamanan
         $gudangUtama = Location::where('name', 'Gudang Utama')->first()
-                    ?? Location::where('id', 1)->first();
+            ?? Location::where('id', 1)->first();
 
         if ($gudangUtama) {
             $validated['from_location_id'] = $gudangUtama->id;
@@ -175,7 +176,7 @@ class TransferInternalController extends Controller
         // Resolve Grade from SortingResult (since ID is now SortingResult ID)
         $sortingResult = \App\Models\SortingResult::findOrFail($step1Data['grade_company_id']);
         $grade = $sortingResult->gradeCompany;
-        
+
         $fromLocation = Location::findOrFail($step1Data['from_location_id']);
         $toLocation = Location::findOrFail($step1Data['to_location_id']);
 
@@ -204,7 +205,7 @@ class TransferInternalController extends Controller
         $batchRemaining = $this->service->getBatchRemainingStock($data['sorting_result_id'], $data['from_location_id']);
 
         if ($batchRemaining < $totalWeight) {
-             return back()->with('error', "Stok batch tidak mencukupi! Dibutuhkan: " . number_format($totalWeight, 2) . " gr. Tersedia: " . number_format($batchRemaining, 2) . " gr.");
+            return back()->with('error', "Stok batch tidak mencukupi! Dibutuhkan: " . number_format($totalWeight, 2) . " gr. Tersedia: " . number_format($batchRemaining, 2) . " gr.");
         }
 
         $this->service->transfer($data);
@@ -220,7 +221,7 @@ class TransferInternalController extends Controller
     public function checkStock(Request $request)
     {
         $sortingResultId = (int) $request->query('grade_company_id');
-        
+
         if (!$sortingResultId) {
             return response()->json(['ok' => false, 'message' => 'Batch required'], 400);
         }
@@ -229,7 +230,7 @@ class TransferInternalController extends Controller
         $locationId = $gudangUtama ? $gudangUtama->id : 1;
 
         $available = $this->service->getBatchRemainingStock($sortingResultId, $locationId);
-        return response()->json(['ok' => true, 'available_grams' => (float)$available]);
+        return response()->json(['ok' => true, 'available_grams' => (float) $available]);
     }
 
     public function edit($id)
@@ -240,7 +241,7 @@ class TransferInternalController extends Controller
             ->where('name', '!=', 'Gudang Utama')
             ->orderBy('name')
             ->get();
-        
+
         // Get stock for the current location and grade to show available
         $availableStock = $this->service->getAvailableStock($transfer->grade_company_id, $transfer->from_location_id);
         // Add back the current transfer weight because we are editing it
@@ -264,16 +265,18 @@ class TransferInternalController extends Controller
         // Check stock availability (excluding current transaction)
         $totalWeight = $validated['weight_grams'] + ($validated['susut_grams'] ?? 0);
         $availableStock = $this->service->getAvailableStock($validated['grade_company_id'], $validated['from_location_id']);
-        
+
         // If editing same location/grade, we need to add back the old weight to available stock check
         $oldTransfer = \App\Models\StockTransfer::findOrFail($id);
-        if ($oldTransfer->grade_company_id == $validated['grade_company_id'] && 
-            $oldTransfer->from_location_id == $validated['from_location_id']) {
+        if (
+            $oldTransfer->grade_company_id == $validated['grade_company_id'] &&
+            $oldTransfer->from_location_id == $validated['from_location_id']
+        ) {
             $availableStock += $oldTransfer->weight_grams + ($oldTransfer->susut_grams ?? 0);
         }
 
         if ($availableStock < $totalWeight) {
-             return back()->with('error', "Stok tidak mencukupi! Dibutuhkan: " . number_format($totalWeight, 2) . " gr. Tersedia: " . number_format($availableStock, 2) . " gr.");
+            return back()->with('error', "Stok tidak mencukupi! Dibutuhkan: " . number_format($totalWeight, 2) . " gr. Tersedia: " . number_format($availableStock, 2) . " gr.");
         }
 
         $this->service->updateTransferInternal($id, $validated);
@@ -286,11 +289,19 @@ class TransferInternalController extends Controller
     {
         $transfer = \App\Models\StockTransfer::findOrFail($id);
 
-        // Delete associated inventory transactions
-        $transfer->transactions()->delete();
+        DB::transaction(function () use ($transfer) {
+            // Set deleted_by and delete associated inventory transactions
+            foreach ($transfer->transactions as $transaction) {
+                $transaction->deleted_by = auth()->id();
+                $transaction->save();
+                $transaction->delete();
+            }
 
-        // Delete the transfer record
-        $transfer->delete();
+            // Set deleted_by and delete the transfer record
+            $transfer->deleted_by = auth()->id();
+            $transfer->save();
+            $transfer->delete();
+        });
 
         return redirect()->route('barang.keluar.transfer.step1')
             ->with('success', 'Transfer internal berhasil dihapus dan stok dikembalikan.');
