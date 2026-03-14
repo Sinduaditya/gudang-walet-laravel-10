@@ -29,26 +29,19 @@ class PenjualanController extends Controller
             return redirect()->back()->with('error', 'Lokasi "Gudang Utama" tidak ditemukan.');
         }
 
-        // Fetch Grading Sources for "Penjualan Langsung"
-        $gradingSources = $this->service->getGradingSources(\App\Models\SortingResult::OUTGOING_TYPE_PENJUALAN_LANGSUNG);
+        // Ambil sumber grading dengan logika "Global Budgeting"
+        $gradingSources = $this->service->getGradingSourcesWithStock(\App\Models\SortingResult::OUTGOING_TYPE_INTERNAL, $defaultLocation->id);
 
-        // Map sources to view format
-        // Note: We use Batch Stock Logic here to ensure specific batch selection
-        $gradesWithStock = $gradingSources->map(function ($source) use ($defaultLocation) {
-            // Calculate remaining stock for this specific batch
-            $batchRemaining = $this->service->getBatchRemainingStock($source->id, $defaultLocation->id);
-
+        $gradesWithStock = $gradingSources->map(function ($source) {
             return [
-                'id' => $source->id, // Use SortingResult ID
+                'id' => $source->id,
                 'name' => $source->gradeCompany->name ?? 'Unknown',
                 'supplier_name' => $source->receiptItem->purchaseReceipt->supplier->name ?? 'Unknown',
                 'supplier_id' => $source->receiptItem->purchaseReceipt->supplier_id ?? null,
                 'grading_date' => $source->grading_date ? $source->grading_date->format('d M Y') : '-',
-                'batch_stock_grams' => $batchRemaining,
-                'total_stock_grams' => $batchRemaining,
+                'batch_stock_grams' => $source->adjusted_weight,
+                'total_stock_grams' => $source->real_global_stock,
             ];
-        })->filter(function ($item) {
-            return $item['batch_stock_grams'] > 0;
         });
 
         // Fetch Suppliers and Grades for filters
@@ -111,7 +104,7 @@ class PenjualanController extends Controller
         $locationId = $defaultLocation ? $defaultLocation->id : 1;
 
         $available = $this->service->getBatchRemainingStock($sortingResultId, $locationId);
-        return response()->json(['ok' => true, 'available_grams' => (float)$available]);
+        return response()->json(['ok' => true, 'available_grams' => (float) $available]);
     }
 
     /**
@@ -129,13 +122,20 @@ class PenjualanController extends Controller
         $data['grade_company_id'] = $sortingResult->grade_company_id;
         $data['location_id'] = $defaultLocation->id;
 
-        // Check BATCH stock
+        // 1. Cek stok BATCH (Link ke sorting_result)
         $batchRemaining = $this->service->getBatchRemainingStock($data['sorting_result_id'], $data['location_id']);
-
         if ($batchRemaining < $data['weight_grams']) {
             return redirect()->back()
                 ->withInput()
-                ->with('error', 'Stok batch tidak mencukupi. Tersedia: ' . $batchRemaining . ' gr.');
+                ->with('error', 'Stok batch (' . $sortingResult->gradeCompany->name . ') tidak mencukupi atau sudah habis terpakai transaksi lain. Tersedia: ' . number_format($batchRemaining, 2) . ' gr.');
+        }
+
+        // 2. Cek stok NYATA di Gudang (Total Grade di lokasi tersebut)
+        if (!$this->service->hasEnoughStock($data['grade_company_id'], $data['location_id'], $data['weight_grams'])) {
+            $realStock = $this->service->getAvailableStock($data['grade_company_id'], $data['location_id']);
+            return redirect()->back()
+                ->withInput()
+                ->with('error', 'Stok fisik di gudang tidak mencukupi untuk Grade ini! Stok Nyata: ' . number_format($realStock, 2) . ' gr. Anda mencoba menjual: ' . number_format($data['weight_grams'], 2) . ' gr.');
         }
 
         $this->service->sell($data);

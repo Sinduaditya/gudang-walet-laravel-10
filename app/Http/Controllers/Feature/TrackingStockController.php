@@ -34,9 +34,24 @@ class TrackingStockController extends Controller
         $parentGrade = $this->trackingStockService->getParentGradeById($id);
         $search = $request->input('search');
         $gradeCompanies = $this->trackingStockService->getChildGrades($id, $search);
-        $globalStock = $this->trackingStockService->calculateParentGlobalStock($id);
 
-        return view('admin.stock.parent-grades', compact('parentGrade', 'gradeCompanies', 'search', 'globalStock'));
+        // Attach stock to each grade
+        foreach ($gradeCompanies as $item) {
+            $item->total_stock = $this->trackingStockService->calculateGlobalStock($item->id);
+        }
+
+        $globalStock = $this->trackingStockService->calculateParentGlobalStock($id);
+        $positiveStock = $this->trackingStockService->calculateParentPositiveStock($id);
+        $negativeStock = $this->trackingStockService->calculateParentNegativeStock($id);
+
+        return view('admin.stock.parent-grades', compact(
+            'parentGrade',
+            'gradeCompanies',
+            'search',
+            'globalStock',
+            'positiveStock',
+            'negativeStock'
+        ));
     }
 
     public function parentSorts(Request $request, $id)

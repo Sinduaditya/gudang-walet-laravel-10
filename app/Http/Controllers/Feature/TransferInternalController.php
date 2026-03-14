@@ -31,25 +31,23 @@ class TransferInternalController extends Controller
             return redirect()->back()->with('error', 'Lokasi "Gudang Utama" tidak ditemukan.');
         }
 
-        // Fetch Grading Sources for "Internal"
-        $gradingSources = $this->service->getGradingSources(\App\Models\SortingResult::OUTGOING_TYPE_INTERNAL);
+        // Ambil sumber grading dengan logika "Global Budgeting"
+        // Ini memastikan jumlah di dropdown SINKRON dengan Net Global di Tracking Stok
+        $gradingSources = $this->service->getGradingSourcesWithStock(\App\Models\SortingResult::OUTGOING_TYPE_INTERNAL, $gudangUtama->id);
 
-        $gradesWithStock = $gradingSources->map(function ($source) use ($gudangUtama) {
-            // Calculate remaining stock for this specific batch
-            $batchRemaining = $this->service->getBatchRemainingStock($source->id, $gudangUtama->id);
-
+        $gradesWithStock = $gradingSources->map(function ($source) {
             return [
-                'id' => $source->id, // Use SortingResult ID
+                'id' => $source->id,
                 'name' => $source->gradeCompany->name ?? 'Unknown',
                 'supplier_name' => $source->receiptItem->purchaseReceipt->supplier->name ?? 'Unknown',
                 'supplier_id' => $source->receiptItem->purchaseReceipt->supplier_id ?? null,
                 'grading_date' => $source->grading_date ? $source->grading_date->format('d M Y') : '-',
-                'batch_stock_grams' => $batchRemaining,
-                'total_stock_grams' => $batchRemaining,
+                'batch_stock_grams' => $source->adjusted_weight,
+                'total_stock_grams' => $source->real_global_stock,
             ];
-        })->filter(function ($item) {
-            return $item['batch_stock_grams'] > 0;
         });
+
+
 
         $dmkLocation = Location::where('name', 'DMK')->first();
 
@@ -90,6 +88,7 @@ class TransferInternalController extends Controller
 
         $transferInternalTransactions = $query->paginate(10)->withQueryString();
 
+        // dd($gradesWithStock);
         return view('admin.barang-keluar.transfer-step1', compact(
             'gradesWithStock',
             'dmkLocation',
@@ -144,13 +143,20 @@ class TransferInternalController extends Controller
         // Calculate total weight to be deducted (transfer weight + shrinkage)
         $totalWeight = $validated['weight_grams'] + ($validated['susut_grams'] ?? 0);
 
-        // Check BATCH stock
+        // 1. Cek stok BATCH (Link ke sorting_result)
         $batchRemaining = $this->service->getBatchRemainingStock($validated['sorting_result_id'], $validated['from_location_id']);
-
         if ($batchRemaining < $totalWeight) {
             return redirect()->back()
                 ->withInput()
-                ->with('error', "Stok batch tidak mencukupi! Dibutuhkan: " . number_format($totalWeight, 2) . " gr. Tersedia: " . number_format($batchRemaining, 2) . " gr.");
+                ->with('error', "Stok batch tidak mencukupi atau sudah habis terpakai transaksi lain! Tersedia: " . number_format($batchRemaining, 2) . " gr.");
+        }
+
+        // 2. Cek stok NYATA di Gudang (Total Grade di lokasi tersebut)
+        if (!$this->service->hasEnoughStock($sortingResult->grade_company_id, $validated['from_location_id'], $totalWeight)) {
+            $realStock = $this->service->getAvailableStock($sortingResult->grade_company_id, $validated['from_location_id']);
+            return redirect()->back()
+                ->withInput()
+                ->with('error', "GAGAL: Stok fisik Grade " . $sortingResult->gradeCompany->name . " di gudang tidak mencukupi! Stok Nyata: " . number_format($realStock, 2) . " gr. (Dibutuhkan: " . number_format($totalWeight, 2) . " gr)");
         }
 
         // Store in session
@@ -206,6 +212,12 @@ class TransferInternalController extends Controller
 
         if ($batchRemaining < $totalWeight) {
             return back()->with('error', "Stok batch tidak mencukupi! Dibutuhkan: " . number_format($totalWeight, 2) . " gr. Tersedia: " . number_format($batchRemaining, 2) . " gr.");
+        }
+
+        // 2. Cek stok NYATA di Gudang (Total Grade di lokasi tersebut)
+        if (!$this->service->hasEnoughStock($data['grade_company_id'], $data['from_location_id'], $totalWeight)) {
+            $realStock = $this->service->getAvailableStock($data['grade_company_id'], $data['from_location_id']);
+            return back()->with('error', "GAGAL: Stok fisik Grade di gudang tidak mencukupi secara global! Stok Nyata: " . number_format($realStock, 2) . " gr. (Dibutuhkan: " . number_format($totalWeight, 2) . " gr)");
         }
 
         $this->service->transfer($data);
