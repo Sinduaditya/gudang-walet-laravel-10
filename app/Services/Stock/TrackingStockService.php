@@ -82,6 +82,42 @@ class TrackingStockService
         return (int) round(InventoryTransaction::whereIn('grade_company_id', $gradeIds)->sum('quantity_change_grams'));
     }
 
+    public function calculateParentPositiveStock(int $parentId): int
+    {
+        $gradeIds = GradeCompany::where('parent_grade_company_id', $parentId)->pluck('id');
+
+        // Sum only locations that have positive net total for the grade
+        // This simulates the "Gross" stock the user expects
+        $positiveTotal = 0;
+        foreach ($gradeIds as $id) {
+            $gradeStock = InventoryTransaction::where('grade_company_id', $id)
+                ->selectRaw('location_id, SUM(quantity_change_grams) as total')
+                ->groupBy('location_id')
+                ->get()
+                ->filter(fn($t) => $t->total > 0)
+                ->sum('total');
+            $positiveTotal += $gradeStock;
+        }
+        return (int) round($positiveTotal);
+    }
+
+    public function calculateParentNegativeStock(int $parentId): int
+    {
+        $gradeIds = GradeCompany::where('parent_grade_company_id', $parentId)->pluck('id');
+
+        $negativeTotal = 0;
+        foreach ($gradeIds as $id) {
+            $gradeStock = InventoryTransaction::where('grade_company_id', $id)
+                ->selectRaw('location_id, SUM(quantity_change_grams) as total')
+                ->groupBy('location_id')
+                ->get()
+                ->filter(fn($t) => $t->total < 0)
+                ->sum('total');
+            $negativeTotal += $gradeStock;
+        }
+        return (int) round($negativeTotal);
+    }
+
     public function calculateParentSortStock(int $parentId): int
     {
         return (int) round(SortMaterial::where('parent_grade_company_id', $parentId)->sum('weight'));
@@ -133,8 +169,7 @@ class TrackingStockService
             ->select('location_id', 'supplier_id') // Select supplier juga
             ->selectRaw('SUM(quantity_change_grams) as total_stock')
             ->where('grade_company_id', $gradeId)
-            ->groupBy('location_id', 'supplier_id') // Grouping ganda
-            ->having('total_stock', '>', 0);
+            ->groupBy('location_id', 'supplier_id');
 
         // Jika ada search berdasarkan nama lokasi
         if ($search) {
@@ -145,9 +180,13 @@ class TrackingStockService
 
         // Eager load relasi untuk ditampilkan di View
         // Mengembalikan Collection of InventoryTransaction objects
-        return $query->with(['location', 'supplier'])
+        $results = $query->with(['location', 'supplier'])
             ->orderBy('location_id') // Optional sorting
             ->get();
+
+        \Illuminate\Support\Facades\Log::info("getStockPerLocation for Grade $gradeId: " . $results->count() . " rows found. Total Stock Sum: " . $results->sum('total_stock'));
+
+        return $results;
     }
 
     public function getAllLocations(): Collection

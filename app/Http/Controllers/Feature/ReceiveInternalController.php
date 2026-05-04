@@ -24,7 +24,7 @@ class ReceiveInternalController extends Controller
     public function receiveInternalStep1(Request $request)
     {
         $grades = GradeCompany::all();
-        
+
         $locations = Location::where('name', 'LIKE', '%IDM%')
             ->orWhere('name', 'LIKE', '%DMK%')
             ->get();
@@ -32,9 +32,9 @@ class ReceiveInternalController extends Controller
         // Riwayat penerimaan internal
         $query = InventoryTransaction::where('transaction_type', 'RECEIVE_INTERNAL_IN')
             ->with(['gradeCompany', 'location', 'stockTransfer.fromLocation'])
-            ->whereHas('stockTransfer.fromLocation', function($q) {
+            ->whereHas('stockTransfer.fromLocation', function ($q) {
                 $q->where('name', 'LIKE', '%IDM%')
-                  ->orWhere('name', 'LIKE', '%DMK%');
+                    ->orWhere('name', 'LIKE', '%DMK%');
             });
 
         if ($request->filled('grade_id')) {
@@ -81,7 +81,7 @@ class ReceiveInternalController extends Controller
 
         foreach ($locations as $location) {
             $stock = $this->service->getAvailableStock($gradeCompanyId, $location->id);
-            
+
             if ($stock > 0) {
                 $stockData[] = [
                     'location_id' => $location->id,
@@ -125,7 +125,7 @@ class ReceiveInternalController extends Controller
         ]);
 
         $availableStock = $this->service->getAvailableStock(
-            $validated['grade_company_id'], 
+            $validated['grade_company_id'],
             $validated['from_location_id']
         );
 
@@ -178,6 +178,13 @@ class ReceiveInternalController extends Controller
         if (!$step1Data) {
             return redirect()->route('barang.keluar.receive-internal.step1')
                 ->with('error', 'Data tidak ditemukan');
+        }
+
+        // Final Safety Check: Pastikan stok di lokasi asal masih cukup
+        $availableStock = $this->service->getAvailableStock($step1Data['grade_company_id'], $step1Data['from_location_id']);
+        if ($availableStock < $step1Data['weight_grams']) {
+            return redirect()->route('barang.keluar.receive-internal.step1')
+                ->with('error', "GAGAL: Stok di lokasi asal sudah berubah atau tidak mencukupi! Tersedia: " . number_format($availableStock, 2) . " gram");
         }
 
         $this->service->receiveInternal($step1Data);

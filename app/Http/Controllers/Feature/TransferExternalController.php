@@ -29,24 +29,19 @@ class TransferExternalController extends Controller
             return redirect()->back()->with('error', 'Lokasi "Gudang Utama" tidak ditemukan.');
         }
 
-        // Fetch Grading Sources for "External"
-        $gradingSources = $this->service->getGradingSources(\App\Models\SortingResult::OUTGOING_TYPE_EXTERNAL);
+        // Ambil sumber grading dengan logika "Global Budgeting"
+        $gradingSources = $this->service->getGradingSourcesWithStock(\App\Models\SortingResult::OUTGOING_TYPE_EXTERNAL, $gudangUtama->id);
 
-        $gradesWithStock = $gradingSources->map(function ($source) use ($gudangUtama) {
-            // Calculate remaining stock for this specific batch
-            $batchRemaining = $this->service->getBatchRemainingStock($source->id, $gudangUtama->id);
-            
+        $gradesWithStock = $gradingSources->map(function ($source) {
             return [
-                'id' => $source->id, // Use SortingResult ID
+                'id' => $source->id,
                 'name' => $source->gradeCompany->name ?? 'Unknown',
                 'supplier_name' => $source->receiptItem->purchaseReceipt->supplier->name ?? 'Unknown',
                 'supplier_id' => $source->receiptItem->purchaseReceipt->supplier_id ?? null,
                 'grading_date' => $source->grading_date ? $source->grading_date->format('d M Y') : '-',
-                'batch_stock_grams' => $batchRemaining,
-                'total_stock_grams' => $batchRemaining,
+                'batch_stock_grams' => $source->adjusted_weight,
+                'total_stock_grams' => $source->real_global_stock,
             ];
-        })->filter(function ($item) {
-            return $item['batch_stock_grams'] > 0;
         });
 
         $jasaCuciLocations = Location::where('name', 'NOT LIKE', '%IDM%')
@@ -92,9 +87,9 @@ class TransferExternalController extends Controller
         $transferExternalTransactions = $query->paginate(10)->withQueryString();
 
         return view('admin.barang-keluar.external-transfer-step1', compact(
-            'gradesWithStock', 
-            'jasaCuciLocations', 
-            'transferExternalTransactions', 
+            'gradesWithStock',
+            'jasaCuciLocations',
+            'transferExternalTransactions',
             'gudangUtama',
             'suppliers',
             'grades',
@@ -133,13 +128,20 @@ class TransferExternalController extends Controller
         // Calculate total weight to be deducted (transfer weight + shrinkage)
         $totalWeight = $validated['weight_grams'] + ($validated['susut_grams'] ?? 0);
 
-        // Check BATCH stock
+        // 1. Cek stok BATCH (Link ke sorting_result)
         $batchRemaining = $this->service->getBatchRemainingStock($validated['sorting_result_id'], $validated['from_location_id']);
-
         if ($batchRemaining < $totalWeight) {
             return redirect()->back()
                 ->withInput()
-                ->with('error', "Stok batch tidak mencukupi! Dibutuhkan: " . number_format($totalWeight, 2) . " gr. Tersedia: " . number_format($batchRemaining, 2) . " gr.");
+                ->with('error', "Stok batch tidak mencukupi atau sudah habis terpakai transaksi lain! Tersedia: " . number_format($batchRemaining, 2) . " gr.");
+        }
+
+        // 2. Cek stok NYATA di Gudang (Total Grade di lokasi tersebut)
+        if (!$this->service->hasEnoughStock($sortingResult->grade_company_id, $validated['from_location_id'], $totalWeight)) {
+            $realStock = $this->service->getAvailableStock($sortingResult->grade_company_id, $validated['from_location_id']);
+            return redirect()->back()
+                ->withInput()
+                ->with('error', "GAGAL: Stok fisik Grade " . $sortingResult->gradeCompany->name . " di gudang tidak mencukupi! Stok Nyata: " . number_format($realStock, 2) . " gr. (Dibutuhkan: " . number_format($totalWeight, 2) . " gr)");
         }
 
         $request->session()->put('external_transfer_step1', $validated);
@@ -162,7 +164,7 @@ class TransferExternalController extends Controller
         // Resolve Grade from SortingResult (since ID is now SortingResult ID)
         $sortingResult = \App\Models\SortingResult::findOrFail($step1Data['grade_company_id']);
         $grade = $sortingResult->gradeCompany;
-        
+
         $fromLocation = Location::findOrFail($step1Data['from_location_id']);
         $toLocation = Location::findOrFail($step1Data['to_location_id']);
 
@@ -191,7 +193,13 @@ class TransferExternalController extends Controller
         $batchRemaining = $this->service->getBatchRemainingStock($data['sorting_result_id'], $data['from_location_id']);
 
         if ($batchRemaining < $totalWeight) {
-             return back()->with('error', "Stok batch tidak mencukupi! Dibutuhkan: " . number_format($totalWeight, 2) . " gr. Tersedia: " . number_format($batchRemaining, 2) . " gr.");
+            return back()->with('error', "Stok batch tidak mencukupi! Dibutuhkan: " . number_format($totalWeight, 2) . " gr. Tersedia: " . number_format($batchRemaining, 2) . " gr.");
+        }
+
+        // 2. Cek stok NYATA di Gudang (Total Grade di lokasi tersebut)
+        if (!$this->service->hasEnoughStock($sortingResult->grade_company_id, $data['from_location_id'], $totalWeight)) {
+            $realStock = $this->service->getAvailableStock($sortingResult->grade_company_id, $data['from_location_id']);
+            return back()->with('error', "GAGAL: Stok fisik Grade di gudang tidak mencukupi secara global! Stok Nyata: " . number_format($realStock, 2) . " gr. (Dibutuhkan: " . number_format($totalWeight, 2) . " gr)");
         }
 
         $this->service->externalTransfer($data);
@@ -212,9 +220,9 @@ class TransferExternalController extends Controller
             ->where('name', '!=', 'Gudang Utama')
             ->orderBy('name')
             ->get();
-        
+
         $gudangUtama = \App\Models\Location::where('name', 'Gudang Utama')->first();
-        
+
         $availableStock = $this->service->getAvailableStock($transfer->grade_company_id, $gudangUtama->id);
         $availableStock += $transfer->weight_grams + ($transfer->susut_grams ?? 0);
 
@@ -237,14 +245,14 @@ class TransferExternalController extends Controller
 
         $totalWeight = $validated['weight_grams'] + ($validated['susut_grams'] ?? 0);
         $availableStock = $this->service->getAvailableStock($validated['grade_company_id'], $validated['from_location_id']);
-        
+
         $oldTransfer = \App\Models\StockTransfer::findOrFail($id);
         if ($oldTransfer->grade_company_id == $validated['grade_company_id']) {
             $availableStock += $oldTransfer->weight_grams + ($oldTransfer->susut_grams ?? 0);
         }
 
         if ($availableStock < $totalWeight) {
-             return back()->with('error', "Stok di Gudang Utama tidak mencukupi! Dibutuhkan: " . number_format($totalWeight, 2) . " gr. Tersedia: " . number_format($availableStock, 2) . " gr.");
+            return back()->with('error', "Stok di Gudang Utama tidak mencukupi! Dibutuhkan: " . number_format($totalWeight, 2) . " gr. Tersedia: " . number_format($availableStock, 2) . " gr.");
         }
 
         $this->service->updateExternalTransfer($id, $validated);
