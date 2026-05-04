@@ -8,6 +8,7 @@ use App\Http\Requests\IncomingGoods\Step2Request;
 use App\Http\Requests\IncomingGoods\Step3Request;
 use App\Services\IncomingGoods\IncomingGoodsService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 class IncomingGoodsController extends Controller
 {
@@ -125,7 +126,10 @@ class IncomingGoodsController extends Controller
 
             return redirect()->route('incoming-goods.show', $receipt->id)->with('success', 'Data barang masuk berhasil disimpan!');
         } catch (\Exception $e) {
-            return back()->withInput()->with('error', $e->getMessage());
+            Log::error('IncomingGoods storeFinal error: ' . $e->getMessage(), [
+                'user_id' => auth()->id(),
+            ]);
+            return back()->withInput()->with('error', 'Terjadi kesalahan sistem. Silakan coba lagi atau hubungi administrator.');
         }
     }
 
@@ -134,7 +138,11 @@ class IncomingGoodsController extends Controller
      */
     public function show(Request $request, $id)
     {
-        $receipt = \App\Models\PurchaseReceipt::with(['supplier', 'receiptItems.gradeSupplier'])->findOrFail($id);
+        $receipt = \App\Models\PurchaseReceipt::with([
+            'supplier',
+            'receiptItems.gradeSupplier',
+            'receiptItems.sortingResults',
+        ])->findOrFail($id);
 
         $page = $request->get('page');
         $month = $request->get('month');
@@ -149,6 +157,15 @@ class IncomingGoodsController extends Controller
     public function edit(Request $request, $id)
     {
         $receipt = $this->incomingGoodsService->getReceiptById($id);
+
+        // Cek apakah ada item yang sudah di-grading, jika ya redirect dengan error
+        foreach ($receipt->receiptItems as $item) {
+            if ($item->sortingResults->isNotEmpty()) {
+                return redirect()->route('incoming-goods.index')
+                    ->with('error', 'Tidak dapat edit. Items sudah di-grading.');
+            }
+        }
+
         $suppliers = $this->incomingGoodsService->getSuppliers();
         $gradeSuppliers = $this->incomingGoodsService->getGradeSuppliers();
 
@@ -168,7 +185,7 @@ class IncomingGoodsController extends Controller
             $validated = $request->validate([
                 'supplier_id' => 'required|exists:suppliers,id',
                 'receipt_date' => 'required|date',
-                'unloading_date' => 'required|date',
+                'unloading_date' => 'required|date|after_or_equal:receipt_date',
                 'notes' => 'nullable|string|max:500',
                 'items' => 'required|array|min:1',
                 'items.*.grade_supplier_id' => 'required|exists:grades_supplier,id', 
@@ -188,7 +205,11 @@ class IncomingGoodsController extends Controller
 
             return redirect()->route('incoming-goods.show', array_merge(['id' => $receipt->id], $redirectParams))->with('success', 'Data barang masuk berhasil diperbarui!');
         } catch (\Exception $e) {
-            return back()->withInput()->with('error', $e->getMessage());
+            Log::error('IncomingGoods update error: ' . $e->getMessage(), [
+                'user_id' => auth()->id(),
+                'receipt_id' => $id,
+            ]);
+            return back()->withInput()->with('error', 'Terjadi kesalahan sistem. Silakan coba lagi atau hubungi administrator.');
         }
     }
 
@@ -210,12 +231,20 @@ class IncomingGoodsController extends Controller
             $this->incomingGoodsService->deleteReceipt($id);
             return redirect()->route('incoming-goods.index')->with('success', 'Data barang masuk berhasil dihapus!');
         } catch (\Exception $e) {
-            return back()->with('error', 'Gagal menghapus data: ' . $e->getMessage());
+            Log::error('IncomingGoods destroy error: ' . $e->getMessage(), [
+                'user_id' => auth()->id(),
+                'receipt_id' => $id,
+            ]);
+            return back()->with('error', 'Terjadi kesalahan sistem. Silakan coba lagi atau hubungi administrator.');
         }
     }
 
     public function export(Request $request)
     {
+        if (empty($request->get('month')) && empty($request->get('year'))) {
+            return back()->with('error', 'Pilih minimal filter Bulan atau Tahun sebelum export.');
+        }
+
         try {
             $filters = [
                 'month' => $request->get('month'),
@@ -224,7 +253,10 @@ class IncomingGoodsController extends Controller
 
             return $this->incomingGoodsService->exportToExcel($filters);
         } catch (\Exception $e) {
-            return back()->with('error', 'Gagal mengekspor data: ' . $e->getMessage());
+            Log::error('IncomingGoods export error: ' . $e->getMessage(), [
+                'user_id' => auth()->id(),
+            ]);
+            return back()->with('error', 'Terjadi kesalahan sistem. Silakan coba lagi atau hubungi administrator.');
         }
     }
 }

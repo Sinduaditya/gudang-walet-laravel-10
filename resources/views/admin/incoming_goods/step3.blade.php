@@ -177,9 +177,6 @@
     @push('scripts')
         <script>
             function calculateDifference(gradeId, beratAwal) {
-                console.log('=== DEBUG CALCULATION ===');
-                console.log('Grade ID:', gradeId, 'Berat Awal:', beratAwal);
-
                 const beratAkhirInput = document.getElementById('berat_akhir_' + gradeId);
                 const selisihDiv = document.getElementById('selisih_' + gradeId);
                 const selisihSpan = document.getElementById('selisih_value_' + gradeId);
@@ -188,8 +185,6 @@
 
                 if (beratAkhirInput && selisihDiv && selisihSpan && decimalSpan && percentageSpan) {
                     const beratAkhir = parseFloat(beratAkhirInput.value) || 0;
-
-                    console.log('Berat Akhir:', beratAkhir);
 
                     // ✅ Skip calculation jika input kosong
                     if (beratAkhir === 0) {
@@ -206,10 +201,6 @@
                         decimal = selisih / beratAwal; // ✅ Rasio desimal (bisa negatif/positif)
                         percentage = Math.abs(decimal) * 100; // ✅ Persentase selalu positif
                     }
-
-                    console.log('Selisih:', selisih);
-                    console.log('Decimal:', decimal);
-                    console.log('Percentage:', percentage);
 
                     // ✅ Format tampilan selisih dengan status Indonesia
                     let selisihText = '';
@@ -236,7 +227,7 @@
                     } else {
                         const formattedDecimal = decimal.toFixed(3).replace('.', ','); // ✅ Koma sebagai desimal
 
-                        // ✅ Warning jika rasio > 0.05 (2%)
+                        // ✅ Warning jika rasio > 0.02 (2%)
                         if (Math.abs(decimal) > 0.02) {
                             decimalClass = 'text-red-600 bg-red-50 px-1 py-0.5 rounded';
                             decimalText = formattedDecimal + ' ⚠️';
@@ -281,10 +272,6 @@
 
                     // ✅ Show container
                     selisihDiv.classList.remove('hidden');
-
-                    console.log('Final decimal:', decimalText);
-                    console.log('Final percentage:', percentageText);
-                    console.log('=== END DEBUG ===');
                 }
             }
 

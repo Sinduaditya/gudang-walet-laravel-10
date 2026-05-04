@@ -15,7 +15,22 @@ class ReceiptItem extends Model
     const STATUS_MENTAH = 'mentah';
     const STATUS_SELESAI_DISORTIR = 'selesai_disortir';
 
-    protected $fillable = ['purchase_receipt_id', 'grade_supplier_id', 'supplier_weight_grams', 'warehouse_weight_grams', 'difference_grams', 'percentage_difference', 'moisture_percentage', 'is_flagged_red', 'status', 'created_by', 'updated_by'];
+    // Threshold untuk flag selisih tinggi (%)
+    const FLAG_THRESHOLD_PERCENT = 2;
+
+    protected $fillable = [
+        'purchase_receipt_id',
+        'grade_supplier_id',
+        'supplier_weight_grams',
+        'warehouse_weight_grams',
+        'difference_grams',
+        'percentage_difference',
+        'moisture_percentage',
+        'is_flagged_red',
+        'status',
+        'created_by',
+        'updated_by',
+    ];
 
     protected $casts = [
         'supplier_weight_grams' => 'integer',
@@ -26,9 +41,9 @@ class ReceiptItem extends Model
         'is_flagged_red' => 'boolean',
     ];
 
-    public function isPercentageAboveThreshold()
+    public function isPercentageAboveThreshold(): bool
     {
-        return abs($this->percentage_difference ?? 0) > 5;
+        return abs($this->percentage_difference ?? 0) > self::FLAG_THRESHOLD_PERCENT;
     }
 
      public function getFormattedPercentageAttribute()
@@ -68,7 +83,7 @@ class ReceiptItem extends Model
     }
 
     // ✅ Helper method untuk mendapatkan class CSS berdasarkan persentase
-     public function getPercentageColorClassAttribute()
+     public function getPercentageColorClassAttribute(): string
     {
         if ($this->percentage_difference === null || $this->percentage_difference == 0) {
             return 'text-gray-600';
@@ -76,17 +91,14 @@ class ReceiptItem extends Model
 
         $absPercentage = abs($this->percentage_difference);
 
-        // ✅ Merah jika di atas 5%
-        if ($absPercentage > 5) {
+        if ($absPercentage > self::FLAG_THRESHOLD_PERCENT) {
             return 'text-red-600 font-bold bg-red-50 px-1 py-0.5 rounded';
         }
 
-        // ✅ Orange jika 1% - 5%
         if ($absPercentage > 1) {
             return 'text-orange-600';
         }
 
-        // ✅ Hijau jika < 1%
         return 'text-green-600';
     }
 
