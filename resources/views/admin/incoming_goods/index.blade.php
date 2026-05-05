@@ -125,7 +125,7 @@
                             @forelse($receipts as $i => $receipt)
                                 @php
                                     $hasHighPercentage = $receipt->receiptItems->some(function ($item) {
-                                        return abs($item->percentage_difference ?? 0) > 2; 
+                                        return abs($item->percentage_difference ?? 0) > 2;
                                     });
                                 @endphp
                                 <tr class="{{ $hasHighPercentage ? 'bg-red-50 border-l-4 border-red-500' : '' }}">

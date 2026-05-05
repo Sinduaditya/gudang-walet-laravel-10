@@ -14,14 +14,31 @@
                     </p>
                 </div>
                 <div class="flex gap-2">
-                    <a href="{{ route('incoming-goods.edit', $receipt->id) }}"
-                        class="inline-flex items-center px-3 py-2 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 text-sm">
-                        <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                        </svg>
-                        Edit
-                    </a>
+                    @php
+                        $isReceiptGraded = $receipt->receiptItems->contains(
+                            fn($item) => $item->sortingResults->isNotEmpty()
+                        );
+                    @endphp
+
+                    @if(!$isReceiptGraded)
+                        <a href="{{ route('incoming-goods.edit', $receipt->id) }}"
+                            class="inline-flex items-center px-3 py-2 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 text-sm">
+                            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                            </svg>
+                            Edit
+                        </a>
+                    @else
+                        <span class="inline-flex items-center px-3 py-2 bg-gray-100 text-gray-400 rounded text-sm cursor-not-allowed"
+                            title="Tidak dapat diedit — sudah di-grading">
+                            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                            </svg>
+                            Edit (Terkunci)
+                        </span>
+                    @endif
                     <a href="{{ route('incoming-goods.index', ['page' => $page, 'month' => $month, 'year' => $year]) }}"
                         class="inline-flex items-center px-3 py-2 bg-gray-100 rounded hover:bg-gray-200 text-sm">
                         <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -127,7 +144,7 @@
                                                 $decimalClass = 'text-gray-600';
                                                 $warningIcon = '';
 
-                                                // ✅ UPDATED: Ganti threshold dari 5% ke 2%
+                                                // ✅ UPDATED: Ganti threshold ke 2%
                                                 if (abs($decimal) > 0.02) {
                                                     // 2%
                                                     $decimalClass =
@@ -162,7 +179,7 @@
                                                 $percentageClass = 'text-gray-600';
                                                 $percentWarningIcon = '';
 
-                                                // ✅ UPDATED: Ganti threshold dari 5% ke 2%
+                                                // ✅ UPDATED: Ganti threshold ke 2%
                                                 if ($percentage > 2) {
                                                     // 2%
                                                     $percentageClass =

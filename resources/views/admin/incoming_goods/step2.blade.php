@@ -120,7 +120,7 @@
 
                 <!-- Form Actions -->
                 <div class="flex items-center justify-between">
-                    <a href="{{ route('incoming-goods.step1') }}"
+                    <a href="{{ route('incoming-goods.cancel') }}"
                         class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
                         <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"

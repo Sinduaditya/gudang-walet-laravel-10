@@ -67,7 +67,11 @@ class IncomingGoodsService
      */
     public function getReceiptById($id)
     {
-        return PurchaseReceipt::with(['supplier', 'receiptItems.gradeSupplier'])->findOrFail($id);
+        return PurchaseReceipt::with([
+            'supplier',
+            'receiptItems.gradeSupplier',
+            'receiptItems.sortingResults',
+        ])->findOrFail($id);
     }
 
     /**
@@ -102,7 +106,8 @@ class IncomingGoodsService
                         $percentageDifference = ($selisih / $beratAwal) * 100;
                     }
 
-                    $isFlagged = $percentageDifference !== null && abs($percentageDifference) > 2;
+                    $isFlagged = $percentageDifference !== null
+                        && abs($percentageDifference) > ReceiptItem::FLAG_THRESHOLD_PERCENT;
 
                     ReceiptItem::create([
                         'purchase_receipt_id' => $receipt->id,
@@ -112,7 +117,7 @@ class IncomingGoodsService
                         'difference_grams' => $selisih,
                         'percentage_difference' => $percentageDifference,  // ✅ Correct calculation
                         'moisture_percentage' => $kadarAir,
-                        'is_flagged_red' => $isFlagged,  // ✅ 5% threshold
+                        'is_flagged_red' => $isFlagged,  // ✅ 2% threshold
                         'status' => ReceiptItem::STATUS_MENTAH,
                         'created_by' => auth()->id(),
                         'updated_by' => auth()->id(),
@@ -122,7 +127,7 @@ class IncomingGoodsService
                 return $receipt->load(['supplier', 'receiptItems.gradeSupplier']);
             });
         } catch (Exception $e) {
-            throw new Exception('Gagal menyimpan data: ' . $e->getMessage());
+            throw $e;
         }
     }
 
@@ -133,7 +138,14 @@ class IncomingGoodsService
     {
         try {
             return DB::transaction(function () use ($id, $data) {
-                $receipt = PurchaseReceipt::findOrFail($id);
+                $receipt = PurchaseReceipt::with('receiptItems.sortingResults')->findOrFail($id);
+
+                // Validasi: Jika ada item yang sudah di-grading, blok edit
+                foreach ($receipt->receiptItems as $item) {
+                    if ($item->sortingResults()->exists()) {
+                        throw new \Exception('Tidak dapat edit. Items sudah di-grading.');
+                    }
+                }
 
                 // Update receipt basic info
                 $receipt->update([
@@ -144,8 +156,10 @@ class IncomingGoodsService
                     'updated_by' => auth()->id(),
                 ]);
 
-                // Delete existing items
+                // Delete existing items (dengan audit trail deleted_by)
                 $receipt->receiptItems()->get()->each(function ($item) {
+                    $item->deleted_by = auth()->id();
+                    $item->save();
                     $item->delete();
                 });
 
@@ -160,7 +174,8 @@ class IncomingGoodsService
                         $percentageDifference = ($difference / $supplierWeight) * 100;
                     }
 
-                    $isFlagged = $percentageDifference !== null && abs($percentageDifference) > 5;
+                    $isFlagged = $percentageDifference !== null
+                        && abs($percentageDifference) > ReceiptItem::FLAG_THRESHOLD_PERCENT;
 
                     ReceiptItem::create([
                         'purchase_receipt_id' => $receipt->id,
@@ -180,7 +195,7 @@ class IncomingGoodsService
                 return $receipt->load(['supplier', 'receiptItems.gradeSupplier']);
             });
         } catch (Exception $e) {
-            throw new Exception('Gagal mengupdate data: ' . $e->getMessage());
+            throw $e;
         }
     }
 
@@ -191,7 +206,14 @@ class IncomingGoodsService
     {
         try {
             return DB::transaction(function () use ($id) {
-                $receipt = PurchaseReceipt::findOrFail($id);
+                $receipt = PurchaseReceipt::with('receiptItems.sortingResults')->findOrFail($id);
+
+                // Validasi: Jika ada item yang sudah di-grading, blok delete
+                foreach ($receipt->receiptItems as $item) {
+                    if ($item->sortingResults()->exists()) {
+                        throw new \Exception('Tidak dapat hapus. Items sudah di-grading.');
+                    }
+                }
 
                 // delete related items (trigger observer)
                 $receipt->receiptItems()->get()->each(function ($item) {
@@ -207,7 +229,7 @@ class IncomingGoodsService
                 return true;
             });
         } catch (Exception $e) {
-            throw new Exception('Gagal menghapus data: ' . $e->getMessage());
+            throw $e;
         }
     }
 
@@ -229,42 +251,11 @@ class IncomingGoodsService
             // Generate filename with filter info
             $filename = 'laporan_barang_masuk';
 
-            if (!empty($filters['month']) && !empty($filters['year'])) {
-                $monthNames = [
-                    '1' => 'Januari',
-                    '2' => 'Februari',
-                    '3' => 'Maret',
-                    '4' => 'April',
-                    '5' => 'Mei',
-                    '6' => 'Juni',
-                    '7' => 'Juli',
-                    '8' => 'Agustus',
-                    '9' => 'September',
-                    '10' => 'Oktober',
-                    '11' => 'November',
-                    '12' => 'Desember',
-                ];
-                $monthName = $monthNames[$filters['month']] ?? $filters['month'];
-                $filename .= '_bulan_' . $filters['month'] . '_tahun_' . $filters['year'];
-            } elseif (!empty($filters['year'])) {
-                $filename .= '_tahun_' . $filters['year'];
-            } elseif (!empty($filters['month'])) {
-                $monthNames = [
-                    '1' => 'Januari',
-                    '2' => 'Februari',
-                    '3' => 'Maret',
-                    '4' => 'April',
-                    '5' => 'Mei',
-                    '6' => 'Juni',
-                    '7' => 'Juli',
-                    '8' => 'Agustus',
-                    '9' => 'September',
-                    '10' => 'Oktober',
-                    '11' => 'November',
-                    '12' => 'Desember',
-                ];
-                $monthName = $monthNames[$filters['month']] ?? $filters['month'];
+            if (!empty($filters['month'])) {
                 $filename .= '_bulan_' . $filters['month'];
+            }
+            if (!empty($filters['year'])) {
+                $filename .= '_tahun_' . $filters['year'];
             }
 
             $filename .= '_' . date('Y-m-d') . '.xlsx';
@@ -272,7 +263,7 @@ class IncomingGoodsService
             return Excel::download(new IncomingGoodsExport($filters), $filename);
         } catch (\Exception $e) {
             Log::error('Export failed: ' . $e->getMessage());
-            throw new Exception('Gagal mengekspor data: ' . $e->getMessage());
+            throw $e;
         }
     }
 }

@@ -90,8 +90,14 @@
                     <div class="bg-white shadow-sm rounded-lg p-6">
                         <div class="flex justify-between items-center mb-4">
                             <h3 class="text-lg font-medium text-gray-900">Detail Item</h3>
-                            <button type="button" onclick="addNewItem()" 
-                                class="bg-blue-500 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm">
+                            @php
+                                $isGraded = $receipt->receiptItems->contains(function($item) {
+                                    return $item->sortingResults->isNotEmpty();
+                                });
+                            @endphp
+                            <button type="button" onclick="addNewItem()"
+                                class="bg-blue-500 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm {{ $isGraded ? 'opacity-50 cursor-not-allowed' : '' }}"
+                                {{ $isGraded ? 'disabled' : '' }}>
                                 Tambah Item
                             </button>
                         </div>
@@ -304,23 +310,31 @@
                 ? Math.round(percentage).toString()
                 : percentage.toFixed(1).replace('.', ',');
             
-            // ✅ FIX: Update threshold ke 5%
-            if (percentage > 5) {  // ✅ 5% threshold
-                displayText += ` | <span class="text-red-600 font-bold">Rasio: ${formattedDecimal} | ${formattedPercentage}% ⚠️</span>`;
+            // ✅ FIX: Update threshold ke 2%
+            if (percentage > 2) {  // ✅ 2% threshold
+                displayText += ` | Rasio: ${escapeHtml(formattedDecimal)} | ${escapeHtml(formattedPercentage)}% ⚠️`;
             } else if (percentage > 1) { // 1%
-                displayText += ` | <span class="text-orange-600">Rasio: ${formattedDecimal} | ${formattedPercentage}%</span>`;
+                displayText += ` | Rasio: ${escapeHtml(formattedDecimal)} | ${escapeHtml(formattedPercentage)}%`;
             } else {
-                displayText += ` | <span class="text-green-600">Rasio: ${formattedDecimal} | ${formattedPercentage}%</span>`;
+                displayText += ` | Rasio: ${escapeHtml(formattedDecimal)} | ${escapeHtml(formattedPercentage)}%`;
             }
         }
-        
-        displaySpan.innerHTML = displayText;
+
+        // ✅ FIX XSS: Gunakan textContent untuk hindari injection
+        displaySpan.textContent = displayText;
         displaySpan.className = `difference-display text-sm font-medium ${colorClass}`;
     }
 
     // ✅ Helper function untuk format angka Indonesia
     function formatNumber(number) {
         return new Intl.NumberFormat('id-ID').format(number);
+    }
+
+    // ✅ Helper function untuk escape HTML (mencegah XSS)
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
     }
 </script>
 @endpush
