@@ -86,36 +86,50 @@ class TrackingStockService
     {
         $gradeIds = GradeCompany::where('parent_grade_company_id', $parentId)->pluck('id');
 
-        // Sum only locations that have positive net total for the grade
-        // This simulates the "Gross" stock the user expects
-        $positiveTotal = 0;
-        foreach ($gradeIds as $id) {
-            $gradeStock = InventoryTransaction::where('grade_company_id', $id)
-                ->selectRaw('location_id, SUM(quantity_change_grams) as total')
-                ->groupBy('location_id')
-                ->get()
-                ->filter(fn($t) => $t->total > 0)
-                ->sum('total');
-            $positiveTotal += $gradeStock;
+        if ($gradeIds->isEmpty()) {
+            return 0;
         }
-        return (int) round($positiveTotal);
+
+        $total = InventoryTransaction::whereIn('grade_company_id', $gradeIds)
+            ->selectRaw('SUM(quantity_change_grams) as total')
+            ->value('total') ?? 0;
+
+        return (int) round(max(0, $total));
     }
 
     public function calculateParentNegativeStock(int $parentId): int
     {
         $gradeIds = GradeCompany::where('parent_grade_company_id', $parentId)->pluck('id');
 
-        $negativeTotal = 0;
-        foreach ($gradeIds as $id) {
-            $gradeStock = InventoryTransaction::where('grade_company_id', $id)
-                ->selectRaw('location_id, SUM(quantity_change_grams) as total')
-                ->groupBy('location_id')
-                ->get()
-                ->filter(fn($t) => $t->total < 0)
-                ->sum('total');
-            $negativeTotal += $gradeStock;
+        if ($gradeIds->isEmpty()) {
+            return 0;
         }
-        return (int) round($negativeTotal);
+
+        $total = InventoryTransaction::whereIn('grade_company_id', $gradeIds)
+            ->selectRaw('SUM(quantity_change_grams) as total')
+            ->value('total') ?? 0;
+
+        return (int) round(min(0, $total));
+    }
+
+    /**
+     * TS-02 Fix: Batch calculate global stock for multiple grade IDs in single query.
+     * Avoids N+1 query problem when calculating stock for multiple grades in loop.
+     */
+    public function calculateGlobalStockBulk(array $gradeIds): array
+    {
+        if (empty($gradeIds)) {
+            return [];
+        }
+
+        $results = InventoryTransaction::select('grade_company_id')
+            ->selectRaw('SUM(quantity_change_grams) as total_stock')
+            ->whereIn('grade_company_id', $gradeIds)
+            ->groupBy('grade_company_id')
+            ->pluck('total_stock', 'grade_company_id')
+            ->toArray();
+
+        return array_map(fn($v) => (int) round($v ?: 0), array_fill_keys($gradeIds, 0) + $results);
     }
 
     public function calculateParentSortStock(int $parentId): int
@@ -184,7 +198,10 @@ class TrackingStockService
             ->orderBy('location_id') // Optional sorting
             ->get();
 
-        \Illuminate\Support\Facades\Log::info("getStockPerLocation for Grade $gradeId: " . $results->count() . " rows found. Total Stock Sum: " . $results->sum('total_stock'));
+        // TS-06 fix: Remove debug Log::info from production
+        // if (app()->environment('local', 'development')) {
+        //     Log::info("getStockPerLocation for Grade $gradeId...", [...]);
+        // }
 
         return $results;
     }
