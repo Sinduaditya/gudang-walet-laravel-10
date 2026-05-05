@@ -11,10 +11,14 @@
                     <p class="mt-1 text-sm text-gray-600">Lengkapi hasil grading untuk item yang dipilih (Multiple Grade).
                     </p>
                 </div>
-                <a href="{{ route('grading-goods.step1') }}"
-                    class="inline-flex items-center px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 text-sm">
-                    Kembali
-                </a>
+                <form method="POST" action="{{ route('grading-goods.cancel.step2', $sortingResult->id) }}" class="inline">
+                    @csrf
+                    @method('DELETE')
+                    <button type="submit"
+                        class="inline-flex items-center px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 text-sm">
+                        Kembali
+                    </button>
+                </form>
             </div>
 
             <!-- Progress Steps -->

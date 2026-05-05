@@ -66,6 +66,14 @@ class GradeCompanyService
     {
         $gradeCompany = $this->getById($id);
 
+        // ✅ G-15: Cek apakah masih digunakan di sorting_results
+        $usageCount = $gradeCompany->sortingResults()->count();
+        if ($usageCount > 0) {
+            throw new \Exception(
+                "Grade company \"{$gradeCompany->name}\" tidak dapat dihapus karena masih digunakan di {$usageCount} data grading."
+            );
+        }
+
         if ($gradeCompany->image_url && Storage::disk('public')->exists($gradeCompany->image_url)) {
             Storage::disk('public')->delete($gradeCompany->image_url);
         }
@@ -76,6 +84,14 @@ class GradeCompanyService
 
     public function bulkAssign(int $parentGradeId, array $gradeCompanyIds)
     {
+        // ✅ G-17: Validasi parent ada
+        GradeCompany::findOrFail($parentGradeId);
+
+        // ✅ G-17: Validasi IDs tidak kosong
+        if (empty($gradeCompanyIds)) {
+            throw new \InvalidArgumentException('Tidak ada grade company yang dipilih.');
+        }
+
         return GradeCompany::whereIn('id', $gradeCompanyIds)->update(['parent_grade_company_id' => $parentGradeId]);
     }
 

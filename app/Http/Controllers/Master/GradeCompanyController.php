@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Services\GradeCompany\GradeCompanyService;
 use App\Http\Requests\GradeCompany\GradeCompanyRequest;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Log;
 use Maatwebsite\Excel\Facades\Excel;
 
 class GradeCompanyController extends Controller
@@ -33,7 +34,10 @@ class GradeCompanyController extends Controller
         try {
             return $this->GradeCompanyService->exportToExcel();
         } catch (\Exception $e) {
-            return back()->with('error', 'Gagal mengekspor data: ' . $e->getMessage());
+            Log::error('GradeCompany export error: ' . $e->getMessage(), [
+                'user_id' => auth()->id(),
+            ]);
+            return back()->with('error', 'Gagal mengekspor data. Silakan coba lagi.');
         }
     }
 
@@ -66,7 +70,11 @@ class GradeCompanyController extends Controller
 
     public function destroy(int $id)
     {
-        $this->GradeCompanyService->delete($id);
-        return redirect()->route('grade-company.index')->with('success', 'Grade company berhasil dihapus.');
+        try {
+            $this->GradeCompanyService->delete($id);
+            return redirect()->route('grade-company.index')->with('success', 'Grade company berhasil dihapus.');
+        } catch (\Exception $e) {
+            return back()->with('error', $e->getMessage());
+        }
     }
 }

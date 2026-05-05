@@ -11,7 +11,13 @@ class SortingResult extends Model
 
     protected $table = 'sorting_results';
 
-    protected $fillable = ['grading_date', 'receipt_item_id', 'grade_company_id', 'weight_grams', 'quantity', 'percentage_difference', 'notes', 'outgoing_type', 'category_grade', 'created_by', 'idm_management_id'];
+    protected $fillable = [
+        'grading_date', 'receipt_item_id', 'grade_company_id', 'weight_grams',
+        'quantity', 'percentage_difference', 'notes', 'outgoing_type', 'category_grade',
+        'created_by',
+        // idm_management_id: Di-set oleh modul IDM Management, bukan proses grading biasa
+        'idm_management_id'
+    ];
 
     const OUTGOING_TYPE_PENJUALAN_LANGSUNG = 'penjualan_langsung';
     const OUTGOING_TYPE_INTERNAL = 'internal';

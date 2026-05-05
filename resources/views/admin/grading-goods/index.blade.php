@@ -186,18 +186,17 @@
                                                     : number_format($percentage, 1, ',', '.');
 
                                             $percentageClass = 'text-gray-600';
-                                            if ($percentage > 5) {
+                                            // ✅ G-19: Threshold standar 2% (konsisten dengan barang masuk)
+                                            if ($percentage > 2) {
                                                 $percentageClass =
                                                     'text-red-600 font-bold bg-red-50 px-1 py-0.5 rounded';
-                                            } elseif ($percentage > 1) {
-                                                $percentageClass = 'text-orange-600 font-semibold';
                                             } elseif ($percentage > 0) {
-                                                $percentageClass = 'text-green-600';
+                                                $percentageClass = 'text-orange-600 font-semibold';
                                             }
                                         @endphp
                                         <span class="{{ $percentageClass }} font-semibold">
                                             {{ $percentageFormatted }}%
-                                            @if ($percentage > 5)
+                                            @if ($percentage > 2)
                                                 ⚠️
                                             @endif
                                         </span>
@@ -239,7 +238,8 @@
     </div>
 
     <!-- Delete Modal -->
-    <div id="deleteModal" class="hidden fixed inset-0 bg-black bg-opacity-40 z-50 flex items-center justify-center">
+    <div id="deleteModal" class="hidden fixed inset-0 bg-black bg-opacity-40 z-50 flex items-center justify-center"
+         data-url-template="{{ route('grading-goods.destroy', ['receiptItemId' => ':id']) }}">
         <div class="bg-white rounded-lg p-6 w-96">
             <h3 class="font-medium mb-4">Hapus Data</h3>
             <p class="text-sm text-gray-600 mb-4">Apakah Anda yakin ingin menghapus data grading ini?</p>
@@ -260,7 +260,8 @@
             function confirmDelete(id) {
                 const modal = document.getElementById('deleteModal');
                 const form = document.getElementById('deleteForm');
-                form.action = `grading-goods/delete/${id}`;
+                const urlTemplate = modal.dataset.urlTemplate;
+                form.action = urlTemplate.replace(':id', id);
                 modal.classList.remove('hidden');
             }
 

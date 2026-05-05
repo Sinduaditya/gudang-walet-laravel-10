@@ -11,7 +11,7 @@ class GradeCompanyRequest extends FormRequest
      */
     public function authorize(): bool
     {
-        return true;
+        return auth()->check();
     }
 
     /**
@@ -34,9 +34,9 @@ class GradeCompanyRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'name.required' => 'Nama lokasi wajib diisi.',
-            'name.string' => 'Nama lokasi harus berupa teks.',
-            'name.max' => 'Nama lokasi maksimal 255 karakter.',
+            'name.required' => 'Nama grade company wajib diisi.',
+            'name.string' => 'Nama grade company harus berupa teks.',
+            'name.max' => 'Nama grade company maksimal 255 karakter.',
             'image_url.image' => 'URL gambar harus berupa file gambar.',
             'image_url.mimes' => 'URL gambar harus berformat jpg, jpeg, atau png.',
             'image_url.max' => 'Ukuran gambar maksimal 2MB.',
