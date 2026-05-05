@@ -73,18 +73,39 @@ class BarangKeluarService
     // }
     public function getBatchRemainingStock(int $sortingResultId, ?int $locationId = null): float
     {
-        // Query transaksi untuk batch ini
-        $query = InventoryTransaction::where('sorting_result_id', $sortingResultId);
+        // 1. Dapatkan SortingResult
+        $sortingResult = SortingResult::find($sortingResultId);
+        if (!$sortingResult)
+            return 0;
 
-        // Jika location ditentukan, HANYA hitung transaksi di lokasi itu
+        $gradeCompanyId = $sortingResult->grade_company_id;
+
+        // 2. Hitung Stok khusus Batch ini (di lokasi tertentu jika ada)
+        $batchQuery = InventoryTransaction::where('sorting_result_id', $sortingResultId);
         if ($locationId) {
-            $query->where('location_id', $locationId);
+            $batchQuery->where('location_id', $locationId);
         }
+        $batchStock = (float) $batchQuery->sum('quantity_change_grams');
 
-        // Akumulasi semua transaksi (GRADING_IN positif + Outgoing negatif)
-        $totalStock = $query->sum('quantity_change_grams');
+        // 3. Hitung Total Stok Grade ini di lokasi tersebut
+        $gradeQuery = InventoryTransaction::where('grade_company_id', $gradeCompanyId);
+        if ($locationId) {
+            $gradeQuery->where('location_id', $locationId);
+        }
+        $totalGradeLocationStock = (float) $gradeQuery->sum('quantity_change_grams');
 
-        return max(0, $totalStock);
+        // 4. Hitung TOTAL STOK GRADE DI SELURUH GUDANG (Net Global)
+        // Ini kunci perbaikan: agar dropdown tidak melebihi stok asli keseluruhan
+        $globalNetStock = (float) InventoryTransaction::where('grade_company_id', $gradeCompanyId)
+            ->sum('quantity_change_grams');
+
+        // Dropdown harus menampilkan angka terkecil dari 3 pengecekan:
+        // - Stok batch itu sendiri
+        // - Stok grade di lokasi tersebut
+        // - Stok grade secara global (agar minus di gudang lain ikut diperhitungkan)
+        $finalStock = min($batchStock, $totalGradeLocationStock, $globalNetStock);
+
+        return max(0, $finalStock);
     }
 
     /**
@@ -374,32 +395,25 @@ class BarangKeluarService
         return $rows;
     }
 
-    /**
-     * Ambil stok tersedia untuk grade tertentu di lokasi tertentu
-     *
-     * @param int $gradeCompanyId
-     * @param int $locationId
-     * @return float Stok dalam gram
-     */
     public function getAvailableStock(int $gradeCompanyId, int $locationId): float
     {
-        $stock = InventoryTransaction::where('grade_company_id', $gradeCompanyId)->where('location_id', $locationId)->sum('quantity_change_grams');
-
-        return max(0, $stock); // Tidak boleh negatif
+        // Kembalikan angka apa adanya (bisa negatif) agar sistem tahu kondisi error data
+        return (float) InventoryTransaction::where('grade_company_id', $gradeCompanyId)
+            ->where('location_id', $locationId)
+            ->sum('quantity_change_grams');
     }
 
-    /**
-     * Validasi apakah stok mencukupi untuk transaksi
-     *
-     * @param int $gradeCompanyId
-     * @param int $locationId
-     * @param float $requiredGrams
-     * @return bool
-     */
     public function hasEnoughStock(int $gradeCompanyId, int $locationId, float $requiredGrams): bool
     {
-        $availableStock = $this->getAvailableStock($gradeCompanyId, $locationId);
-        return $availableStock >= $requiredGrams;
+        // 1. Stok di gudang lokal
+        $locationStock = $this->getAvailableStock($gradeCompanyId, $locationId);
+
+        // 2. Stok di seluruh sistem (Net Global)
+        $globalNetStock = (float) InventoryTransaction::where('grade_company_id', $gradeCompanyId)
+            ->sum('quantity_change_grams');
+
+        // Harus cukup di gudang lokal DAN cukup secara global
+        return ($locationStock >= $requiredGrams) && ($globalNetStock >= $requiredGrams);
     }
 
     /**
@@ -626,11 +640,74 @@ class BarangKeluarService
      * @param string $outgoingType
      * @return \Illuminate\Database\Eloquent\Collection
      */
-    public function getGradingSources(string $outgoingType)
+    /**
+     * Get Grading Sources (Sorting Results) with adjusted stock weights.
+     * This implements 'Global Budgeting' logic so the SUM of weights in dropdown
+     * will never exceed the total Global Net Stock of the grade.
+     *
+     * @param string $outgoingType
+     * @param int $locationId
+     * @return \Illuminate\Support\Collection
+     */
+    public function getGradingSourcesWithStock(string $outgoingType, int $locationId)
     {
-        return \App\Models\SortingResult::with(['gradeCompany', 'receiptItem.purchaseReceipt.supplier'])
+        $sources = \App\Models\SortingResult::with(['gradeCompany', 'receiptItem.purchaseReceipt.supplier'])
             ->where('outgoing_type', $outgoingType)
             ->orderBy('grading_date', 'desc')
             ->get();
+
+        $budgetPools = []; // Menampung budget berdasarkan Parent ID (atau Grade ID jika tidak ada parent)
+        $locationBudgets = [];
+
+        return $sources->map(function ($source) use ($locationId, &$budgetPools, &$locationBudgets) {
+            $grade = $source->gradeCompany;
+            if (!$grade)
+                return null;
+
+            $gradeId = $grade->id;
+            $parentId = $grade->parent_grade_company_id;
+
+            // Kunci budget: Gunakan Parent ID jika ada, agar satu keluarga grade berbagi pengurang minus
+            $budgetKey = $parentId ? "parent_{$parentId}" : "grade_{$gradeId}";
+
+            // 1. Inisialisasi Budget Global (Total Net satu keluarga Grade)
+            if (!isset($budgetPools[$budgetKey])) {
+                if ($parentId) {
+                    $childIds = GradeCompany::where('parent_grade_company_id', $parentId)->pluck('id');
+                    $budgetPools[$budgetKey] = (float) InventoryTransaction::whereIn('grade_company_id', $childIds)
+                        ->sum('quantity_change_grams');
+                } else {
+                    $budgetPools[$budgetKey] = (float) InventoryTransaction::where('grade_company_id', $gradeId)
+                        ->sum('quantity_change_grams');
+                }
+            }
+
+            // 2. Inisialisasi Budget Lokal (Fisik di gudang terpilih - tetap per Grade)
+            if (!isset($locationBudgets[$gradeId])) {
+                $locationBudgets[$gradeId] = (float) InventoryTransaction::where('grade_company_id', $gradeId)
+                    ->where('location_id', $locationId)
+                    ->sum('quantity_change_grams');
+            }
+
+            // 3. Stok asli batch ini di lokasi tersebut
+            $batchStock = (float) InventoryTransaction::where('sorting_result_id', $source->id)
+                ->where('location_id', $locationId)
+                ->sum('quantity_change_grams');
+
+            // 4. Ambil yang paling membatasi
+            $displayWeight = max(0, min($batchStock, $locationBudgets[$gradeId], $budgetPools[$budgetKey]));
+
+            // 5. Kurangi budget
+            $locationBudgets[$gradeId] -= $displayWeight;
+            $budgetPools[$budgetKey] -= $displayWeight;
+
+            // Info tambahan untuk UI
+            $source->adjusted_weight = $displayWeight;
+            $source->real_global_stock = $budgetPools[$budgetKey] + $displayWeight; // Sisa budget keluarga
+
+            return $source;
+        })->filter(function ($source) {
+            return $source && $source->adjusted_weight > 0;
+        });
     }
 }

@@ -11,10 +11,16 @@ use Carbon\Carbon;
 use App\Models\InventoryTransaction;
 use App\Models\Location;
 use Illuminate\Support\Facades\Auth;
+use App\Services\BarangKeluar\BarangKeluarService;
 
 class TransferIdmService
 {
-    // ... (existing methods getTransfers, getAvailableIdmDetails, generateTransferCode) ...
+    protected $barangKeluarService;
+
+    public function __construct(BarangKeluarService $barangKeluarService)
+    {
+        $this->barangKeluarService = $barangKeluarService;
+    }
 
     public function getTransfers($filters = [])
     {
@@ -143,7 +149,16 @@ class TransferIdmService
 
                         if ($totalOutputWeight > 0 && $management->initial_weight > 0) {
                             $factor = $management->initial_weight / $totalOutputWeight;
-                            $deductionWeight = round($item['weight'] * $factor);
+                            $deductionWeight = round($item['weight'] * $factor, 2);
+                        }
+
+                        $gradeCompanyId = $detailModel->idmManagement->grade_company_id;
+
+                        // STOK CHECK: Pastikan stok Global & Lokal mencukupi
+                        if (!$this->barangKeluarService->hasEnoughStock($gradeCompanyId, $sourceLocationId, $deductionWeight)) {
+                            $available = $this->barangKeluarService->getAvailableStock($gradeCompanyId, $sourceLocationId);
+                            $gradeName = $detailModel->idmManagement->gradeCompany->name ?? 'Grade';
+                            throw new \Exception("Stok tidak mencukupi untuk item {$item['grade_idm_name']} (Grade: {$gradeName}). Dibutuhkan: {$deductionWeight}g, Tersedia: {$available}g");
                         }
 
                         // Ensure precise rounding not needed if DB handles float, but logically consistent
