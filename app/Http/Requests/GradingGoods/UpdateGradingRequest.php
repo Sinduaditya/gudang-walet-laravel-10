@@ -6,32 +6,34 @@ use Illuminate\Foundation\Http\FormRequest;
 
 class UpdateGradingRequest extends FormRequest
 {
-    public function authorize()
+    public function authorize(): bool
     {
-        return true; // Asumsi user yang login boleh mengedit
+        return auth()->check();
     }
 
-    public function rules()
+    public function rules(): array
     {
         return [
-            'grading_date' => 'required|date',
-            'receipt_item_id' => 'required|exists:receipt_items,id',
-            'quantity' => 'required|integer|min:1',
-            'grade_company_name' => 'required|string|max:255',
-            'weight_grams' => 'required|numeric|min:0.01',
-            'notes' => 'nullable|string',
+            'grades'                      => 'required|array|min:1',
+            'grades.*.grading_date'       => 'required|date',
+            'grades.*.grade_company_name' => 'required|string|max:255',
+            'grades.*.quantity'           => 'required|numeric|min:0',
+            'grades.*.weight_grams'       => 'required|numeric|min:0',
+            'grades.*.notes'             => 'nullable|string|max:1000',
+            'grades.*.outgoing_type'     => 'nullable|in:penjualan_langsung,internal,external',
+            'grades.*.category_grade'     => 'nullable|in:IDM A,IDM B',
+            'global_notes'                 => 'nullable|string|max:1000',
         ];
     }
 
-    public function messages()
+    public function messages(): array
     {
         return [
-            'grading_date.required' => 'Tanggal grading wajib diisi.',
-            'receipt_item_id.required' => 'Nama grade supplier (item) wajib dipilih.',
-            'receipt_item_id.exists' => 'Item yang dipilih tidak valid.',
-            'quantity.required' => 'Kuantitas wajib diisi.',
-            'grade_company_name.required' => 'Nama grade company wajib diisi.',
-            'weight_grams.required' => 'Berat setelah grading wajib diisi.',
+            'grades.required'                       => 'Minimal satu grade harus diisi.',
+            'grades.*.grading_date.required'        => 'Tanggal grading harus diisi.',
+            'grades.*.grade_company_name.required' => 'Nama grade company harus diisi.',
+            'grades.*.quantity.required'            => 'Jumlah item harus diisi.',
+            'grades.*.weight_grams.required'        => 'Berat hasil harus diisi.',
         ];
     }
 }

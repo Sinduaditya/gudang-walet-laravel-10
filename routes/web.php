@@ -79,6 +79,7 @@ Route::middleware(['auth'])->group(function () {
                 Route::get('/edit/{receiptItemId}', [GradingGoodsController::class, 'edit'])->name('edit');
                 Route::put('/update/{receiptItemId}', [GradingGoodsController::class, 'update'])->name('update');
                 Route::delete('/delete/{receiptItemId}', [GradingGoodsController::class, 'destroy'])->name('destroy');
+                Route::delete('/cancel/{sortingResultId}', [GradingGoodsController::class, 'cancelStep2'])->name('cancel.step2');
             });
 
         // Export Data Master to Excel

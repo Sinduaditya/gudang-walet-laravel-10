@@ -14,7 +14,8 @@ class Step1Request extends FormRequest
     public function rules()
     {
         return [
-            'grading_date' => 'required|date',
+            // ✅ G-22: Tambah validasi before_or_equal:today
+            'grading_date' => 'required|date|before_or_equal:today',
             'receipt_item_id' => 'required|exists:receipt_items,id',
         ];
     }

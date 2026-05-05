@@ -31,7 +31,7 @@ class GradingGoodsController extends Controller
 
         $gradings = $this->gradingGoodsService->getAllGrading($filters);
 
-        $suppliers = \App\Models\Supplier::orderBy('name')->get();
+        $suppliers = $this->gradingGoodsService->getSuppliers();
 
         return view('admin.grading-goods.index', compact('gradings', 'suppliers'));
     }
@@ -41,7 +41,8 @@ class GradingGoodsController extends Controller
         $allGradingResults = $this->gradingGoodsService->getSortingResultsByReceiptItem($receiptItemId);
 
         if ($allGradingResults->isEmpty()) {
-            return abort(404, 'Grading not found');
+            return redirect()->route('grading-goods.index')
+                ->with('error', 'Data grading tidak ditemukan.');
         }
 
         $grading = $allGradingResults->first();
@@ -52,7 +53,10 @@ class GradingGoodsController extends Controller
         $month = $request->get('month');
         $year = $request->get('year');
 
-        return view('admin.grading-goods.show', compact('grading', 'allGradingResults', 'notaWeight', 'page', 'month', 'year'));
+        // ✅ G-01: Cek apakah grading bisa di-edit (belum ada transaksi keluar)
+        $canEdit = !$this->isGradingUsedInOutgoingTransaction($receiptItemId);
+
+        return view('admin.grading-goods.show', compact('grading', 'allGradingResults', 'notaWeight', 'page', 'month', 'year', 'canEdit'));
     }
 
     public function createStep1(Request $request)
@@ -98,14 +102,26 @@ class GradingGoodsController extends Controller
                 ->route('grading-goods.index')
                 ->with('success', "Grading berhasil disimpan! Menghasilkan {$gradesCount} grade dengan total berat {$totalWeight} gram.");
         } catch (\Exception $e) {
-            return back()
-                ->withInput()
-                ->with('error', 'Terjadi kesalahan: ' . $e->getMessage());
+            \Illuminate\Support\Facades\Log::error('GradingGoods storeStep2 error: ' . $e->getMessage(), [
+                'user_id' => auth()->id(),
+                'sorting_result_id' => $id,
+            ]);
+            return back()->withInput()->with('error', 'Terjadi kesalahan sistem. Silakan coba lagi atau hubungi administrator.');
         }
     }
 
     public function export(Request $request)
     {
+        // ✅ G-12: Wajib pilih minimal satu filter
+        $hasFilter = !empty($request->get('month'))
+            || !empty($request->get('year'))
+            || !empty($request->get('supplier_name'))
+            || !empty($request->get('grading_date'));
+
+        if (!$hasFilter) {
+            return back()->with('error', 'Pilih minimal satu filter (Bulan, Tahun, Supplier, atau Tanggal Grading) sebelum export.');
+        }
+
         $filters = [
             'month' => $request->get('month'),
             'year' => $request->get('year'),
@@ -145,6 +161,12 @@ class GradingGoodsController extends Controller
             return redirect()->route('grading-goods.index')->with('error', 'Data grading tidak ditemukan.');
         }
 
+        // ✅ G-01: Cek apakah grading sudah digunakan di transaksi keluar
+        if ($this->isGradingUsedInOutgoingTransaction($receiptItemId)) {
+            return redirect()->route('grading-goods.show', $receiptItemId)
+                ->with('error', 'Tidak dapat edit. Grading sudah digunakan dalam transaksi barang keluar.');
+        }
+
         $receiptItem = $allGradingResults->first()->receiptItem;
         $allGradeCompanies = $this->gradingGoodsService->getAllGradeCompanies();
 
@@ -155,18 +177,30 @@ class GradingGoodsController extends Controller
         return view('admin.grading-goods.edit', compact('allGradingResults', 'receiptItem', 'allGradeCompanies', 'page', 'month', 'year'));
     }
 
-    public function update(Request $request, $receiptItemId)
+    /**
+     * ✅ G-01: Helper cek apakah grading sudah dipakai di transaksi keluar
+     */
+    private function isGradingUsedInOutgoingTransaction($receiptItemId): bool
     {
-        $request->validate([
-            'grades.*.grading_date' => 'required|date',
-            'grades.*.grade_company_name' => 'required|string|max:255',
-            'grades.*.quantity' => 'required|numeric|min:0',
-            'grades.*.weight_grams' => 'required|numeric|min:0',
-            'grades.*.notes' => 'nullable|string',
-            'grades.*.outgoing_type' => 'nullable|in:penjualan_langsung,internal,external',
-            'grades.*.category_grade' => 'nullable|in:IDM A,IDM B',
-            'global_notes' => 'nullable|string',
-        ]);
+        $sortingResults = $this->gradingGoodsService->getSortingResultsByReceiptItem($receiptItemId);
+
+        foreach ($sortingResults as $sr) {
+            $hasOutgoing = \App\Models\InventoryTransaction::where('sorting_result_id', $sr->id)
+                ->where('transaction_type', '!=', 'GRADING_IN')
+                ->exists();
+
+            if ($hasOutgoing) return true;
+        }
+
+        return false;
+    }
+
+    public function update(UpdateGradingRequest $request, $receiptItemId)
+    {
+        // ✅ G-01: Cek apakah grading sudah digunakan di transaksi keluar
+        if ($this->isGradingUsedInOutgoingTransaction($receiptItemId)) {
+            return back()->with('error', 'Tidak dapat edit. Grading sudah digunakan dalam transaksi barang keluar.');
+        }
 
         try {
             $grades = $request->input('grades');
@@ -194,9 +228,11 @@ class GradingGoodsController extends Controller
 
             return redirect()->route('grading-goods.show', array_merge(['receiptItemId' => $receiptItemId], $redirectParams))->with('success', 'Data grading berhasil diperbarui.');
         } catch (\Exception $e) {
-            return back()
-                ->withInput()
-                ->with('error', 'Terjadi kesalahan: ' . $e->getMessage());
+            \Illuminate\Support\Facades\Log::error('GradingGoods update error: ' . $e->getMessage(), [
+                'user_id' => auth()->id(),
+                'receipt_item_id' => $receiptItemId,
+            ]);
+            return back()->withInput()->with('error', 'Terjadi kesalahan sistem. Silakan coba lagi atau hubungi administrator.');
         }
     }
 
@@ -206,7 +242,30 @@ class GradingGoodsController extends Controller
             $this->gradingGoodsService->deleteGrading($receiptItemId);
             return redirect()->route('grading-goods.index')->with('success', 'Data grading berhasil dihapus.');
         } catch (\Exception $e) {
-            return back()->with('error', 'Gagal menghapus data: ' . $e->getMessage());
+            \Illuminate\Support\Facades\Log::error('GradingGoods destroy error: ' . $e->getMessage(), [
+                'user_id' => auth()->id(),
+                'receipt_item_id' => $receiptItemId,
+            ]);
+            return back()->with('error', 'Terjadi kesalahan sistem. Silakan coba lagi atau hubungi administrator.');
         }
+    }
+
+    // ✅ G-21: Cancel Step 2 - cleanup orphan SortingResult
+    public function cancelStep2($sortingResultId)
+    {
+        $sortingResult = \App\Models\SortingResult::find($sortingResultId);
+
+        if ($sortingResult && is_null($sortingResult->weight_grams)) {
+            $sortingResult->deleted_by = auth()->id();
+            $sortingResult->save();
+            $sortingResult->delete();
+
+            \Illuminate\Support\Facades\Log::info('Orphan SortingResult dari Step 1 dihapus via cancel', [
+                'sorting_result_id' => $sortingResultId,
+                'user_id' => auth()->id(),
+            ]);
+        }
+
+        return redirect()->route('grading-goods.step1')->with('info', 'Proses grading dibatalkan.');
     }
 }
