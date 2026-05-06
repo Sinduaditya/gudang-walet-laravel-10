@@ -645,6 +645,8 @@ class BarangKeluarService
      * This implements 'Global Budgeting' logic so the SUM of weights in dropdown
      * will never exceed the total Global Net Stock of the grade.
      *
+     * OPTIMIZED: Pre-calculates all stock data in batch queries to avoid N+1.
+     *
      * @param string $outgoingType
      * @param int $locationId
      * @return \Illuminate\Support\Collection
@@ -656,54 +658,93 @@ class BarangKeluarService
             ->orderBy('grading_date', 'desc')
             ->get();
 
-        $budgetPools = []; // Menampung budget berdasarkan Parent ID (atau Grade ID jika tidak ada parent)
-        $locationBudgets = [];
+        if ($sources->isEmpty()) {
+            return $sources;
+        }
 
-        return $sources->map(function ($source) use ($locationId, &$budgetPools, &$locationBudgets) {
+        // Pre-fetch all grade IDs grouped by parent
+        $gradeIdsByParent = [];
+        $orphanGradeIds = [];
+        $gradeIdToParentMap = [];
+
+        foreach ($sources as $source) {
             $grade = $source->gradeCompany;
-            if (!$grade)
-                return null;
+            if (!$grade) continue;
 
             $gradeId = $grade->id;
             $parentId = $grade->parent_grade_company_id;
+            $gradeIdToParentMap[$gradeId] = $parentId;
 
-            // Kunci budget: Gunakan Parent ID jika ada, agar satu keluarga grade berbagi pengurang minus
+            if ($parentId) {
+                if (!isset($gradeIdsByParent[$parentId])) {
+                    $gradeIdsByParent[$parentId] = [];
+                }
+                $gradeIdsByParent[$parentId][] = $gradeId;
+            } else {
+                $orphanGradeIds[] = $gradeId;
+            }
+        }
+
+        // Pre-calculate ALL budget pools in ONE query per parent group
+        $budgetPools = [];
+        foreach ($gradeIdsByParent as $parentId => $childIds) {
+            $total = (float) InventoryTransaction::whereIn('grade_company_id', $childIds)
+                ->sum('quantity_change_grams');
+            $budgetPools["parent_{$parentId}"] = $total;
+        }
+        // Handle orphan grades (no parent)
+        foreach ($orphanGradeIds as $gradeId) {
+            $total = (float) InventoryTransaction::where('grade_company_id', $gradeId)
+                ->sum('quantity_change_grams');
+            $budgetPools["grade_{$gradeId}"] = $total;
+        }
+
+        // Pre-calculate ALL location budgets in ONE query
+        $allGradeIds = array_merge($orphanGradeIds, array_merge(...array_values($gradeIdsByParent)));
+        $locationBudgetResults = InventoryTransaction::select('grade_company_id')
+            ->selectRaw('SUM(quantity_change_grams) as total_stock')
+            ->whereIn('grade_company_id', $allGradeIds)
+            ->where('location_id', $locationId)
+            ->groupBy('grade_company_id')
+            ->pluck('total_stock', 'grade_company_id')
+            ->toArray();
+        $locationBudgets = array_map('floatval', $locationBudgetResults);
+
+        // Pre-calculate ALL batch stocks in ONE query
+        $sourceIds = $sources->pluck('id')->toArray();
+        $batchStockResults = InventoryTransaction::select('sorting_result_id')
+            ->selectRaw('SUM(quantity_change_grams) as batch_stock')
+            ->whereIn('sorting_result_id', $sourceIds)
+            ->where('location_id', $locationId)
+            ->groupBy('sorting_result_id')
+            ->pluck('batch_stock', 'sorting_result_id')
+            ->toArray();
+        $batchStocks = array_map('floatval', $batchStockResults);
+
+        // Now iterate using pre-calculated data (NO additional queries)
+        return $sources->map(function ($source) use ($locationId, &$budgetPools, &$locationBudgets, $batchStocks, $gradeIdToParentMap) {
+            $grade = $source->gradeCompany;
+            if (!$grade) return null;
+
+            $gradeId = $grade->id;
+            $parentId = $gradeIdToParentMap[$gradeId] ?? null;
             $budgetKey = $parentId ? "parent_{$parentId}" : "grade_{$gradeId}";
 
-            // 1. Inisialisasi Budget Global (Total Net satu keluarga Grade)
-            if (!isset($budgetPools[$budgetKey])) {
-                if ($parentId) {
-                    $childIds = GradeCompany::where('parent_grade_company_id', $parentId)->pluck('id');
-                    $budgetPools[$budgetKey] = (float) InventoryTransaction::whereIn('grade_company_id', $childIds)
-                        ->sum('quantity_change_grams');
-                } else {
-                    $budgetPools[$budgetKey] = (float) InventoryTransaction::where('grade_company_id', $gradeId)
-                        ->sum('quantity_change_grams');
-                }
-            }
+            // Get pre-calculated values (default to 0 if not found)
+            $batchStock = $batchStocks[$source->id] ?? 0;
+            $locationBudget = $locationBudgets[$gradeId] ?? 0;
+            $globalBudget = $budgetPools[$budgetKey] ?? 0;
 
-            // 2. Inisialisasi Budget Lokal (Fisik di gudang terpilih - tetap per Grade)
-            if (!isset($locationBudgets[$gradeId])) {
-                $locationBudgets[$gradeId] = (float) InventoryTransaction::where('grade_company_id', $gradeId)
-                    ->where('location_id', $locationId)
-                    ->sum('quantity_change_grams');
-            }
+            // Calculate display weight
+            $displayWeight = max(0, min($batchStock, $locationBudget, $globalBudget));
 
-            // 3. Stok asli batch ini di lokasi tersebut
-            $batchStock = (float) InventoryTransaction::where('sorting_result_id', $source->id)
-                ->where('location_id', $locationId)
-                ->sum('quantity_change_grams');
-
-            // 4. Ambil yang paling membatasi
-            $displayWeight = max(0, min($batchStock, $locationBudgets[$gradeId], $budgetPools[$budgetKey]));
-
-            // 5. Kurangi budget
-            $locationBudgets[$gradeId] -= $displayWeight;
-            $budgetPools[$budgetKey] -= $displayWeight;
+            // Update running totals
+            $locationBudgets[$gradeId] = ($locationBudgets[$gradeId] ?? 0) - $displayWeight;
+            $budgetPools[$budgetKey] = ($budgetPools[$budgetKey] ?? 0) - $displayWeight;
 
             // Info tambahan untuk UI
             $source->adjusted_weight = $displayWeight;
-            $source->real_global_stock = $budgetPools[$budgetKey] + $displayWeight; // Sisa budget keluarga
+            $source->real_global_stock = $budgetPools[$budgetKey] + $displayWeight;
 
             return $source;
         })->filter(function ($source) {
