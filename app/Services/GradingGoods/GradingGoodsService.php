@@ -165,80 +165,6 @@ class GradingGoodsService
         return SortingResult::with(['receiptItem.purchaseReceipt.supplier', 'receiptItem.gradeSupplier', 'gradeCompany'])->find($id);
     }
 
-    public function updateMultipleSortingResults($receiptItemId, array $gradesData, $globalNotes = null)
-    {
-        try {
-            return DB::transaction(function () use ($receiptItemId, $gradesData, $globalNotes) {
-                $receiptItem = ReceiptItem::findOrFail($receiptItemId);
-
-                // Hapus semua sorting results lama untuk receipt item ini
-                $oldSortingResults = SortingResult::where('receipt_item_id', $receiptItemId)->get();
-                foreach ($oldSortingResults as $oldResult) {
-                    $this->deleteInventoryFromGrading($oldResult->id);
-                }
-                SortingResult::where('receipt_item_id', $receiptItemId)->get()->each(function ($item) {
-                    $item->deleted_by = auth()->id();
-                    $item->save();
-                    $item->delete();
-                });
-
-                $createdResults = [];
-
-                // Buat sorting result baru untuk setiap grade
-                foreach ($gradesData as $index => $gradeData) {
-                    $gradeCompany = GradeCompany::firstOrCreate(
-                        ['name' => $gradeData['grade_company_name']],
-                        ['name' => $gradeData['grade_company_name']]
-                    );
-
-                    $warehouseWeight = $receiptItem->warehouse_weight_grams;
-
-                    // ✅ FIX: Pastikan casting ke integer
-                    $weightGrams = (int) $gradeData['weight_grams'];
-                    $quantity = (int) $gradeData['quantity'];
-
-                    $percentageDifference = $warehouseWeight > 0
-                        ? abs((($weightGrams - $warehouseWeight) / $warehouseWeight) * 100)
-                        : 0;
-
-                    // Gabungkan catatan
-                    $notes = collect([
-                        $globalNotes,
-                        $gradeData['notes'] ?? null,
-                        $index > 0 ? 'Grade ke-' . ($index + 1) . ' dari grading berganda' : null
-                    ])->filter()->implode('. ');
-
-                    $sortingResult = SortingResult::create([
-                        'grading_date' => $gradeData['grading_date'],
-                        'receipt_item_id' => $receiptItemId,
-                        'quantity' => $quantity, // ✅ Sudah integer
-                        'grade_company_id' => $gradeCompany->id,
-                        'weight_grams' => $weightGrams, // ✅ Sudah integer
-                        'percentage_difference' => round($percentageDifference, 2),
-                        'notes' => $notes,
-                        'outgoing_type' => $gradeData['outgoing_type'] ?? null,
-                        'category_grade' => $gradeData['category_grade'] ?? null,
-                        'created_by' => auth()->id(),
-                    ]);
-
-                    $this->createInventoryFromGrading($sortingResult);
-                    $createdResults[] = $sortingResult;
-                }
-
-                // ✅ G-03: Pastikan status receipt_item tetap SELESAI_DISORTIR setelah edit
-                $receiptItem->update(['status' => ReceiptItem::STATUS_SELESAI_DISORTIR]);
-
-                return $createdResults;
-            });
-        } catch (Exception $e) {
-            Log::error('Gagal update multiple grading: ' . $e->getMessage(), [
-                'receipt_item_id' => $receiptItemId,
-                'error' => $e->getMessage(),
-                'grades_data' => $gradesData
-            ]);
-            throw $e;
-        }
-    }
 
     public function updateSortingResultStep2Multiple($sortingResultId, array $grades, $globalNotes = null)
     {
@@ -330,9 +256,20 @@ class GradingGoodsService
     {
         try {
             return DB::transaction(function () use ($receiptItemId) {
-                // ✅ Hapus semua sorting results untuk receipt item ini
                 $sortingResults = SortingResult::where('receipt_item_id', $receiptItemId)->get();
 
+                // ✅ Guard: Cek apakah ada transaksi keluar yang menggunakan grading ini
+                foreach ($sortingResults as $sorting) {
+                    $hasOutgoing = InventoryTransaction::where('sorting_result_id', $sorting->id)
+                        ->where('transaction_type', '!=', 'GRADING_IN')
+                        ->exists();
+
+                    if ($hasOutgoing) {
+                        throw new Exception('Tidak dapat hapus. Grading sudah digunakan dalam transaksi barang keluar (penjualan/transfer). Hubungi administrator jika perlu koreksi.');
+                    }
+                }
+
+                // ✅ Hapus semua sorting results beserta inventory-nya
                 foreach ($sortingResults as $sorting) {
                     $this->deleteInventoryFromGrading($sorting->id);
                     $sorting->deleted_by = auth()->id();
@@ -349,7 +286,10 @@ class GradingGoodsService
                 return true;
             });
         } catch (Exception $e) {
-            Log::error('Gagal hapus grading: ' . $e->getMessage());
+            Log::error('Gagal hapus grading: ' . $e->getMessage(), [
+                'receipt_item_id' => $receiptItemId,
+                'user_id' => auth()->id(),
+            ]);
             throw $e;
         }
     }

@@ -141,16 +141,16 @@ Secara design, **ini problematik** karena:
 | Severity | ID | Aspek | Masalah | Lokasi | Status |
 |----------|----|-------|---------|--------|--------|
 | 🔴 HIGH | G-01 | Logic/Business | Grading bisa di-edit meski `sorting_result` sudah dipakai di transaksi barang keluar (penjualan/transfer) — stok bisa tidak konsisten | `GradingGoodsController::edit()` + `update()` | ✅ Done |
-| 🟡 MEDIUM | G-02 | Bug | Error message di `storeStep2` dan `destroy` langsung ekspos `$e->getMessage()` ke user | `GradingGoodsController.php:103, 209` | 🔴 Open |
-| 🟡 MEDIUM | G-03 | Bug | `updateMultipleSortingResults()` tidak update status `receipt_item` — status bisa tidak sinkron setelah edit | `GradingGoodsService.php:204-274` | 🔴 Open |
-| 🟡 MEDIUM | G-04 | Logic | `createInventoryFromGrading()` **silent fail** jika `Gudang Utama` tidak ditemukan — grading berhasil tapi stok tidak masuk | `GradingGoodsService.php:423-427` | 🔴 Open |
-| 🟡 MEDIUM | G-05 | Bug | `updateFullGrading()` ada di service tapi **tidak dipanggil dari manapun** — dead method | `GradingGoodsService.php:362-391` | 🔴 Open |
-| 🟡 MEDIUM | G-06 | Logic | `getAllGrading()` dan `getAllGradingForExport()` adalah **duplikasi query yang identik** — DRY violation, satu perubahan bisa lupa diaplikasikan di yang lain | `GradingGoodsService.php:22-83 vs 85-147` | 🔴 Open |
-| 🟡 MEDIUM | G-07 | Security | `update()` di controller tidak pakai FormRequest — validasi inline bisa terlewat jika ada field baru | `GradingGoodsController.php:160-168` | 🔴 Open |
-| 🟢 LOW | G-08 | Bug | `step3.blade.php` ada di direktori tapi file kosong — route tidak ada, membingungkan | `resources/views/admin/grading-goods/step3.blade.php` | 🔴 Open |
-| 🟢 LOW | G-09 | Data | `idm_management_id` di fillable `SortingResult` tapi tidak pernah di-set saat create grading — selalu null | `SortingResult.php:14`, `GradingGoodsService.php:247` | 🔴 Open |
-| 🟢 LOW | G-10 | N+1 | `index` controller memanggil `Supplier::orderBy()->get()` langsung, bukan via service | `GradingGoodsController.php:34` | 🔴 Open |
-| 🟢 LOW | G-11 | Error | `show()` mengembalikan `abort(404)` untuk grading tidak ditemukan — tidak konsisten dengan pattern lain yang redirect dengan error | `GradingGoodsController.php:44` | 🔴 Open |
+| 🟡 MEDIUM | G-02 | Bug | Error message di `storeStep2` dan `destroy` langsung ekspos `$e->getMessage()` ke user | `GradingGoodsController.php:103, 209` | ✅ Done |
+| 🟡 MEDIUM | G-03 | Bug | `updateMultipleSortingResults()` tidak update status `receipt_item` — status bisa tidak sinkron setelah edit | `GradingGoodsService.php:204-274` | ✅ Done |
+| 🟡 MEDIUM | G-04 | Logic | `createInventoryFromGrading()` **silent fail** jika `Gudang Utama` tidak ditemukan — grading berhasil tapi stok tidak masuk | `GradingGoodsService.php:423-427` | ✅ Done |
+| 🟡 MEDIUM | G-05 | Bug | `updateFullGrading()` ada di service tapi **tidak dipanggil dari manapun** — dead method | `GradingGoodsService.php:362-391` | ✅ Done |
+| 🟡 MEDIUM | G-06 | Logic | `getAllGrading()` dan `getAllGradingForExport()` adalah **duplikasi query yang identik** — DRY violation, satu perubahan bisa lupa diaplikasikan di yang lain | `GradingGoodsService.php:22-83 vs 85-147` | ✅ Done |
+| 🟡 MEDIUM | G-07 | Security | `update()` di controller tidak pakai FormRequest — validasi inline bisa terlewat jika ada field baru | `GradingGoodsController.php:160-168` | ✅ Done |
+| 🟢 LOW | G-08 | Bug | `step3.blade.php` ada di direktori tapi file kosong — route tidak ada, membingungkan | `resources/views/admin/grading-goods/step3.blade.php` | ✅ Done |
+| 🟢 LOW | G-09 | Data | `idm_management_id` di fillable `SortingResult` tapi tidak pernah di-set saat create grading — selalu null | `SortingResult.php:14`, `GradingGoodsService.php:247` | ✅ Done |
+| 🟢 LOW | G-10 | N+1 | `index` controller memanggil `Supplier::orderBy()->get()` langsung, bukan via service | `GradingGoodsController.php:34` | ✅ Done |
+| 🟢 LOW | G-11 | Error | `show()` mengembalikan `abort(404)` untuk grading tidak ditemukan — tidak konsisten dengan pattern lain yang redirect dengan error | `GradingGoodsController.php:44` | ✅ Done |
 | 🟢 LOW | G-12 | Export | Export grading tidak punya filter wajib — bisa load semua data jika tidak ada filter | `GradingGoodsController.php:107-138` | ✅ Done |
 | 🟡 MEDIUM | G-13 | UX/Logic | Tombol Edit di `show.blade.php` sudah conditional — `$canEdit` dari controller | `show.blade.php:23`, `GradingGoodsController.php:57` | ✅ Done |
 
@@ -733,26 +733,26 @@ User yang mendapat error validasi akan membaca "Nama **lokasi** wajib diisi" pad
 | ID | Issue | Severity | Status |
 |----|-------|----------|--------|
 | G-01 | Grading bisa di-edit meski sudah dipakai di transaksi keluar | 🔴 HIGH | ✅ Done |
-| G-02 | Error message ekspos `$e->getMessage()` ke user (controller grading) | 🟡 MEDIUM | 🔴 Open |
-| G-03 | Status `receipt_item` tidak di-update saat edit grading | 🟡 MEDIUM | 🔴 Open |
-| G-04 | Silent fail jika `Gudang Utama` tidak ditemukan | 🟡 MEDIUM | 🔴 Open |
-| G-05 | `updateFullGrading()` — dead method | 🟡 MEDIUM | 🔴 Open |
-| G-06 | Duplikasi query `getAllGrading` vs `getAllGradingForExport` | 🟡 MEDIUM | 🔴 Open |
-| G-07 | `update()` tidak pakai FormRequest | 🟡 MEDIUM | 🔴 Open |
-| G-08 | `step3.blade.php` kosong | 🟢 LOW | 🔴 Open |
-| G-09 | `idm_management_id` selalu `null` | 🟢 LOW | 🔴 Open |
-| G-10 | Direct model call di controller (Supplier) | 🟢 LOW | 🔴 Open |
-| G-11 | `abort(404)` tidak konsisten | 🟢 LOW | 🔴 Open |
+| G-02 | Error message ekspos `$e->getMessage()` ke user (controller grading) | 🟡 MEDIUM | ✅ Done |
+| G-03 | Status `receipt_item` tidak di-update saat edit grading | 🟡 MEDIUM | ✅ Done |
+| G-04 | Silent fail jika `Gudang Utama` tidak ditemukan | 🟡 MEDIUM | ✅ Done |
+| G-05 | `updateFullGrading()` — dead method | 🟡 MEDIUM | ✅ Done |
+| G-06 | Duplikasi query `getAllGrading` vs `getAllGradingForExport` | 🟡 MEDIUM | ✅ Done |
+| G-07 | `update()` tidak pakai FormRequest | 🟡 MEDIUM | ✅ Done |
+| G-08 | `step3.blade.php` kosong | 🟢 LOW | ✅ Done |
+| G-09 | `idm_management_id` selalu `null` | 🟢 LOW | ✅ Done |
+| G-10 | Direct model call di controller (Supplier) | 🟢 LOW | ✅ Done |
+| G-11 | `abort(404)` tidak konsisten | 🟢 LOW | ✅ Done |
 | G-12 | Export tanpa filter wajib | 🟢 LOW | ✅ Done |
 | G-13 | Tombol Edit conditional sudah ada `$canEdit` | 🟡 MEDIUM | ✅ Done |
-| G-14 | `GradeCompanyRequest::authorize()` hardcoded `return true` | 🟡 MEDIUM | 🔴 Open |
-| G-15 | `GradeCompanyService::delete()` tidak cek penggunaan di sorting_results | 🟡 MEDIUM | 🔴 Open |
-| G-16 | `GradeCompanyController::export()` ekspos error message | 🟡 MEDIUM | 🔴 Open |
-| G-17 | `bulkAssign()` tidak validasi `$parentGradeId` exist | 🟡 MEDIUM | 🔴 Open |
-| G-18 | Orphan `SortingResult` dari Step 1 yang tidak dilanjutkan | 🟡 MEDIUM | 🔴 Open |
-| G-19 | Threshold persentase inkonsisten: 5% (grading) vs 2% (barang masuk) | 🟡 MEDIUM | 🔴 Open |
-| G-20 | URL delete hardcoded string, bukan route helper | 🟢 LOW | 🔴 Open |
-| G-21 | Tombol "Kembali" Step 2 tidak hapus orphan SortingResult | 🟢 LOW | 🔴 Open |
-| G-22 | `grading_date` tidak ada validasi `before_or_equal:today` | 🟢 LOW | 🔴 Open |
-| G-23 | Copy-paste bug: `GradeCompanyRequest` messages pakai "Nama lokasi" | 🟢 LOW | 🔴 Open |
+| G-14 | `GradeCompanyRequest::authorize()` hardcoded `return true` | 🟡 MEDIUM | ✅ Done |
+| G-15 | `GradeCompanyService::delete()` tidak cek penggunaan di sorting_results | 🟡 MEDIUM | ✅ Done |
+| G-16 | `GradeCompanyController::export()` ekspos error message | 🟡 MEDIUM | ✅ Done |
+| G-17 | `bulkAssign()` tidak validasi `$parentGradeId` exist | 🟡 MEDIUM | ✅ Done |
+| G-18 | Orphan `SortingResult` dari Step 1 yang tidak dilanjutkan | 🟡 MEDIUM | ✅ Done |
+| G-19 | Threshold persentase inkonsisten: 5% (grading) vs 2% (barang masuk) | 🟡 MEDIUM | ✅ Done |
+| G-20 | URL delete hardcoded string, bukan route helper | 🟢 LOW | ✅ Done |
+| G-21 | Tombol "Kembali" Step 2 tidak hapus orphan SortingResult | 🟢 LOW | ✅ Done |
+| G-22 | `grading_date` tidak ada validasi `before_or_equal:today` | 🟢 LOW | ✅ Done |
+| G-23 | Copy-paste bug: `GradeCompanyRequest` messages pakai "Nama lokasi" | 🟢 LOW | ✅ Done |
 

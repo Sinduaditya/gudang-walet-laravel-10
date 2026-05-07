@@ -405,18 +405,18 @@ Refactor untuk gunakan state object atau query yang lebih straightforward.
 
 ## Summary Temuan
 
-| ID | Issue | Severity | Lokasi | Solusi |
-|----|-------|----------|--------|--------|
-| BK-01 | Error message terekspos (no try-catch) | 🟡 MEDIUM | Semua controller | Tambah try-catch |
-| BK-02 | getGradesByFilter() tidak digunakan | 🟢 LOW | BarangKeluarService.php | Hapus atau integrate |
-| BK-03 | Inconsistent stock check logic | 🟡 MEDIUM | Service vs Controller | Centralize di service |
-| BK-04 | N+1 query di getGradingSourcesWithStock | 🟡 MEDIUM | BarangKeluarService.php | Batch query |
-| BK-05 | TransferIdmService consistency | 🟡 MEDIUM | TransferIdmService.php | Audit transaction handling |
-| BK-06 | updateTransfer() orphan method | 🟢 LOW | BarangKeluarService.php | Hapus dead code |
-| BK-07 | withInput() expose data | 🟢 LOW | Controller methods | Review error messages |
-| BK-08 | Inline validation vs Form Request | 🟢 LOW | PenjualanController | Gunakan Form Request |
-| BK-09 | deleted_by column check | 🟢 LOW | TransferInternalController | Verify schema |
-| BK-10 | Global Budgeting logic complex | 🟡 MEDIUM | BarangKeluarService.php | Refactor untuk testability |
+| ID | Issue | Severity | Lokasi | Solusi | Status |
+|----|-------|----------|--------|--------|--------|
+| BK-01 | Error message terekspos (no try-catch) | 🟡 MEDIUM | Semua controller | Tambah try-catch | ✅ Done |
+| BK-02 | getGradesByFilter() tidak digunakan | 🟢 LOW | BarangKeluarService.php | Hapus atau integrate | 🔴 Open |
+| BK-03 | Inconsistent stock check logic | 🟡 MEDIUM | Service vs Controller | Centralize di service | ✅ Done |
+| BK-04 | N+1 query di getGradingSourcesWithStock | 🟡 MEDIUM | BarangKeluarService.php | Batch query | ✅ Done |
+| BK-05 | TransferIdmService consistency | 🟡 MEDIUM | TransferIdmService.php | Audit transaction handling | 🔴 Open |
+| BK-06 | updateTransfer() orphan method | 🟢 LOW | BarangKeluarService.php | Hapus dead code | 🔴 Open |
+| BK-07 | withInput() expose data | 🟢 LOW | Controller methods | Review error messages | 🔴 Open |
+| BK-08 | Inline validation vs Form Request | 🟢 LOW | PenjualanController | Gunakan Form Request | 🔴 Open |
+| BK-09 | deleted_by column check | 🟢 LOW | TransferInternalController | Verify schema | 🔴 Open |
+| BK-10 | Global Budgeting logic complex | 🟡 MEDIUM | BarangKeluarService.php | Refactor untuk testability | ✅ Done |
 
 ---
 

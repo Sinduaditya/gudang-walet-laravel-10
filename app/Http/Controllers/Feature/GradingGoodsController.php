@@ -7,7 +7,6 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\GradingGoods\Step1Request;
 use App\Http\Requests\GradingGoods\Step2Request;
 use App\Services\GradingGoods\GradingGoodsService;
-use App\Http\Requests\GradingGoods\UpdateGradingRequest;
 use App\Exports\GradingGoodsExport;
 use Maatwebsite\Excel\Facades\Excel;
 
@@ -53,10 +52,7 @@ class GradingGoodsController extends Controller
         $month = $request->get('month');
         $year = $request->get('year');
 
-        // ✅ G-01: Cek apakah grading bisa di-edit (belum ada transaksi keluar)
-        $canEdit = !$this->isGradingUsedInOutgoingTransaction($receiptItemId);
-
-        return view('admin.grading-goods.show', compact('grading', 'allGradingResults', 'notaWeight', 'page', 'month', 'year', 'canEdit'));
+        return view('admin.grading-goods.show', compact('grading', 'allGradingResults', 'notaWeight', 'page', 'month', 'year'));
     }
 
     public function createStep1(Request $request)
@@ -153,88 +149,7 @@ class GradingGoodsController extends Controller
         return Excel::download($export, $fileName);
     }
 
-    public function edit(Request $request, $receiptItemId)
-    {
-        $allGradingResults = $this->gradingGoodsService->getSortingResultsByReceiptItem($receiptItemId);
 
-        if ($allGradingResults->isEmpty()) {
-            return redirect()->route('grading-goods.index')->with('error', 'Data grading tidak ditemukan.');
-        }
-
-        // ✅ G-01: Cek apakah grading sudah digunakan di transaksi keluar
-        if ($this->isGradingUsedInOutgoingTransaction($receiptItemId)) {
-            return redirect()->route('grading-goods.show', $receiptItemId)
-                ->with('error', 'Tidak dapat edit. Grading sudah digunakan dalam transaksi barang keluar.');
-        }
-
-        $receiptItem = $allGradingResults->first()->receiptItem;
-        $allGradeCompanies = $this->gradingGoodsService->getAllGradeCompanies();
-
-        $page = $request->get('page');
-        $month = $request->get('month');
-        $year = $request->get('year');
-
-        return view('admin.grading-goods.edit', compact('allGradingResults', 'receiptItem', 'allGradeCompanies', 'page', 'month', 'year'));
-    }
-
-    /**
-     * ✅ G-01: Helper cek apakah grading sudah dipakai di transaksi keluar
-     */
-    private function isGradingUsedInOutgoingTransaction($receiptItemId): bool
-    {
-        $sortingResults = $this->gradingGoodsService->getSortingResultsByReceiptItem($receiptItemId);
-
-        foreach ($sortingResults as $sr) {
-            $hasOutgoing = \App\Models\InventoryTransaction::where('sorting_result_id', $sr->id)
-                ->where('transaction_type', '!=', 'GRADING_IN')
-                ->exists();
-
-            if ($hasOutgoing) return true;
-        }
-
-        return false;
-    }
-
-    public function update(UpdateGradingRequest $request, $receiptItemId)
-    {
-        // ✅ G-01: Cek apakah grading sudah digunakan di transaksi keluar
-        if ($this->isGradingUsedInOutgoingTransaction($receiptItemId)) {
-            return back()->with('error', 'Tidak dapat edit. Grading sudah digunakan dalam transaksi barang keluar.');
-        }
-
-        try {
-            $grades = $request->input('grades');
-            $globalNotes = $request->input('global_notes');
-
-            $processedGrades = [];
-            foreach ($grades as $grade) {
-                $processedGrades[] = [
-                    'grading_date' => $grade['grading_date'],
-                    'grade_company_name' => $grade['grade_company_name'],
-                    'quantity' => (int) $grade['quantity'],
-                    'weight_grams' => (int) $grade['weight_grams'],
-                    'outgoing_type' => $grade['outgoing_type'] ?? null,
-                    'category_grade' => $grade['category_grade'] ?? null,
-                    'notes' => $grade['notes'] ?? null,
-                ];
-            }
-
-            $this->gradingGoodsService->updateMultipleSortingResults($receiptItemId, $processedGrades, $globalNotes);
-
-            $redirectParams = [];
-            if ($request->has('page')) $redirectParams['page'] = $request->page;
-            if ($request->has('month')) $redirectParams['month'] = $request->month;
-            if ($request->has('year')) $redirectParams['year'] = $request->year;
-
-            return redirect()->route('grading-goods.show', array_merge(['receiptItemId' => $receiptItemId], $redirectParams))->with('success', 'Data grading berhasil diperbarui.');
-        } catch (\Exception $e) {
-            \Illuminate\Support\Facades\Log::error('GradingGoods update error: ' . $e->getMessage(), [
-                'user_id' => auth()->id(),
-                'receipt_item_id' => $receiptItemId,
-            ]);
-            return back()->withInput()->with('error', 'Terjadi kesalahan sistem. Silakan coba lagi atau hubungi administrator.');
-        }
-    }
 
     public function destroy($receiptItemId)
     {

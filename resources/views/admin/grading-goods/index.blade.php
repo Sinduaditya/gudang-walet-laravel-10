@@ -206,8 +206,6 @@
                                             {{-- ✅ FIX: Gunakan receipt_item_id --}}
                                             <a href="{{ route('grading-goods.show', array_merge(['receiptItemId' => $grading->receipt_item_id], request()->query())) }}"
                                                 class="text-blue-600 hover:text-blue-800 font-medium">Detail</a>
-                                            <a href="{{ route('grading-goods.edit', array_merge(['receiptItemId' => $grading->receipt_item_id], request()->query())) }}"
-                                                class="text-yellow-600 hover:text-yellow-800 font-medium">Edit</a>
                                             <button onclick="confirmDelete({{ $grading->receipt_item_id }})"
                                                 class="text-red-600 hover:text-red-800 font-medium">Hapus</button>
                                         </div>
