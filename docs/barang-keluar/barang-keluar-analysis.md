@@ -207,7 +207,92 @@ Dokumen ini menganalisis potential bugs dan kerentanan yang dapat menyebabkan **
 
 ---
 
-## 7. GENERAL ISSUES (Semua Modul)
+## 7. ROOT CAUSE - GRADING_IN Tidak Memiliki sorting_result_id (CRITICAL)
+
+### G-0: GRADING_IN Transactions Tidak Terikat SortingResult
+**Severity: CRITICAL**
+**Location**: Database & GradingGoodsService, BarangKeluarService::getGradingSourcesWithStock()
+
+#### Evidence dari SQL Dump:
+```
+INSERT INTO `inventory_transactions` (`id`, ..., `transaction_type`, `reference_id`, `sorting_result_id`, ...)
+VALUES
+(1059, '2025-12-15', 118, 1, 36, 368.00, 'GRADING_IN', 1060, NULL, 1, ...),
+(1060, '2025-12-15', 118, 1, 36, 302.00, 'GRADING_IN', 1061, NULL, 1, ...),
+...
+```
+**Sorting_result_id = NULL** pada semua GRADING_IN transactions!
+
+#### Dampak pada Dropdown Stock:
+
+**Location**: `BarangKeluarService.php:713-722`
+```php
+// Batch stock hanya menghitung yang ADA sorting_result_id
+$batchStockResults = InventoryTransaction::select('sorting_result_id')
+    ->selectRaw('SUM(quantity_change_grams) as batch_stock')
+    ->whereIn('sorting_result_id', $sourceIds)  // GRADING_IN dengan NULL TIDAK TERHITUNG!
+    ->where('location_id', $locationId)
+    ->groupBy('sorting_result_id')
+    ->pluck('batch_stock', 'sorting_result_id')
+    ->toArray();
+```
+
+#### Contoh Bug:
+1. **Initial State**: SortingResult A dibuat dengan GRADING_IN 500gr (sorting_result_id = NULL)
+2. **Penjualan 1**: User jual 300gr dari SortingResult A → SALE_OUT dengan sorting_result_id = A.id
+3. **Dropdown Refresh**:
+   - `batchStock` = SUM WHERE sorting_result_id = A.id = 0 (GRADING_IN tidak punya sorting_result_id!)
+   - `locationBudget` = SUM WHERE grade_company_id = A.grade_id AND location_id = 1 = 200gr
+   - `globalBudget` = SUM WHERE grade_company_id = A.grade_id = 200gr
+4. **displayWeight** = min(0, 200, 200) = 0 → Batch A **TIDAK TAMPIL** di dropdown
+5. Tapi user tetap bisa jual 200gr tersisa karena `hasEnoughStock()` berdasarkan `globalBudget = 200gr` tetap OK
+
+#### Kenapa Minus Bisa Terjadi:
+
+**Scenario lengkap:**
+1. SortingResult A (Grade X) punya GRADING_IN 500gr (sorting_result_id = NULL)
+2. User A pilih Grade X di dropdown barang keluar
+3. Sistem cek: globalBudget = 500gr (dari SUM semua transactions tanpa filter sorting_result_id)
+4. User A jual 500gr → globalBudget - 500 = 0
+5. Tapi dropdown masih menampilkan Grade X dengan stock 500gr (ERROR: dropdown tidak update!)
+6. User B pilih Grade X → jual lagi 500gr → **MINUS 500gr!**
+
+#### Root Cause:
+- GRADING_IN tidak menyimpan `sorting_result_id` saat dibuat
+- `getBatchRemainingStock()` menggunakan SUM dengan `WHERE sorting_result_id = X`, tapi GRADING_IN tidak punya ID ini
+- Global stock dihitung dari `grade_company_id` saja (tanpa sorting_result_id), jadi GRADING_IN tetap terhitung
+
+#### Solution:
+1. **Fix segera**: GRADING_IN harus menyimpan `sorting_result_id` saat dibuat (relasi harus benar)
+2. **Alternative fix**: Ubah query `getBatchRemainingStock()` untuk tidak bergantung pada sorting_result_id
+
+### G-0 STATUS: ALREADY FIXED ✅
+**Tanggal Update**: 2026-05-09
+
+**Verifikasi di Production Database**:
+- Total GRADING_IN transactions: 4,687
+- GRADING_IN dengan sorting_result_id: 4,374 (93.3%)
+- GRADING_IN dengan NULL: 313 (6.7%) - **data lama historis**
+
+**Bukti GRADING_IN terbaru sudah terisi**:
+```
+ID: 9122 | sorting_result_id: 7826   | ✓ HAS ID
+ID: 9121 | sorting_result_id: 7825   | ✓ HAS ID
+ID: 9120 | sorting_result_id: 7824   | ✓ HAS ID
+... (10 GRADING_IN terbaru - SEMUA punya sorting_result_id)
+```
+
+**Kenapa NULL di data lama tidak berbahaya**:
+1. Batch dengan `batchStock = 0` tidak muncul di dropdown (displayWeight = 0)
+2. Sistem tetap melakukan validasi `hasEnoughStock()` saat proses jual
+3. NULL GRADING_IN hanya mempengaruhi global budget, TIDAK batch stock
+4. Protection: `min(batchStock, locationBudget, globalBudget)` tetap berjalan
+
+**Kesimpulan**: Issue G-0 sudah **FIXED untuk data baru**. Data NULL lama (313 records) adalah historical data yang tidak menyebabkan minus stock karena batchnya tidak muncul di dropdown.
+
+---
+
+## 8. GENERAL ISSUES (Semua Modul)
 
 ### G-1: hasEnoughStock() Check But Not Atomic
 **Severity: MEDIUM**
@@ -242,19 +327,19 @@ Dokumen ini menganalisis potential bugs dan kerentanan yang dapat menyebabkan **
 
 | ID | Issue | Severity | Impact | Status |
 |----|-------|----------|--------|--------|
-| V-1.1 | Race Condition Penjualan | HIGH | Stock minus | Need Fix |
-| V-1.2 | Edit Penjualan Tanpa Validasi Stok | HIGH | Stock minus | Need Fix |
-| V-1.3 | Delete Penjualan Tidak Revert Stok | MEDIUM | Stock mismatch | Need Fix |
-| V-2.1 | Edit Transfer Internal Ganti Grade | HIGH | Minus di grade lama | Need Fix |
-| V-2.2 | Delete Transfer Internal Tidak Revert | HIGH | Stock minus | Need Fix |
-| V-3.1 | Edit Transfer External Ganti Grade | HIGH | Minus di grade lama | Need Fix |
-| V-3.2 | Delete Transfer External Tidak Revert | HIGH | Stock minus | Need Fix |
-| V-4.1 | Edit Receive External Validation | MEDIUM | Potential minus | Need Fix |
-| V-4.2 | Delete Receive External Tidak Revert | MEDIUM | Stock mismatch | Need Fix |
-| V-6.1 | Edit Transfer IDM Item Management | HIGH | Item tersesat | Need Fix |
-| V-6.2 | Delete Transfer IDM Orphan | MEDIUM | Item inconsistency | Need Fix |
-| G-1 | Race Condition - Non Atomic Check | MEDIUM | Stock minus | Need Fix |
-| G-2 | getAvailableStock Returns Negative | MEDIUM | Uncontrolled minus | Need Fix |
+| ~~**G-0**~~ | ~~**GRADING_IN sorting_result_id = NULL**~~ | ~~**CRITICAL**~~ | ~~**Minus dari dropdown error**~~ | **✅ ALREADY FIXED** |
+| V-1.2 | Edit Penjualan Tanpa Validasi Stok | HIGH | Stock minus | **Need Fix** |
+| V-1.3 | Delete Penjualan Tidak Revert Stok | MEDIUM | Stock mismatch | **Need Fix** |
+| V-2.1 | Edit Transfer Internal Ganti Grade | HIGH | Minus di grade lama | **Need Fix** |
+| V-2.2 | Delete Transfer Internal Tidak Revert | HIGH | Stock minus | **Need Fix** |
+| V-3.1 | Edit Transfer External Ganti Grade | HIGH | Minus di grade lama | **Need Fix** |
+| V-3.2 | Delete Transfer External Tidak Revert | HIGH | Stock minus | **Need Fix** |
+| V-4.1 | Edit Receive External Validation | MEDIUM | Potential minus | **Need Fix** |
+| V-4.2 | Delete Receive External Tidak Revert | MEDIUM | Stock mismatch | **Need Fix** |
+| V-6.1 | Edit Transfer IDM Item Management | HIGH | Item tersesat | **Need Fix** |
+| V-6.2 | Delete Transfer IDM Orphan | MEDIUM | Item inconsistency | **Need Fix** |
+| G-1 | Race Condition - Non Atomic Check | MEDIUM | Stock minus | Consider |
+| G-2 | getAvailableStock Returns Negative | MEDIUM | Uncontrolled minus | Consider |
 | G-3 | No Transaction Isolation | MEDIUM | Race conditions | Consider |
 
 ---

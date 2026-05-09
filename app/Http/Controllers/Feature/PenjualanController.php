@@ -11,6 +11,7 @@ use App\Http\Requests\BarangKeluar\SellRequest;
 use App\Exports\PenjualanExport;
 use Maatwebsite\Excel\Facades\Excel;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class PenjualanController extends Controller
 {
@@ -167,43 +168,33 @@ class PenjualanController extends Controller
         }
     }
 
-    public function edit($id)
-    {
-        try {
-            $tx = InventoryTransaction::findOrFail($id);
-            return view('admin.barang-keluar.sell-edit', compact('tx'));
-        } catch (\Exception $e) {
-            \Illuminate\Support\Facades\Log::error('PenjualanController edit error: ' . $e->getMessage());
-            return redirect()->route('barang.keluar.sell.form')->with('error', 'Data tidak ditemukan.');
-        }
-    }
-
-    public function update(\Illuminate\Http\Request $request, $id)
-    {
-        try {
-            $tx = InventoryTransaction::findOrFail($id);
-            $request->validate([
-                'weight_grams' => 'required|numeric|min:0.01',
-                'transaction_date' => 'required|date',
-            ]);
-
-            $tx->update([
-                'quantity_change_grams' => -abs($request->input('weight_grams')),
-                'transaction_date' => $request->input('transaction_date'),
-            ]);
-            return redirect()->route('barang.keluar.sell.form')->with('success', 'Transaksi diperbarui.');
-        } catch (\Exception $e) {
-            \Illuminate\Support\Facades\Log::error('PenjualanController update error: ' . $e->getMessage());
-            return redirect()->back()->with('error', 'Terjadi kesalahan saat memperbarui transaksi.');
-        }
-    }
-
     public function destroy($id)
     {
         try {
-            $tx = InventoryTransaction::findOrFail($id);
-            $tx->delete();
-            return redirect()->route('barang.keluar.sell.form')->with('success', 'Transaksi penjualan dihapus.');
+            return DB::transaction(function () use ($id) {
+                $tx = InventoryTransaction::lockForUpdate()->findOrFail($id);
+                $oldQuantity = $tx->quantity_change_grams;
+
+                InventoryTransaction::create([
+                    'transaction_date' => now(),
+                    'grade_company_id' => $tx->grade_company_id,
+                    'location_id' => $tx->location_id,
+                    'quantity_change_grams' => abs($oldQuantity),
+                    'supplier_id' => $tx->supplier_id,
+                    'transaction_type' => 'SALE_REVERT',
+                    'reference_id' => $tx->id,
+                    'sorting_result_id' => $tx->sorting_result_id,
+                    'notes' => 'Revert dari delete penjualan ID: ' . $id,
+                    'created_by' => auth()->id(),
+                ]);
+
+                $tx->deleted_by = auth()->id();
+                $tx->save();
+                $tx->delete();
+
+                return redirect()->route('barang.keluar.sell.form')
+                    ->with('success', 'Transaksi penjualan dihapus dan stok dikembalikan.');
+            });
         } catch (\Exception $e) {
             \Illuminate\Support\Facades\Log::error('PenjualanController destroy error: ' . $e->getMessage());
             return redirect()->back()->with('error', 'Terjadi kesalahan saat menghapus transaksi.');

@@ -104,8 +104,6 @@ Route::middleware(['auth'])->group(function () {
                 Route::get('sell/export', [PenjualanController::class, 'export'])->name('sell.export');
 
                 // History actions
-                Route::get('sell/{id}/edit', [PenjualanController::class, 'edit'])->name('sell.edit');
-                Route::put('sell/{id}', [PenjualanController::class, 'update'])->name('sell.update');
                 Route::delete('sell/{id}', [PenjualanController::class, 'destroy'])->name('sell.destroy');
 
                 // ========== TRANSFER INTERNAL ==========
@@ -118,8 +116,6 @@ Route::middleware(['auth'])->group(function () {
                     Route::post('/confirm', [TransferInternalController::class, 'transfer'])->name('store');
                     Route::get('/stock-check', [TransferInternalController::class, 'checkStock'])->name('stock_check');
                     Route::get('/export', [TransferInternalController::class, 'export'])->name('export');
-                    Route::get('/{id}/edit', [TransferInternalController::class, 'edit'])->name('edit');
-                    Route::put('/{id}', [TransferInternalController::class, 'update'])->name('update');
                     Route::delete('/{id}', [TransferInternalController::class, 'destroy'])->name('destroy');
                 });
 
@@ -132,8 +128,6 @@ Route::middleware(['auth'])->group(function () {
                     Route::get('/step2', [TransferExternalController::class, 'externalTransferStep2'])->name('step2');
                     Route::post('/confirm', [TransferExternalController::class, 'externalTransfer'])->name('store');
                     Route::get('/export', [TransferExternalController::class, 'export'])->name('export');
-                    Route::get('/{id}/edit', [TransferExternalController::class, 'edit'])->name('edit');
-                    Route::put('/{id}', [TransferExternalController::class, 'update'])->name('update');
                     Route::delete('/{id}', [TransferExternalController::class, 'destroy'])->name('destroy');
                 });
                 // ========== RECEIVE INTERNAL ==========
@@ -159,8 +153,6 @@ Route::middleware(['auth'])->group(function () {
 
                     Route::get('/stock-check', [ReceiveExternalController::class, 'checkExternalStock'])->name('stock_check');
                     Route::get('/export', [ReceiveExternalController::class, 'export'])->name('export');
-                    Route::get('/{id}/edit', [ReceiveExternalController::class, 'edit'])->name('edit');
-                    Route::put('/{id}', [ReceiveExternalController::class, 'update'])->name('update');
                     Route::delete('/{id}', [ReceiveExternalController::class, 'destroy'])->name('destroy');
                 });
 
@@ -176,8 +168,6 @@ Route::middleware(['auth'])->group(function () {
                         Route::post('/step-2', [TransferIdmController::class, 'step2'])->name('step2');
                         Route::post('/store', [TransferIdmController::class, 'store'])->name('store');
                         Route::get('/{id}', [TransferIdmController::class, 'show'])->name('show');
-                        Route::get('/{id}/edit', [TransferIdmController::class, 'edit'])->name('edit');
-                        Route::put('/{id}', [TransferIdmController::class, 'update'])->name('update');
                         Route::delete('/{id}', [TransferIdmController::class, 'destroy'])->name('destroy');
                     });
             });

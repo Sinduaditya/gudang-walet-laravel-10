@@ -397,11 +397,123 @@ class BarangKeluarService
 
     public function getAvailableStock(int $gradeCompanyId, int $locationId): float
     {
-        // Kembalikan angka apa adanya (bisa negatif) agar sistem tahu kondisi error data
-        return (float) InventoryTransaction::where('grade_company_id', $gradeCompanyId)
+        $stock = (float) InventoryTransaction::where('grade_company_id', $gradeCompanyId)
             ->where('location_id', $locationId)
             ->sum('quantity_change_grams');
+
+        if ($stock < 0) {
+            \Illuminate\Support\Facades\Log::warning('Negative stock detected', [
+                'grade_company_id' => $gradeCompanyId,
+                'location_id' => $locationId,
+                'stock' => $stock,
+            ]);
+        }
+
+        return $stock;
     }
+
+    public function getDisplayStock(int $gradeCompanyId, int $locationId): float
+    {
+        return max(0, $this->getAvailableStock($gradeCompanyId, $locationId));
+    }
+    /**
+     * Atomic sell operation with row-level locking to prevent race conditions.
+     * Uses SELECT FOR UPDATE to lock the inventory transaction rows during check.
+     *
+     * @param array $data
+     * @return InventoryTransaction
+     * @throws \Exception
+     */
+    public function sellWithLock(array $data): InventoryTransaction
+    {
+        return DB::transaction(function () use ($data) {
+            $userId = Auth::id();
+            $sortingResultId = $data['sorting_result_id'] ?? null;
+            $locationId = $data['location_id'];
+            $gradeCompanyId = $data['grade_company_id'];
+            $weightGrams = abs($data['weight_grams']);
+
+            // Lock and fetch batch remaining stock
+            $batchRemaining = $this->getBatchRemainingStockWithLock($sortingResultId, $locationId);
+            if ($batchRemaining < $weightGrams) {
+                throw new \Exception('Stok batch tidak mencukupi. Tersedia: ' . number_format($batchRemaining, 2) . ' gr.');
+            }
+
+            // Lock and check global stock
+            $sortingResult = SortingResult::lockForUpdate()->find($sortingResultId);
+            $globalStock = $this->getGlobalStockWithLock($gradeCompanyId);
+            if ($globalStock < $weightGrams) {
+                throw new \Exception('Stok global tidak mencukupi. Tersedia: ' . number_format($globalStock, 2) . ' gr.');
+            }
+
+            // Lock and check location stock
+            $locationStock = $this->getLocationStockWithLock($gradeCompanyId, $locationId);
+            if ($locationStock < $weightGrams) {
+                throw new \Exception('Stok lokasi tidak mencukupi. Tersedia: ' . number_format($locationStock, 2) . ' gr.');
+            }
+
+            $supplierId = $this->getSupplierIdFromSortingResult($sortingResultId);
+
+            return InventoryTransaction::create([
+                'transaction_date' => $data['transaction_date'] ?? now(),
+                'grade_company_id' => $gradeCompanyId,
+                'location_id' => $locationId,
+                'quantity_change_grams' => -$weightGrams,
+                'supplier_id' => $supplierId,
+                'transaction_type' => 'SALE_OUT',
+                'reference_id' => null,
+                'sorting_result_id' => $sortingResultId,
+                'created_by' => $userId,
+            ]);
+        });
+    }
+
+    /**
+     * Get batch remaining stock with row-level locking.
+     */
+    private function getBatchRemainingStockWithLock(int $sortingResultId, int $locationId): float
+    {
+        $sortingResult = SortingResult::lockForUpdate()->find($sortingResultId);
+        if (!$sortingResult) return 0;
+
+        $batchStock = (float) InventoryTransaction::where('sorting_result_id', $sortingResultId)
+            ->where('location_id', $locationId)
+            ->lockForUpdate()
+            ->sum('quantity_change_grams');
+
+        $globalStock = (float) InventoryTransaction::where('grade_company_id', $sortingResult->grade_company_id)
+            ->lockForUpdate()
+            ->sum('quantity_change_grams');
+
+        $locationStock = (float) InventoryTransaction::where('grade_company_id', $sortingResult->grade_company_id)
+            ->where('location_id', $locationId)
+            ->lockForUpdate()
+            ->sum('quantity_change_grams');
+
+        return max(0, min($batchStock, $locationStock, $globalStock));
+    }
+
+    /**
+     * Get global stock with row-level locking.
+     */
+    private function getGlobalStockWithLock(int $gradeCompanyId): float
+    {
+        return (float) InventoryTransaction::where('grade_company_id', $gradeCompanyId)
+            ->lockForUpdate()
+            ->sum('quantity_change_grams');
+    }
+
+    /**
+     * Get location stock with row-level locking.
+     */
+    private function getLocationStockWithLock(int $gradeCompanyId, int $locationId): float
+    {
+        return (float) InventoryTransaction::where('grade_company_id', $gradeCompanyId)
+            ->where('location_id', $locationId)
+            ->lockForUpdate()
+            ->sum('quantity_change_grams');
+    }
+
 
     public function hasEnoughStock(int $gradeCompanyId, int $locationId, float $requiredGrams): bool
     {
