@@ -247,87 +247,60 @@ class TransferExternalController extends Controller
         }
     }
 
-    public function edit($id)
-    {
-        try {
-            $transfer = \App\Models\StockTransfer::findOrFail($id);
-            $grades = \App\Models\GradeCompany::orderBy('name')->get();
-            $jasaCuciLocations = \App\Models\Location::where('name', 'NOT LIKE', '%IDM%')
-                ->where('name', 'NOT LIKE', '%DMK%')
-                ->where('name', '!=', 'Gudang Utama')
-                ->orderBy('name')
-                ->get();
-
-            $gudangUtama = \App\Models\Location::where('name', 'Gudang Utama')->first();
-
-            $availableStock = $this->service->getAvailableStock($transfer->grade_company_id, $gudangUtama->id);
-            $availableStock += $transfer->weight_grams + ($transfer->susut_grams ?? 0);
-
-            return view('admin.barang-keluar.external-transfer-edit', compact('transfer', 'grades', 'jasaCuciLocations', 'availableStock'));
-        } catch (\Throwable $e) {
-            Log::error('Error in edit: ' . $e->getMessage(), [
-                'user_id' => auth()->id(),
-                'trace' => $e->getTraceAsString()
-            ]);
-            return redirect()->back()->with('error', 'Terjadi kesalahan saat memuat data edit. Silakan coba lagi.');
-        }
-    }
-
-    public function update(Request $request, $id)
-    {
-        try {
-            $validated = $request->validate([
-                'grade_company_id' => 'required|exists:grades_company,id',
-                'to_location_id' => 'required|exists:locations,id',
-                'weight_grams' => 'required|numeric|min:0.01',
-                'susut_grams' => 'nullable|numeric|min:0',
-                'transfer_date' => 'nullable|date',
-                'notes' => 'nullable|string|max:500',
-            ]);
-
-            $gudangUtama = \App\Models\Location::where('name', 'Gudang Utama')->first();
-            $validated['from_location_id'] = $gudangUtama->id;
-
-            $totalWeight = $validated['weight_grams'] + ($validated['susut_grams'] ?? 0);
-            $availableStock = $this->service->getAvailableStock($validated['grade_company_id'], $validated['from_location_id']);
-
-            $oldTransfer = \App\Models\StockTransfer::findOrFail($id);
-            if ($oldTransfer->grade_company_id == $validated['grade_company_id']) {
-                $availableStock += $oldTransfer->weight_grams + ($oldTransfer->susut_grams ?? 0);
-            }
-
-            if ($availableStock < $totalWeight) {
-                return back()->with('error', "Stok di Gudang Utama tidak mencukupi! Dibutuhkan: " . number_format($totalWeight, 2) . " gr. Tersedia: " . number_format($availableStock, 2) . " gr.");
-            }
-
-            $this->service->updateExternalTransfer($id, $validated);
-
-            return redirect()->route('barang.keluar.external-transfer.step1')
-                ->with('success', 'Transfer eksternal berhasil diperbarui.');
-        } catch (\Throwable $e) {
-            Log::error('Error in update: ' . $e->getMessage(), [
-                'user_id' => auth()->id(),
-                'trace' => $e->getTraceAsString()
-            ]);
-            return redirect()->back()->with('error', 'Terjadi kesalahan saat memperbarui transfer. Silakan coba lagi.');
-        }
-    }
-
     public function destroy($id)
     {
         try {
-            $transfer = \App\Models\StockTransfer::findOrFail($id);
-            $transfer->transactions()->delete();
-            $transfer->delete();
-
-            return redirect()->route('barang.keluar.external-transfer.step1')
-                ->with('success', 'Transfer eksternal berhasil dihapus.');
+            return DB::transaction(function () use ($id) {
+                $transfer = \App\Models\StockTransfer::lockForUpdate()->findOrFail($id);
+                $userId = auth()->id();
+                
+                $totalDeduction = abs($transfer->weight_grams) + abs($transfer->susut_grams ?? 0);
+                
+                $outTx = $transfer->transactions()->where("transaction_type", "EXTERNAL_TRANSFER_OUT")->first();
+                $inTx = $transfer->transactions()->where("transaction_type", "EXTERNAL_TRANSFER_IN")->first();
+                
+                if ($outTx) {
+                    InventoryTransaction::create([
+                        "transaction_date" => now(),
+                        "grade_company_id" => $transfer->grade_company_id,
+                        "location_id" => $transfer->from_location_id,
+                        "supplier_id" => $outTx->supplier_id,
+                        "quantity_change_grams" => $totalDeduction,
+                        "transaction_type" => "EXTERNAL_TRANSFER_REVERT_OUT",
+                        "reference_id" => $transfer->id,
+                        "sorting_result_id" => $transfer->sorting_result_id,
+                        "created_by" => $userId,
+                    ]);
+                }
+                
+                if ($inTx) {
+                    InventoryTransaction::create([
+                        "transaction_date" => now(),
+                        "grade_company_id" => $transfer->grade_company_id,
+                        "location_id" => $transfer->to_location_id,
+                        "supplier_id" => $inTx->supplier_id,
+                        "quantity_change_grams" => -abs($transfer->weight_grams),
+                        "transaction_type" => "EXTERNAL_TRANSFER_REVERT_IN",
+                        "reference_id" => $transfer->id,
+                        "sorting_result_id" => $transfer->sorting_result_id,
+                        "created_by" => $userId,
+                    ]);
+                }
+                
+                $transfer->transactions()->delete();
+                $transfer->deleted_by = $userId;
+                $transfer->save();
+                $transfer->delete();
+                
+                return redirect()->route("barang.keluar.external-transfer.step1")
+                    ->with("success", "Transfer eksternal berhasil dihapus dan stok dikembalikan.");
+            });
         } catch (\Throwable $e) {
-            Log::error('Error in destroy: ' . $e->getMessage(), [
-                'user_id' => auth()->id(),
-                'trace' => $e->getTraceAsString()
+            Log::error("Error in destroy: " . $e->getMessage(), [
+                "user_id" => auth()->id(),
+                "trace" => $e->getTraceAsString()
             ]);
-            return redirect()->back()->with('error', 'Terjadi kesalahan saat menghapus transfer. Silakan coba lagi.');
+            return redirect()->back()->with("error", "Terjadi kesalahan saat menghapus transfer.");
         }
     }
 

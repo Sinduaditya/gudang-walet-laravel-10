@@ -195,68 +195,47 @@ class TransferIdmController extends Controller
         return redirect()->route('barang.keluar.transfer-idm.index')->with('success', 'Transfer Created Successfully');
     }
 
-    public function edit($id)
+    public function destroy($id)
     {
-        $transfer = $this->transferIdmService->getTransferById($id);
-        // We pass the transfer object. The view should handle displaying details.
-        // We also need to calculate Non-IDM vs IDM breakdown if we want to allow JS recalculation?
-        // Actually, the stored transfer has the totals. We can just use those for initial display.
-        // If items are removed, JS usage applies.
-        
-        return view('admin.transfer-idm.edit', compact('transfer'));
-    }
-
-    public function update(Request $request, $id)
-    {
-        // Validate
-        $data = $request->validate([
-            'items' => 'required|array',
-            'transfer_date' => 'required|date',
-            'average_idm_price' => 'required|numeric',
-            'total_non_idm_price' => 'required|numeric',
-            'total_idm_price' => 'required|numeric',
-            'total_price' => 'required|numeric',
-        ]);
-
-        // Items come from the form as array of [id, grade_idm_name, weight, price, total_price]
-        // But the form in edit.blade.php might just send IDs if we want to re-fetch?
-        // In store(), we re-fetched. Here, if we allow "Delete", we are submitting a subset.
-        // The Service expects an array of item data to create IdmTransferDetail.
-        // If we only send IDs, we need to fetch IdmDetail.
-        // But wait, if we delete an item from the specific transfer, the IdmDetail still exists.
-        // So we can just send the list of IdmDetail IDs that should remain.
-        // "items" in request should be the array of IdmDetail IDs?
-        // In store() logic: $itemIds = array_column($request->items, 'id'); $items = IdmDetail::whereIn...
-        // So yes, we should send the 'id' (of the IdmDetail, not the pivot IdmTransferDetail).
-        
-        // In edit.blade.php, we will have hidden inputs name="items[i][id]" value="{{ $detail->idm_detail_id }}".
-        
-        $itemIds = array_column($request->items, 'id');
-        $items = \App\Models\IdmDetail::whereIn('id', $itemIds)->get();
-        
-        $itemsData = $items->map(function($item) {
-            return [
-                'id' => $item->id,
-                'weight' => $item->weight,
-                'price' => $item->price, 
-                'total_price' => $item->total_price,
-                'grade_idm_name' => $item->grade_idm_name,
-            ];
-        });
-
-        $updateData = [
-            'transfer_date' => $request->transfer_date,
-            'items' => $itemsData,
-            'total_price' => $request->total_price,
-            'average_idm_price' => $request->average_idm_price,
-            'total_non_idm_price' => $request->total_non_idm_price,
-            'total_idm_price' => $request->total_idm_price,
-            'notes' => $request->notes
-        ];
-
-        $this->transferIdmService->updateTransfer($id, $updateData);
-
-        return redirect()->route('barang.keluar.transfer-idm.index')->with('success', 'Transfer Updated Successfully');
+        try {
+            return DB::transaction(function () use ($id) {
+                $transfer = \App\Models\IdmTransfer::lockForUpdate()->findOrFail($id);
+                $userId = auth()->id();
+                
+                // Revert IDM_TRANSFER_OUT transactions
+                $transactions = \App\Models\InventoryTransaction::where("transaction_type", "IDM_TRANSFER_OUT")
+                    ->where("reference_id", $transfer->id)
+                    ->get();
+                
+                foreach ($transactions as $tx) {
+                    // Create reversal transaction
+                    \App\Models\InventoryTransaction::create([
+                        "transaction_date" => now(),
+                        "grade_company_id" => $tx->grade_company_id,
+                        "location_id" => $tx->location_id,
+                        "quantity_change_grams" => abs($tx->quantity_change_grams),
+                        "transaction_type" => "IDM_TRANSFER_REVERT",
+                        "reference_id" => $transfer->id,
+                        "sorting_result_id" => $tx->sorting_result_id,
+                        "created_by" => $userId,
+                    ]);
+                    
+                    $tx->deleted_by = $userId;
+                    $tx->save();
+                    $tx->delete();
+                }
+                
+                $transfer->deleted_by = $userId;
+                $transfer->save();
+                $transfer->delete();
+                
+                return redirect()->route("barang.keluar.transfer-idm.index")
+                    ->with("success", "Transfer IDM berhasil dihapus dan stok dikembalikan.");
+            });
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error("TransferIdmController destroy error: " . $e->getMessage());
+            return redirect()->back()->with("error", "Terjadi kesalahan saat menghapus transfer.");
+        }
     }
 
     public function show($id)
@@ -265,11 +244,6 @@ class TransferIdmController extends Controller
         return view('admin.transfer-idm.show', compact('transfer'));
     }
 
-    public function destroy($id)
-    {
-        $this->transferIdmService->deleteTransfer($id);
-        return redirect()->route('barang.keluar.transfer-idm.index')->with('success', 'Transfer Deleted Successfully');
-    }
 
     public function export(Request $request)
     {

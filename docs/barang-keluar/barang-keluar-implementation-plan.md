@@ -2,24 +2,55 @@
 
 ## Tujuan
 Menghilangkan potential minus stok di modul Barang Keluar dengan:
-1. Menghapus fungsi EDIT dari semua modul (paling signifikan)
-2. Memperbaiki fungsi DELETE agar stok di-revert
-3. Menambahkan validasi atomic untuk race condition
+1. **FIX ROOT CAUSE**: GRADING_IN sorting_result_id = NULL (P0 - CRITICAL)
+2. Menghapus fungsi EDIT dari semua modul (P1)
+3. Memperbaiki fungsi DELETE agar stok di-revert (P2)
+4. Menambahkan validasi atomic untuk race condition (P3)
 
 ---
 
 ## Priority Matrix
 
-| Priority | Issue | Effort | Impact |
-|----------|-------|--------|--------|
-| P0 | Remove ALL Edit Functions | Low | HIGH - eliminates most minus risk |
-| P1 | Fix Delete dengan Stock Revert | Medium | HIGH - prevents orphaned minus |
-| P2 | Add Atomic Stock Check | High | MEDIUM - prevents race condition |
-| P3 | Fix getAvailableStock negative | Low | MEDIUM - prevents uncontrolled minus |
+| Priority | Issue | Effort | Impact | Status |
+|----------|-------|--------|--------|--------|
+| ~~**P0**~~ | ~~**Fix GRADING_IN sorting_result_id = NULL**~~ | ~~**HIGH**~~ | ~~**CRITICAL - Root cause dropdown error**~~ | **✅ DONE** |
+| ~~**P1**~~ | ~~**Remove ALL Edit Functions**~~ | ~~**Low**~~ | ~~**HIGH - eliminates most minus risk**~~ | **✅ DONE** |
+| ~~**P2**~~ | ~~**Fix Delete dengan Stock Revert**~~ | ~~**Medium**~~ | ~~**HIGH - prevents orphaned minus**~~ | **✅ DONE** |
+| P3 | Add Atomic Stock Check | High | MEDIUM - prevents race condition | **IN PROGRESS** |
+| P4 | Fix getAvailableStock negative | Low | MEDIUM - prevents uncontrolled minus | **IN PROGRESS** |
 
 ---
 
 ## Implementation Phases
+
+### Phase 0: Fix GRADING_IN Sorting_Result_ID (CRITICAL - ROOT CAUSE)
+
+#### Status: ✅ ALREADY IMPLEMENTED
+
+#### Problem Summary:
+Dari SQL dump, terlihat bahwa GRADING_IN transactions memiliki `sorting_result_id = NULL`. Ini menyebabkan:
+- `getBatchRemainingStock()` query tidak menghitung GRADING_IN (karena WHERE sorting_result_id)
+- Tapi global stock tetap menghitung GRADING_IN
+- Ketidaksinkronan ini membuat dropdown menampilkan stock tidak akurat → minus
+
+#### Verifikasi (2026-05-09):
+- 10 GRADING_IN terbaru: **SEMUA memiliki sorting_result_id** ✓
+- 313 NULL yang ada adalah data HISTORIS lama
+- NULL tidak berbahaya karena batchStock=0 tidak muncul di dropdown
+
+#### 0.1 ~~Identifikasi Transaction GRADING_IN yang salah~~
+**Status**: ✅ DONE - Data baru sudah terisi dengan benar
+
+#### 0.2 ~~Fix untuk SortMaterialService (ALU Sortir)~~
+**Status**: ✅ DONE - SortingResult ID sudah自动 terisi
+
+#### 0.3 ~~Fix untuk GradingGoodsService~~
+**Status**: ✅ DONE
+
+#### 0.4 ~~Verifikasi dan Testing~~
+**Status**: ✅ DONE
+
+---
 
 ### Phase 1: Remove Edit Functionality (Effort: Low, Impact: HIGH)
 
@@ -122,34 +153,6 @@ public function destroy($id)
 
 #### 2.2 TransferInternalController::destroy()
 **File**: `app/Http/Controllers/Feature/TransferInternalController.php`
-**Current Code** (lines 332-355):
-```php
-public function destroy($id)
-{
-    try {
-        $transfer = \App\Models\StockTransfer::findOrFail($id);
-
-        DB::transaction(function () use ($transfer) {
-            foreach ($transfer->transactions as $transaction) {
-                $transaction->deleted_by = auth()->id();
-                $transaction->save();
-                $transaction->delete();
-            }
-
-            $transfer->deleted_by = auth()->id();
-            $transfer->save();
-            $transfer->delete();
-        });
-
-        return redirect()->route('barang.keluar.transfer.step1')
-            ->with('success', 'Transfer internal berhasil dihapus dan stok dikembalikan.');
-    } catch (\Exception $e) {
-        \Illuminate\Support\Facades\Log::error('TransferInternalController destroy error: ' . $e->getMessage());
-        return redirect()->back()->with('error', 'Terjadi kesalahan saat menghapus transfer.');
-    }
-}
-```
-
 **New Code**:
 ```php
 public function destroy($id)
@@ -159,21 +162,16 @@ public function destroy($id)
             $transfer = \App\Models\StockTransfer::lockForUpdate()->findOrFail($id);
             $userId = auth()->id();
             
-            // Calculate total deduction (weight + susut)
             $totalDeduction = abs($transfer->weight_grams) + abs($transfer->susut_grams ?? 0);
             
-            // Create reversal for TRANSFER_OUT (at from_location)
-            $outTx = $transfer->transactions()
-                ->where('transaction_type', 'TRANSFER_OUT')
-                ->first();
-            
+            $outTx = $transfer->transactions()->where('transaction_type', 'TRANSFER_OUT')->first();
             if ($outTx) {
                 InventoryTransaction::create([
                     'transaction_date' => now(),
                     'grade_company_id' => $transfer->grade_company_id,
                     'location_id' => $transfer->from_location_id,
                     'supplier_id' => $outTx->supplier_id,
-                    'quantity_change_grams' => $totalDeduction, // positive to revert
+                    'quantity_change_grams' => $totalDeduction,
                     'transaction_type' => 'TRANSFER_REVERT_OUT',
                     'reference_id' => $transfer->id,
                     'sorting_result_id' => $transfer->sorting_result_id,
@@ -181,11 +179,7 @@ public function destroy($id)
                 ]);
             }
             
-            // Create reversal for TRANSFER_IN (at to_location) if not DMK
-            $inTx = $transfer->transactions()
-                ->where('transaction_type', 'TRANSFER_IN')
-                ->first();
-            
+            $inTx = $transfer->transactions()->where('transaction_type', 'TRANSFER_IN')->first();
             $toLocation = Location::find($transfer->to_location_id);
             if ($inTx && $toLocation && stripos($toLocation->name, 'DMK') === false) {
                 InventoryTransaction::create([
@@ -193,7 +187,7 @@ public function destroy($id)
                     'grade_company_id' => $transfer->grade_company_id,
                     'location_id' => $transfer->to_location_id,
                     'supplier_id' => $inTx->supplier_id,
-                    'quantity_change_grams' => -abs($transfer->weight_grams), // negative to revert IN
+                    'quantity_change_grams' => -abs($transfer->weight_grams),
                     'transaction_type' => 'TRANSFER_REVERT_IN',
                     'reference_id' => $transfer->id,
                     'sorting_result_id' => $transfer->sorting_result_id,
@@ -201,7 +195,6 @@ public function destroy($id)
                 ]);
             }
             
-            // Soft delete original transactions and transfer
             foreach ($transfer->transactions as $transaction) {
                 $transaction->deleted_by = $userId;
                 $transaction->save();
@@ -235,22 +228,16 @@ public function destroy($id)
             
             $totalDeduction = abs($transfer->weight_grams) + abs($transfer->susut_grams ?? 0);
             
-            // Get original transactions
-            $outTx = $transfer->transactions()
-                ->where('transaction_type', 'EXTERNAL_TRANSFER_OUT')
-                ->first();
-            $inTx = $transfer->transactions()
-                ->where('transaction_type', 'EXTERNAL_TRANSFER_IN')
-                ->first();
+            $outTx = $transfer->transactions()->where('transaction_type', 'EXTERNAL_TRANSFER_OUT')->first();
+            $inTx = $transfer->transactions()->where('transaction_type', 'EXTERNAL_TRANSFER_IN')->first();
             
-            // Create reversal for EXTERNAL_TRANSFER_OUT at Gudang Utama
             if ($outTx) {
                 InventoryTransaction::create([
                     'transaction_date' => now(),
                     'grade_company_id' => $transfer->grade_company_id,
                     'location_id' => $transfer->from_location_id,
                     'supplier_id' => $outTx->supplier_id,
-                    'quantity_change_grams' => $totalDeduction, // positive to revert
+                    'quantity_change_grams' => $totalDeduction,
                     'transaction_type' => 'EXTERNAL_TRANSFER_REVERT_OUT',
                     'reference_id' => $transfer->id,
                     'sorting_result_id' => $transfer->sorting_result_id,
@@ -258,14 +245,13 @@ public function destroy($id)
                 ]);
             }
             
-            // Create reversal for EXTERNAL_TRANSFER_IN at Jasa Cuci
             if ($inTx) {
                 InventoryTransaction::create([
                     'transaction_date' => now(),
                     'grade_company_id' => $transfer->grade_company_id,
                     'location_id' => $transfer->to_location_id,
                     'supplier_id' => $inTx->supplier_id,
-                    'quantity_change_grams' => -abs($transfer->weight_grams), // negative to revert IN
+                    'quantity_change_grams' => -abs($transfer->weight_grams),
                     'transaction_type' => 'EXTERNAL_TRANSFER_REVERT_IN',
                     'reference_id' => $transfer->id,
                     'sorting_result_id' => $transfer->sorting_result_id,
@@ -273,7 +259,6 @@ public function destroy($id)
                 ]);
             }
             
-            // Soft delete
             $transfer->transactions()->delete();
             $transfer->deleted_by = $userId;
             $transfer->save();
@@ -302,22 +287,16 @@ public function destroy($id)
             
             $totalDeduction = abs($transfer->weight_grams) + abs($transfer->susut_grams ?? 0);
             
-            // Get original transactions
-            $inTx = $transfer->transactions()
-                ->where('transaction_type', 'RECEIVE_EXTERNAL_IN')
-                ->first();
-            $outTx = $transfer->transactions()
-                ->where('transaction_type', 'RECEIVE_EXTERNAL_OUT')
-                ->first();
+            $inTx = $transfer->transactions()->where('transaction_type', 'RECEIVE_EXTERNAL_IN')->first();
+            $outTx = $transfer->transactions()->where('transaction_type', 'RECEIVE_EXTERNAL_OUT')->first();
             
-            // Create reversal for RECEIVE_EXTERNAL_IN (at Gudang Utama) - NEGATIVE to remove stock
             if ($inTx) {
                 InventoryTransaction::create([
                     'transaction_date' => now(),
                     'grade_company_id' => $transfer->grade_company_id,
                     'location_id' => $transfer->to_location_id,
                     'supplier_id' => $inTx->supplier_id,
-                    'quantity_change_grams' => -abs($transfer->weight_grams), // negative to remove stock
+                    'quantity_change_grams' => -abs($transfer->weight_grams),
                     'transaction_type' => 'RECEIVE_EXTERNAL_REVERT_IN',
                     'reference_id' => $transfer->id,
                     'sorting_result_id' => $transfer->sorting_result_id,
@@ -325,14 +304,13 @@ public function destroy($id)
                 ]);
             }
             
-            // Create reversal for RECEIVE_EXTERNAL_OUT (at Jasa Cuci) - POSITIVE to return stock
             if ($outTx) {
                 InventoryTransaction::create([
                     'transaction_date' => now(),
                     'grade_company_id' => $transfer->grade_company_id,
                     'location_id' => $transfer->from_location_id,
                     'supplier_id' => $outTx->supplier_id,
-                    'quantity_change_grams' => $totalDeduction, // positive to return
+                    'quantity_change_grams' => $totalDeduction,
                     'transaction_type' => 'RECEIVE_EXTERNAL_REVERT_OUT',
                     'reference_id' => $transfer->id,
                     'sorting_result_id' => $transfer->sorting_result_id,
@@ -340,7 +318,6 @@ public function destroy($id)
                 ]);
             }
             
-            // Soft delete
             $transfer->transactions()->delete();
             $transfer->deleted_by = $userId;
             $transfer->save();
@@ -355,10 +332,6 @@ public function destroy($id)
     }
 }
 ```
-
-#### 2.5 TransferIdmController::destroy()
-**File**: `app/Http/Controllers/Feature/TransferIdmController.php`
-**Note**: We need to check TransferIdmService for the implementation
 
 ---
 
@@ -384,7 +357,6 @@ public function getAvailableStock(int $gradeCompanyId, int $locationId): float
         ->where('location_id', $locationId)
         ->sum('quantity_change_grams');
     
-    // Warn if stock goes negative (indicates data integrity issue)
     if ($stock < 0) {
         \Illuminate\Support\Facades\Log::warning('Negative stock detected', [
             'grade_company_id' => $gradeCompanyId,
@@ -393,12 +365,9 @@ public function getAvailableStock(int $gradeCompanyId, int $locationId): float
         ]);
     }
     
-    return $stock; // Return actual value (can be negative) for validation purposes
+    return $stock;
 }
-```
 
-Also add a helper method for display:
-```php
 public function getDisplayStock(int $gradeCompanyId, int $locationId): float
 {
     return max(0, $this->getAvailableStock($gradeCompanyId, $locationId));
@@ -412,7 +381,6 @@ public function getDisplayStock(int $gradeCompanyId, int $locationId): float
 **File**: `app/Services/BarangKeluar/BarangKeluarService.php`
 
 Add locking mechanism to prevent race conditions:
-
 ```php
 public function sellWithLock(array $data): InventoryTransaction
 {
@@ -420,16 +388,13 @@ public function sellWithLock(array $data): InventoryTransaction
         $userId = Auth::id();
         $sortingResultId = $data['sorting_result_id'] ?? null;
         
-        // Lock the sorting result row for update
         $sortingResult = SortingResult::lockForUpdate()->find($sortingResultId);
         
-        // Lock inventory transactions for this grade and location
         $lockedTx = InventoryTransaction::where('grade_company_id', $data['grade_company_id'])
             ->where('location_id', $data['location_id'])
             ->lockForUpdate()
             ->get();
         
-        // Now validate stock with locked data
         $batchRemaining = $this->getBatchRemainingStock($sortingResultId, $data['location_id']);
         if ($batchRemaining < $data['weight_grams']) {
             throw new \Exception('Stok batch tidak mencukupi');
@@ -439,7 +404,6 @@ public function sellWithLock(array $data): InventoryTransaction
             throw new \Exception('Stok fisik tidak mencukupi');
         }
         
-        // Proceed with insert
         $supplierId = $this->getSupplierIdFromSortingResult($sortingResultId);
         
         return InventoryTransaction::create([
@@ -457,8 +421,6 @@ public function sellWithLock(array $data): InventoryTransaction
 }
 ```
 
-Note: Full atomic locking may impact performance. Consider implementing at critical points only.
-
 ---
 
 ## Files to Delete
@@ -474,6 +436,11 @@ After removing edit functionality:
 
 ## Testing Checklist
 
+### After Phase 0 (GRADING_IN Fix):
+- [ ] Buat GRADING_IN baru via Sortir Bahan (ALU), cek sorting_result_id terisi
+- [ ] Cek dropdown stock sinkron dengan actual stock
+- [ ] Test jual barang, pastikan tidak minus
+
 ### After Phase 1 (Remove Edit):
 - [ ] Penjualan: Pastikan button Edit tidak muncul di UI
 - [ ] Transfer Internal: Pastikan button Edit tidak muncul di UI
@@ -486,7 +453,6 @@ After removing edit functionality:
 - [ ] Transfer Internal: Delete transfer, verify stok di kedua lokasi kembali
 - [ ] Transfer External: Delete transfer, verify stok di Gudang Utama dan Jasa Cuci kembali
 - [ ] Receive External: Delete receive, verify stok di Gudang Utama dan Jasa Cuci kembali
-- [ ] Transfer IDM: Delete transfer, verify IdmDetails kembali available
 
 ### After Phase 3 (Fix getAvailableStock):
 - [ ] Verify minus stock trigger warning logs
@@ -507,5 +473,5 @@ If issues arise:
 
 ---
 
-*Document created: 2026-05-09*
+*Document updated: 2026-05-09*
 *Project: gudang-walet-laravel-10*

@@ -357,97 +357,60 @@ class ReceiveExternalController extends Controller
         }
     }
 
-    public function edit($id)
-    {
-        try {
-            $transfer = \App\Models\StockTransfer::findOrFail($id);
-            $grades = \App\Models\GradeCompany::all();
-            $locations = \App\Models\Location::where('name', 'NOT LIKE', '%IDM%')
-                ->where('name', 'NOT LIKE', '%DMK%')
-                ->where('name', 'NOT LIKE', '%Gudang Utama%')
-                ->get();
-
-            // Calculate pending stock for validation display
-            $sentStock = abs($this->getSentStockToLocation($transfer->grade_company_id, $transfer->from_location_id));
-            $receivedStock = $this->getReceivedStockFromLocation($transfer->grade_company_id, $transfer->from_location_id);
-            // We subtract the current transaction's weight/shrinkage from receivedStock to simulate "before this transaction" state
-            $currentDeduction = $transfer->weight_grams + ($transfer->susut_grams ?? 0);
-            $receivedStock -= $currentDeduction;
-
-            $pendingStock = $sentStock - $receivedStock;
-
-            return view('admin.barang-keluar.receive-external-edit', compact('transfer', 'grades', 'locations', 'pendingStock'));
-        } catch (\Exception $e) {
-            Log::error('Error in edit: ' . $e->getMessage(), [
-                'user_id' => auth()->id(),
-                'trace' => $e->getTraceAsString()
-            ]);
-            return redirect()->route('barang.keluar.receive-external.step1')
-                ->with('error', 'Terjadi kesalahan saat memuat data.');
-        }
-    }
-
-    public function update(Request $request, $id)
-    {
-        try {
-            $validated = $request->validate([
-                'grade_company_id' => 'required|exists:grades_company,id',
-                'from_location_id' => 'required|exists:locations,id',
-                'weight_grams' => 'required|numeric|min:0.01',
-                'susut_grams' => 'nullable|numeric|min:0',
-                'transfer_date' => 'nullable|date',
-                'notes' => 'nullable|string|max:500',
-            ]);
-
-            $sentStock = abs($this->getSentStockToLocation($validated['grade_company_id'], $validated['from_location_id']));
-            $receivedStock = $this->getReceivedStockFromLocation($validated['grade_company_id'], $validated['from_location_id']);
-
-            // If editing the same transaction, we need to exclude its contribution to receivedStock
-            $oldTransfer = \App\Models\StockTransfer::findOrFail($id);
-            if ($oldTransfer->grade_company_id == $validated['grade_company_id'] &&
-                $oldTransfer->from_location_id == $validated['from_location_id']) {
-                $receivedStock -= ($oldTransfer->weight_grams + ($oldTransfer->susut_grams ?? 0));
-            }
-
-            $pendingStock = $sentStock - $receivedStock;
-            $totalDeduction = $validated['weight_grams'] + ($validated['susut_grams'] ?? 0);
-
-            if ($totalDeduction > $pendingStock) {
-                return back()->with('error', "Total berat (Diterima + Susut) melebihi stok yang pending. Maksimal: " . number_format($pendingStock, 2) . " gram");
-            }
-
-            $gudangUtama = \App\Models\Location::where('name', 'Gudang Utama')->first();
-            $validated['to_location_id'] = $gudangUtama->id;
-
-            $this->service->updateReceiveExternal($id, $validated);
-
-            return redirect()->route('barang.keluar.receive-external.step1')
-                ->with('success', 'Penerimaan barang eksternal berhasil diperbarui.');
-        } catch (\Exception $e) {
-            Log::error('Error in update: ' . $e->getMessage(), [
-                'user_id' => auth()->id(),
-                'trace' => $e->getTraceAsString()
-            ]);
-            return redirect()->back()->with('error', 'Terjadi kesalahan saat memperbarui data.');
-        }
-    }
-
     public function destroy($id)
     {
         try {
-            $transfer = \App\Models\StockTransfer::findOrFail($id);
-            $transfer->transactions()->delete();
-            $transfer->delete();
-
-            return redirect()->route('barang.keluar.receive-external.step1')
-                ->with('success', 'Penerimaan eksternal berhasil dihapus.');
+            return DB::transaction(function () use ($id) {
+                $transfer = \App\Models\StockTransfer::lockForUpdate()->findOrFail($id);
+                $userId = auth()->id();
+                
+                $totalDeduction = abs($transfer->weight_grams) + abs($transfer->susut_grams ?? 0);
+                
+                $inTx = $transfer->transactions()->where("transaction_type", "RECEIVE_EXTERNAL_IN")->first();
+                $outTx = $transfer->transactions()->where("transaction_type", "RECEIVE_EXTERNAL_OUT")->first();
+                
+                if ($inTx) {
+                    InventoryTransaction::create([
+                        "transaction_date" => now(),
+                        "grade_company_id" => $transfer->grade_company_id,
+                        "location_id" => $transfer->to_location_id,
+                        "supplier_id" => $inTx->supplier_id,
+                        "quantity_change_grams" => -abs($transfer->weight_grams),
+                        "transaction_type" => "RECEIVE_EXTERNAL_REVERT_IN",
+                        "reference_id" => $transfer->id,
+                        "sorting_result_id" => $transfer->sorting_result_id,
+                        "created_by" => $userId,
+                    ]);
+                }
+                
+                if ($outTx) {
+                    InventoryTransaction::create([
+                        "transaction_date" => now(),
+                        "grade_company_id" => $transfer->grade_company_id,
+                        "location_id" => $transfer->from_location_id,
+                        "supplier_id" => $outTx->supplier_id,
+                        "quantity_change_grams" => $totalDeduction,
+                        "transaction_type" => "RECEIVE_EXTERNAL_REVERT_OUT",
+                        "reference_id" => $transfer->id,
+                        "sorting_result_id" => $transfer->sorting_result_id,
+                        "created_by" => $userId,
+                    ]);
+                }
+                
+                $transfer->transactions()->delete();
+                $transfer->deleted_by = $userId;
+                $transfer->save();
+                $transfer->delete();
+                
+                return redirect()->route("barang.keluar.receive-external.step1")
+                    ->with("success", "Penerimaan berhasil dihapus dan stok dikembalikan.");
+            });
         } catch (\Exception $e) {
-            Log::error('Error in destroy: ' . $e->getMessage(), [
-                'user_id' => auth()->id(),
-                'trace' => $e->getTraceAsString()
+            Log::error("Error in destroy: " . $e->getMessage(), [
+                "user_id" => auth()->id(),
+                "trace" => $e->getTraceAsString()
             ]);
-            return redirect()->route('barang.keluar.receive-external.step1')
-                ->with('error', 'Terjadi kesalahan saat menghapus data.');
+            return redirect()->back()->with("error", "Terjadi kesalahan saat menghapus data.");
         }
     }
 
