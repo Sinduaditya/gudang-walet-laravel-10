@@ -51,10 +51,10 @@ class SortMaterialExport implements FromQuery, WithHeadings, WithMapping, Should
 
         return [
             $this->rowNumber,
-            \Carbon\Carbon::parse($item->sort_date)->format('d/m/Y'),
+            \Carbon\Carbon::parse($item->sort_date)->format('d M Y'),
             $item->parentGradeCompany->name ?? '-',
             $item->gradeCompany->name ?? '-',
-            number_format($item->weight, 2, ',', '.'),
+            number_format($item->weight, 0, ',', '.'),
             $item->description ?? '-',
         ];
     }
