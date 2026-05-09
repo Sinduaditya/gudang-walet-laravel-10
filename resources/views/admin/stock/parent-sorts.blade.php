@@ -78,6 +78,9 @@
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                     Deskripsi
                                 </th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Tujuan
+                                </th>
                             </tr>
                         </thead>
                         <tbody class="bg-white divide-y divide-gray-200">
@@ -98,10 +101,19 @@
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                         {{ Str::limit($item->description, 50) }}
                                     </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm">
+                                        @if($item->destination)
+                                            <span class="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs font-medium">
+                                                {{ ucfirst($item->destination) }}
+                                            </span>
+                                        @else
+                                            <span class="text-gray-400">-</span>
+                                        @endif
+                                    </td>
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="5" class="px-6 py-12 text-center text-sm text-gray-500">
+                                    <td colspan="6" class="px-6 py-12 text-center text-sm text-gray-500">
                                         Tidak ada data bahan sortir.
                                     </td>
                                 </tr>

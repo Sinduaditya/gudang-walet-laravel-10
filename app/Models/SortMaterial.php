@@ -17,6 +17,8 @@ class SortMaterial extends Model
         'parent_grade_company_id',
         'grade_company_id',
         'description',
+        'destination',
+        'sorting_result_id',
     ];
 
     protected $casts = [
@@ -38,5 +40,10 @@ class SortMaterial extends Model
     public function deletedBy()
     {
         return $this->belongsTo(User::class, 'deleted_by');
+    }
+
+    public function sortingResult()
+    {
+        return $this->belongsTo(SortingResult::class);
     }
 }
