@@ -41,7 +41,7 @@
             <!-- Filter Section -->
             <div class="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-6">
                 <form method="GET" action="{{ route('grading-goods.index') }}" class="flex flex-col gap-4">
-                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
                         <!-- Filter Supplier -->
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-1">Supplier</label>
@@ -90,6 +90,19 @@
                                         {{ $year }}
                                     </option>
                                 @endfor
+                            </select>
+                        </div>
+
+                        <!-- Filter Per Page -->
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Data per Halaman</label>
+                            <select name="per_page"
+                                class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                @foreach ([10, 20, 30, 40, 50, 60] as $option)
+                                    <option value="{{ $option }}" {{ $perPage == $option ? 'selected' : '' }}>
+                                        {{ $option }} data
+                                    </option>
+                                @endforeach
                             </select>
                         </div>
                     </div>

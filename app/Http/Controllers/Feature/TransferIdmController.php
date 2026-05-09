@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Feature;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Services\Idm\TransferIdmService;
+use App\Exports\TransferIdmExport;
+use Maatwebsite\Excel\Facades\Excel;
 
 class TransferIdmController extends Controller
 {
@@ -267,5 +269,22 @@ class TransferIdmController extends Controller
     {
         $this->transferIdmService->deleteTransfer($id);
         return redirect()->route('barang.keluar.transfer-idm.index')->with('success', 'Transfer Deleted Successfully');
+    }
+
+    public function export(Request $request)
+    {
+        try {
+            $filters = [
+                'start_date' => $request->get('start_date'),
+                'end_date'   => $request->get('end_date'),
+                'search'     => $request->get('search'),
+            ];
+
+            $fileName = 'transfer_idm_' . date('Y-m-d') . '.xlsx';
+            return Excel::download(new TransferIdmExport($filters), $fileName);
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('TransferIdmController export error: ' . $e->getMessage());
+            return redirect()->back()->with('error', 'Terjadi kesalahan saat export data.');
+        }
     }
 }

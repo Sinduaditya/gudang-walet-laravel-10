@@ -5,6 +5,8 @@ namespace App\Http\Controllers\SortMaterial;
 use App\Http\Controllers\Controller;
 use App\Models\ParentGradeCompany;
 use App\Services\SortMaterial\SortMaterialService;
+use App\Exports\SortMaterialExport;
+use Maatwebsite\Excel\Facades\Excel;
 use Illuminate\Http\Request;
 
 class SortMaterialController extends Controller
@@ -132,6 +134,18 @@ class SortMaterialController extends Controller
             }
         } catch (\Exception $e) {
             return redirect()->back()->with('error', $e->getMessage());
+        }
+    }
+
+    public function export(Request $request)
+    {
+        try {
+            $search = $request->input('search');
+            $fileName = 'sortir_bahan_' . date('Y-m-d') . '.xlsx';
+            return Excel::download(new SortMaterialExport($search), $fileName);
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('SortMaterialController export error: ' . $e->getMessage());
+            return redirect()->back()->with('error', 'Terjadi kesalahan saat export data.');
         }
     }
 }

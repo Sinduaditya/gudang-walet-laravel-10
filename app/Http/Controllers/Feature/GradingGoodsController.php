@@ -28,11 +28,16 @@ class GradingGoodsController extends Controller
             'grading_date' => $request->get('grading_date'),
         ];
 
-        $gradings = $this->gradingGoodsService->getAllGrading($filters);
+        $allowedPerPage = [10, 20, 30, 40, 50, 60];
+        $perPage = in_array((int) $request->get('per_page'), $allowedPerPage)
+            ? (int) $request->get('per_page')
+            : 50;
+
+        $gradings = $this->gradingGoodsService->getAllGrading($filters, $perPage);
 
         $suppliers = $this->gradingGoodsService->getSuppliers();
 
-        return view('admin.grading-goods.index', compact('gradings', 'suppliers'));
+        return view('admin.grading-goods.index', compact('gradings', 'suppliers', 'perPage'));
     }
 
     public function show(Request $request, $receiptItemId)

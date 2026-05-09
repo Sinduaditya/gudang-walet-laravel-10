@@ -8,6 +8,8 @@ use App\Models\GradeCompany;
 use App\Models\Location;
 use App\Services\BarangKeluar\BarangKeluarService;
 use App\Http\Requests\BarangKeluar\SellRequest;
+use App\Exports\PenjualanExport;
+use Maatwebsite\Excel\Facades\Excel;
 use Illuminate\Http\Request;
 
 class PenjualanController extends Controller
@@ -205,6 +207,24 @@ class PenjualanController extends Controller
         } catch (\Exception $e) {
             \Illuminate\Support\Facades\Log::error('PenjualanController destroy error: ' . $e->getMessage());
             return redirect()->back()->with('error', 'Terjadi kesalahan saat menghapus transaksi.');
+        }
+    }
+
+    public function export(Request $request)
+    {
+        try {
+            $filters = [
+                'start_date'      => $request->get('start_date'),
+                'end_date'        => $request->get('end_date'),
+                'supplier_id'     => $request->get('supplier_id'),
+                'grade_company_id'=> $request->get('grade_company_id'),
+            ];
+
+            $fileName = 'penjualan_langsung_' . date('Y-m-d') . '.xlsx';
+            return Excel::download(new PenjualanExport($filters), $fileName);
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('PenjualanController export error: ' . $e->getMessage());
+            return redirect()->back()->with('error', 'Terjadi kesalahan saat export data.');
         }
     }
 }

@@ -7,6 +7,8 @@ use App\Models\InventoryTransaction;
 use App\Models\Location;
 use App\Models\GradeCompany;
 use App\Services\BarangKeluar\BarangKeluarService;
+use App\Exports\ReceiveExternalExport;
+use Maatwebsite\Excel\Facades\Excel;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 
@@ -446,6 +448,24 @@ class ReceiveExternalController extends Controller
             ]);
             return redirect()->route('barang.keluar.receive-external.step1')
                 ->with('error', 'Terjadi kesalahan saat menghapus data.');
+        }
+    }
+
+    public function export(Request $request)
+    {
+        try {
+            $filters = [
+                'grade_id'    => $request->get('grade_id'),
+                'supplier_id' => $request->get('supplier_id'),
+                'start_date'  => $request->get('start_date'),
+                'end_date'    => $request->get('end_date'),
+            ];
+
+            $fileName = 'kembali_eksternal_' . date('Y-m-d') . '.xlsx';
+            return Excel::download(new ReceiveExternalExport($filters), $fileName);
+        } catch (\Exception $e) {
+            Log::error('ReceiveExternalController export error: ' . $e->getMessage());
+            return redirect()->back()->with('error', 'Terjadi kesalahan saat export data.');
         }
     }
 }
