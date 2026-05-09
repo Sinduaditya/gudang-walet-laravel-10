@@ -425,6 +425,12 @@
                                             Filter
                                         </button>
 
+                                        <a href="{{ route('barang.keluar.receive-external.export', request()->query()) }}"
+                                            class="flex items-center gap-1 px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-md hover:bg-green-700 transition-colors">
+                                            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z"/></svg>
+                                            Export Excel
+                                        </a>
+
                                         @if (request('start_date') || request('end_date'))
                                             <a href="{{ route('barang.keluar.receive-external.step1') }}"
                                                 class="px-4 py-2 bg-white border border-gray-300 text-gray-700 text-sm font-medium rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition-colors">

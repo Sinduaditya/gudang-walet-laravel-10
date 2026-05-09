@@ -101,6 +101,7 @@ Route::middleware(['auth'])->group(function () {
                 Route::get('sell', [PenjualanController::class, 'sellForm'])->name('sell.form');
                 Route::post('sell', [PenjualanController::class, 'sell'])->name('sell.store');
                 Route::get('sell/stock-check', [PenjualanController::class, 'checkStock'])->name('sell.stock_check');
+                Route::get('sell/export', [PenjualanController::class, 'export'])->name('sell.export');
 
                 // History actions
                 Route::get('sell/{id}/edit', [PenjualanController::class, 'edit'])->name('sell.edit');
@@ -116,6 +117,7 @@ Route::middleware(['auth'])->group(function () {
                     Route::get('/step2', [TransferInternalController::class, 'transferStep2'])->name('step2');
                     Route::post('/confirm', [TransferInternalController::class, 'transfer'])->name('store');
                     Route::get('/stock-check', [TransferInternalController::class, 'checkStock'])->name('stock_check');
+                    Route::get('/export', [TransferInternalController::class, 'export'])->name('export');
                     Route::get('/{id}/edit', [TransferInternalController::class, 'edit'])->name('edit');
                     Route::put('/{id}', [TransferInternalController::class, 'update'])->name('update');
                     Route::delete('/{id}', [TransferInternalController::class, 'destroy'])->name('destroy');
@@ -129,6 +131,7 @@ Route::middleware(['auth'])->group(function () {
                     Route::post('/step1', [TransferExternalController::class, 'storeExternalTransferStep1'])->name('store-step1');
                     Route::get('/step2', [TransferExternalController::class, 'externalTransferStep2'])->name('step2');
                     Route::post('/confirm', [TransferExternalController::class, 'externalTransfer'])->name('store');
+                    Route::get('/export', [TransferExternalController::class, 'export'])->name('export');
                     Route::get('/{id}/edit', [TransferExternalController::class, 'edit'])->name('edit');
                     Route::put('/{id}', [TransferExternalController::class, 'update'])->name('update');
                     Route::delete('/{id}', [TransferExternalController::class, 'destroy'])->name('destroy');
@@ -155,6 +158,7 @@ Route::middleware(['auth'])->group(function () {
                     Route::post('/confirm', [ReceiveExternalController::class, 'receiveExternal'])->name('store');
 
                     Route::get('/stock-check', [ReceiveExternalController::class, 'checkExternalStock'])->name('stock_check');
+                    Route::get('/export', [ReceiveExternalController::class, 'export'])->name('export');
                     Route::get('/{id}/edit', [ReceiveExternalController::class, 'edit'])->name('edit');
                     Route::put('/{id}', [ReceiveExternalController::class, 'update'])->name('update');
                     Route::delete('/{id}', [ReceiveExternalController::class, 'destroy'])->name('destroy');
@@ -165,8 +169,9 @@ Route::middleware(['auth'])->group(function () {
                     ->group(function () {
                         Route::get('/index', [TransferIdmController::class, 'index'])->name('index');
                         Route::get('/create', [TransferIdmController::class, 'create'])->name('create');
+                        Route::get('/export', [TransferIdmController::class, 'export'])->name('export');
 
-                        Route::get('/step-2', [TransferIdmController::class, 'step2'])->name('step2.form'); // ini apa wok
+                        Route::get('/step-2', [TransferIdmController::class, 'step2'])->name('step2.form');
         
                         Route::post('/step-2', [TransferIdmController::class, 'step2'])->name('step2');
                         Route::post('/store', [TransferIdmController::class, 'store'])->name('store');
@@ -215,6 +220,7 @@ Route::middleware(['auth'])->group(function () {
         Route::resource('grade-company', GradeCompanyController::class);
 
         Route::resource('parent-grade-companies', ParentGradeCompanyController::class);
+        Route::get('sort-materials/export', [\App\Http\Controllers\SortMaterial\SortMaterialController::class, 'export'])->name('sort-materials.export');
         Route::resource('sort-materials', SortMaterialController::class);
         Route::resource('suppliers', SupplierController::class);
 

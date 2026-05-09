@@ -1,442 +1,281 @@
-# Analisis Barang Keluar
+# Barang Keluar - Security & Stock Integrity Analysis
 
 ## Overview
-
-Barang Keluar adalah fitur untuk mencatat dan mengelola pengeluaran/transfer stok barang dari gudang. Fitur ini mencakup beberapa operasi: penjualan langsung, transfer internal, transfer eksternal, penerimaan dari internal, dan penerimaan dari eksternal.
-
----
-
-## Tabel yang Digunakan
-
-| Tabel | Peran | Operasi |
-|-------|-------|---------|
-| `inventory_transactions` | Akumulasi stok per grade + lokasi + supplier | Create, Read |
-| `stock_transfers` | Record transfer antar lokasi | Create, Read, Update, Delete |
-| `sorting_results` | Data batch/sorting per grade | Read |
-| `grades_company` | Grade company (produk akhir) | Read |
-| `locations` | Lokasi gudang | Read |
-| `suppliers` | Supplier (informasi tambahan) | Read |
-| `purchase_receipts` | Receipt item untuk tracing supplier | Read (via relations) |
-
-### Tabel yang Ada di Model tapi TIDAK Digunakan Langsung
-
-| Tabel | Catatan |
-|-------|---------|
-| `grades` | Tidak digunakan — fokus ke grades_company |
-| `parent_grade_companies` | Tidak digunakan langsung |
+Dokumen ini menganalisis potential bugs dan kerentanan yang dapat menyebabkan **minus di stok** pada modul Barang Keluar. Analisis mencakup: Penjualan, Transfer Internal, Transfer External, Receive Internal, Receive External, dan Transfer IDM.
 
 ---
 
-## Controller, Service, dan Blade
+## 1. PENJUALAN (PenjualanController)
 
-### Controllers
-| File | Fungsi |
-|------|--------|
-| `BarangKeluarController.php` | Halaman utama menu (4 card) |
-| `PenjualanController.php` | Penjualan langsung (SALE_OUT) |
-| `TransferInternalController.php` | Transfer internal antar lokasi |
-| `TransferExternalController.php` | Transfer eksternal (Jasa Cuci) |
-| `ReceiveInternalController.php` | Penerimaan dari IDM/DMK |
-| `ReceiveExternalController.php` | Penerimaan dari eksternal (Jasa Cuci) |
-| `TransferIdmController.php` | Transfer IDM (handled by separate service) |
+### Current Flow:
+1. User pilih batch (sorting_result_id) dari dropdown
+2. Cek batch stock via `getBatchRemainingStock()`
+3. Cek real stock via `hasEnoughStock()`
+4. Proses `sell()` → buat InventoryTransaction SALE_OUT (negatif)
 
-### Services
-| File | Fungsi |
-|------|--------|
-| `BarangKeluarService.php` | Core business logic — stock calculation, batch tracking, sell, transfer, receive |
-| `TransferIdmService.php` | IDM-specific transfer operations |
+### Vulnerabilities Found:
 
-### Blade Views
-| File | Fungsi |
-|------|--------|
-| `barang-keluar/index.blade.php` | Menu utama 4 card |
-| `barang-keluar/sell.blade.php` | Form penjualan + history |
-| `barang-keluar/sell-edit.blade.php` | Edit penjualan |
-| `barang-keluar/transfer-step1.blade.php` | Form transfer internal + history |
-| `barang-keluar/transfer-step2.blade.php` | Konfirmasi transfer internal |
-| `barang-keluar/transfer-edit.blade.php` | Edit transfer internal |
-| `barang-keluar/external-transfer-step1.blade.php` | Form transfer eksternal + history |
-| `barang-keluar/external-transfer-step2.blade.php` | Konfirmasi transfer eksternal |
-| `barang-keluar/external-transfer-edit.blade.php` | Edit transfer eksternal |
-| `barang-keluar/receive-internal-step1.blade.php` | Form receive internal + history |
-| `barang-keluar/receive-internal-step2.blade.php` | Konfirmasi receive internal |
-| `barang-keluar/receive-external-step1.blade.php` | Form receive eksternal + history |
-| `barang-keluar/receive-external-edit.blade.php` | Edit receive eksternal |
-| `transfer-idm/*.blade.php` | IDM transfer views |
+#### V-1.1: Race Condition - Stok Check vs Execute
+**Severity: HIGH**
+- **Issue**: Terdapat time gap antara saat user submit form dan saat eksekusi `sell()`. User bisa mengubah jumlah di form setelah stock check.
+- **Location**: `sell()` method di `BarangKeluarService.php:118`
+- **Scenario**:
+  1. User A cek stok → available 100gr
+  2. User A submit form dengan 100gr
+  3. User B juga cek stok → available 100gr (belum terdecrement)
+  4. User B submit form dengan 50gr
+  5. User A sell 100gr → SUCCESS
+  6. User B sell 50gr → SUCCESS (tapi seharusnya hanya 50gr tersisa)
+- **Likelihood**: Medium
+- **Impact**: Stock minus if concurrent transactions exceed actual stock
 
-### Routes
-```
-barang-keluar/
-├── GET  /                            → index (menu)
-├── GET  /sell                        → sellForm
-├── POST /sell                        → sell
-├── GET  /sell/{id}/edit              → edit (Penjualan)
-├── PUT  /sell/{id}                    → update (Penjualan)
-├── DELETE /sell/{id}                  → destroy (Penjualan)
-├── GET  /transfer/step1               → transferStep1
-├── POST /transfer/step1               → storeTransferStep1
-├── GET  /transfer/step2               → transferStep2
-├── POST /transfer                    → transfer
-├── GET  /transfer/{id}/edit          → edit (Transfer)
-├── PUT  /transfer/{id}                → update (Transfer)
-├── DELETE /transfer/{id}             → destroy (Transfer)
-├── GET  /transfer-external/step1     → externalTransferStep1
-├── POST /transfer-external/step1     → storeExternalTransferStep1
-├── GET  /transfer-external/step2     → externalTransferStep2
-├── POST /transfer-external           → externalTransfer
-├── GET  /transfer-external/{id}/edit → editExternalTransfer
-├── PUT  /transfer-external/{id}      → updateExternalTransfer
-├── DELETE /transfer-external/{id}    → destroyExternalTransfer
-├── GET  /receive-internal/step1      → receiveInternalStep1
-├── POST /receive-internal/step1       → storeReceiveInternalStep1
-├── GET  /receive-internal/step2      → receiveInternalStep2
-├── POST /receive-internal            → receiveInternal
-├── GET  /receive-external/step1      → receiveExternalStep1
-├── POST /receive-external/step1      → storeReceiveExternalStep1
-├── GET  /receive-external/step2      → receiveExternalStep2
-├── POST /receive-external            → receiveExternal
-├── GET  /receive-external/{id}/edit → editReceiveExternal
-├── PUT  /receive-external/{id}       → updateReceiveExternal
-├── DELETE /receive-external/{id}     → destroyReceiveExternal
-└── GET  /transfer-idm               → TransferIdmController@index
-```
+#### V-1.2: Edit/Update Tanpa Validasi Stok YangAdequat
+**Severity: HIGH**
+- **Issue**: `update()` di PenjualanController:181-198 melakukan update tanpa recalculate stock validation.
+- **Location**: `PenjualanController.php:181-198`
+- **Problem**:
+  ```php
+  $tx->update([
+      'quantity_change_grams' => -abs($request->input('weight_grams')), // hanya update quantity
+      'transaction_date' => $request->input('transaction_date'),
+  ]);
+  ```
+  - Tidak ada cek apakah stok mencukupi untuk perubahan
+  - Tidak ada reverting transaksi lama
+- **Impact**: Jika user edit dari 50gr ke 100gr, tapi stok hanya 80gr, terjadi minus
+
+#### V-1.3: Delete Tanpa Revert Stok
+**Severity: MEDIUM**
+- **Location**: `PenjualanController.php:201-211`
+- **Issue**: `destroy()` hanya delete transaksi, TIDAK mengembalikan stok.
+- **Code**:
+  ```php
+  $tx->delete(); // hanya hapus, tidak ada reverting
+  ```
+- **Impact**: Jika transaksi dihapus, stok yang sudah ter-decrement tidak kembali, menyebabkan stock mismatch
 
 ---
 
-## Transaction Types di Inventory Transactions
+## 2. TRANSFER INTERNAL (TransferInternalController)
 
-| Type | Effect | Source |
-|------|--------|--------|
-| SALE_OUT | -quantity | PenjualanController::sell() |
-| TRANSFER_OUT | -quantity | BarangKeluarService::createTransferTransactions() |
-| TRANSFER_IN | +quantity | BarangKeluarService::createTransferTransactions() |
-| EXTERNAL_TRANSFER_OUT | -quantity | BarangKeluarService::externalTransfer() |
-| EXTERNAL_TRANSFER_IN | +quantity | BarangKeluarService::externalTransfer() |
-| RECEIVE_INTERNAL_IN | +quantity | BarangKeluarService::receiveInternal() |
-| RECEIVE_EXTERNAL_IN | +quantity | BarangKeluarService::receiveExternal() |
-| RECEIVE_EXTERNAL_OUT | -quantity | BarangKeluarService::receiveExternal() |
-| IDM_TRANSFER_OUT | -quantity | TransferIdmService |
-| IDM_TRANSFER_IN | +quantity | TransferIdmService |
+### Current Flow:
+1. User pilih batch (sorting_result_id)
+2. Cek batch stock & grade stock
+3. Simpan ke session step1
+4. Di step2, submit → `transfer()` → `BarangKeluarService::transfer()`
 
----
+### Vulnerabilities Found:
 
-## Alur Kerja & Struktur Data
+#### V-2.1: Edit/Update Meningkatkan Berat Tanpa Validasi
+**Severity: HIGH**
+- **Location**: `TransferInternalController.php:292-330`
+- **Issue**:
+  ```php
+  // Line 305-306
+  $totalWeight = $validated['weight_grams'] + ($validated['susut_grams'] ?? 0);
+  $availableStock = $this->service->getAvailableStock(...);
+  // ...
+  if ($availableStock < $totalWeight) {
+      return back()->with('error', "Stok tidak mencukupi!");
+  }
+  ```
+  - Available stock dihitung dari current stock, tapi tidak memperhitungkan berat TRANSFER YANG LAMA yang akan di-replace
+  - Line 308-314: Ada effort untuk add back old weight, tapi hanya jika grade_company_id sama
+  - **Masalah**: Jika user ganti grade_company_id saat edit, stok lama tidak di-revert
+- **Scenario**:
+  1. Transfer A: Grade X, 50gr dari Gudang Utama ke DMK
+  2. User edit Transfer A: Ganti ke Grade Y, 80gr
+  3. Validasi cek stok Grade Y = 100gr → OK
+  4. Stok Grade X tidak di-revert → minus 50gr di Grade X
+- **Impact**: Minus di grade yang lama
 
-### Penjualan Langsung (Sell)
+#### V-2.2: Delete Tidak Revert Stok Secara Total
+**Severity: HIGH**
+- **Location**: `TransferInternalController.php:332-355`
+- **Code**:
+  ```php
+  foreach ($transfer->transactions as $transaction) {
+      $transaction->deleted_by = auth()->id();
+      $transaction->save();
+      $transaction->delete(); // Only soft delete, no revert
+  }
+  $transfer->deleted_by = auth()->id();
+  $transfer->save();
+  $transfer->delete();
+  ```
+- **Issue**: Menghapus transaksi TIDAK mengembalikan stok. Hanya menandai deleted_by.
+- **Impact**: Stock yang sudah ter-decrement tetap minus
 
-```
-PenjualanController
-├── sellForm()
-│   ├─ getGradingSourcesWithStock() — "Global Budgeting" logic
-│   ├─ Filter by supplier, grade, date
-│   └─ Show sales history with pagination
-├── checkStock() — AJAX check batch remaining
-├── sell()
-│   ├─ Validate batch stock (getBatchRemainingStock)
-│   ├─ Validate actual stock (hasEnoughStock)
-│   └─ BarangKeluarService::sell() → SALE_OUT transaction
-├── edit() — Show edit form
-├── update() — Update weight/date directly on InventoryTransaction
-└── destroy() — Soft delete transaction
-```
-
-### Transfer Internal
-
-```
-TransferInternalController
-├── transferStep1()
-│   ├─ getGradingSourcesWithStock() — dropdown stock
-│   ├─ Show internal transfer history
-│   └─ Filter by date, supplier, grade
-├── storeTransferStep1() — Validate & store to session
-├── transferStep2() — Confirmation view
-├── transfer() — Final submit
-│   ├─ Validate batch stock
-│   ├─ Validate actual stock
-│   └─ BarangKeluarService::transfer() → TRANSFER_OUT + TRANSFER_IN
-├── checkStock() — AJAX check
-├── edit() — Show edit form
-├── update() → BarangKeluarService::updateTransferInternal()
-└── destroy() — Soft delete + revert stock
-```
-
-### Transfer Eksternal
-
-```
-TransferExternalController
-├── externalTransferStep1()
-│   └─ Similar to internal but for external (Jasa Cuci)
-├── externalTransfer() → EXTERNAL_TRANSFER_OUT + EXTERNAL_TRANSFER_IN
-└── update/destroy similar pattern
-```
-
-### Receive Internal/External
-
-```
-ReceiveInternalController
-└─ receiveInternal() → RECEIVE_INTERNAL_IN transaction
-
-ReceiveExternalController
-└─ receiveExternal() → RECEIVE_EXTERNAL_IN + RECEIVE_EXTERNAL_OUT
-```
+#### V-2.3: Race Condition di Session-Based Step
+**Severity: MEDIUM**
+- **Issue**: Menggunakan session untuk menyimpan step1 data. Jika user lain melakukan transaksi berbeda, session bisa terkontaminasi.
+- **Location**: `storeTransferStep1()` line 167: `$request->session()->put('transfer_step1', $validated);`
+- **Impact**: Low - session per user, tapi tetap ada potential race dalam kondisi edge
 
 ---
 
-## Logika Perhitungan Stok ("Global Budgeting")
+## 3. TRANSFER EXTERNAL (TransferExternalController)
 
-### getBatchRemainingStock()
+### Vulnerabilities Found:
 
-```php
-// 1. Batch stock (sorting_result_id specific)
-$batchStock = InventoryTransaction::where('sorting_result_id', $sortingResultId)
-    ->where('location_id', $locationId)
-    ->sum('quantity_change_grams');
+#### V-3.1: Edit Ganti Grade Tapi Stok Lama Tidak di-Revert
+**Severity: HIGH**
+- **Location**: `TransferExternalController.php:276-313`
+- **Issue**: Sama seperti V-2.1
+  ```php
+  if ($oldTransfer->grade_company_id == $validated['grade_company_id']) {
+      $availableStock += $oldTransfer->weight_grams + ($oldTransfer->susut_grams ?? 0);
+  }
+  ```
+  - Hanya revert jika grade sama
+  - Jika grade berbeda, stok lama tetap minus
+- **Impact**: Minus di grade yang lama
 
-// 2. Total grade stock at location
-$totalGradeLocationStock = InventoryTransaction::where('grade_company_id', $gradeCompanyId)
-    ->where('location_id', $locationId)
-    ->sum('quantity_change_grams');
-
-// 3. Global net stock (entire warehouse system)
-$globalNetStock = InventoryTransaction::where('grade_company_id', $gradeCompanyId)
-    ->sum('quantity_change_grams');
-
-// Final = min(batch, location, global)
-$finalStock = min($batchStock, $totalGradeLocationStock, $globalNetStock);
-```
-
-**Tujuan:** Memastikan dropdown stock tidak melebihi stok nyata di sistem manapun.
-
-### getGradingSourcesWithStock()
-
-```php
-// Menambah logging budget per parent grade family
-// Agar SUM dropdown tidak melebihi total keluarga grade
-$budgetPools[$budgetKey] -= $displayWeight;
-```
+#### V-3.2: Delete Tanpa Revert Stok
+**Severity: HIGH**
+- **Location**: `TransferExternalController.php:316-332`
+- **Code**:
+  ```php
+  $transfer->transactions()->delete();
+  $transfer->delete();
+  ```
+- **Issue**: Hanya delete, tidak ada reverting stock
+- **Impact**: Stock tetap minus
 
 ---
 
-## Security Review
+## 4. RECEIVE EXTERNAL (ReceiveExternalController)
 
-### Yang Sudah Baik
+### Vulnerabilities Found:
 
-| Aspek | Status | Detail |
-|-------|--------|--------|
-| Mass Assignment | ✅ | `fillable` di semua model |
-| SQL Injection | ✅ | Eloquent ORM |
-| CSRF | ✅ | Laravel default di form |
-| Auth Middleware | ✅ | `auth` di route |
-| Soft Deletes | ✅ | InventoryTransaction, StockTransfer pakai SoftDeletes |
-| Eager Load | ✅ | `with(['gradeCompany', 'location', ...])` di query |
-| XSS — Blade | ✅ | `{{ }}` auto-escape |
-| Input Validation | ✅ | Form Request classes (SellRequest, TransferRequest) |
+#### V-4.1: Edit Tidak Melakukan Validasi Pending Stock Yang Tepat
+**Severity: HIGH**
+- **Location**: `ReceiveExternalController.php:390-432`
+- **Issue**:
+  ```php
+  // Line 406-409
+  if ($oldTransfer->grade_company_id == $validated['grade_company_id'] &&
+      $oldTransfer->from_location_id == $validated['from_location_id']) {
+      $receivedStock -= ($oldTransfer->weight_grams + ($oldTransfer->susut_grams ?? 0));
+  }
+  ```
+  - Logic sudah benar untuk subtract old transfer
+  - Tapi ada subtle issue: jika user edit jadi lebih besar, tidak ada extra validation
+- **Impact**: Jika edit menambah berat, pending stock validation bisa gagal
 
-### Area yang Perlu Diperhatikan
-
-| Aspek | Status | Catatan |
-|-------|--------|---------|
-| Error Handling | ⚠️ | Beberapa controller tidak ada try-catch |
-| Stock Validation | ⚠️ | double-check di service dan controller |
-| Session Security | ⚠️ | Step1 data di session perlu di-validate |
-| Delete Logic | ✅ | Soft delete dengan deleted_by tracking |
-
----
-
-## Bug & Vulnerability Findings (Detail)
+#### V-4.2: Delete Tidak Revert Stok
+**Severity: MEDIUM**
+- **Location**: `ReceiveExternalController.php:435-452`
+- **Issue**: Delete hanya remove transactions, tidak revert
+- **Impact**: Stok tidak kembali
 
 ---
 
-### BK-01: Error Message Terekspos ke User (No Try-Catch)
+## 5. RECEIVE INTERNAL (ReceiveInternalController)
 
-**Lokasi:** Semua controller method
+### Vulnerabilities Found:
 
-**Masalah:**
-Controller memanggil service langsung tanpa try-catch. Ketika database error terjadi, exception propagate ke Laravel handler dan bisa expose raw error message.
-
-**Solusi:**
-Bungkus semua method controller dengan try-catch + user-friendly error message.
-
-**Priority: P1** — Security/UX issue.
+#### V-5.1: Delete Method Not Implemented
+**Severity: LOW**
+- **Location**: `ReceiveInternalController.php`
+- **Issue**: Tidak ada `destroy()` method
+- **Impact**: Receive Internal tidak bisa dihapus, tidak ada minus risk dari sini
 
 ---
 
-### BK-02: getGradesByFilter() Tidak Digunakan
+## 6. TRANSFER IDM (TransferIdmController)
 
-**Lokasi:** `BarangKeluarService.php:602-635`
+### Vulnerabilities Found:
 
-**Masalah:**
-Method `getGradesByFilter()` ada di service tapi tidak pernah dipanggil dari controller manapun.
+#### V-6.1: Edit/Update Ganti Items Bisa Cause Stock Issues
+**Severity: HIGH**
+- **Location**: `TransferIdmController.php:209-260`
+- **Issue**:
+  ```php
+  // Line 234-235
+  $itemIds = array_column($request->items, 'id');
+  $items = \App\Models\IdmDetail::whereIn('id', $itemIds)->get();
+  ```
+  - Jika user remove items dari transfer, IdmDetail tidak di-return ke available pool
+  - IdmTransferDetail tetap pointing ke IdmDetail yang sudah tidak terkait
+- **Impact**: Item "tersesat" dalam sistem, tidak bisa di-transfer ulang tapi juga tidak di-count sebagai available
 
-**Solusi:**
-Hapus jika memang tidak diperlukan, atau integrate dengan fitur filter.
-
-**Priority: P3** — Dead code.
-
----
-
-### BK-03: Inconsistent Stock Check Logic
-
-**Lokasi:** `BarangKeluarService.php:406-416` vs Controller
-
-**Masalah:**
-Ada 2 tempat stock check:
-1. Service: `hasEnoughStock()` dan `getAvailableStock()`
-2. Controller: duplicate validation logic
-
-Ini berpotensi inconsistent jika salah satu diupdate tapi yang lain tidak.
-
-**Solusi:**
-Pastikan semua stock check centralized di service layer. Controller hanya memanggil service method.
-
-**Priority: P2** — Maintainability issue.
+#### V-6.2: Delete Tidak Clear IdmTransferDetails
+**Severity: MEDIUM**
+- **Location**: `TransferIdmController.php:268-272`
+- **Issue**: `deleteTransfer()` menghapus IdmTransfer tapi tidak mengembalikan IdmDetail ke available state
 
 ---
 
-### BK-04: getGradingSourcesWithStock() N+1 Query Potensial
+## 7. GENERAL ISSUES (Semua Modul)
 
-**Lokasi:** `BarangKeluarService.php:652-712`
+### G-1: hasEnoughStock() Check But Not Atomic
+**Severity: MEDIUM**
+- **Location**: `BarangKeluarService.php:406-417`
+- **Issue**: `hasEnoughStock()` adalah separate query, tidak atomic dengan insert
+- **Race Condition**: Thread A check stock OK → Thread B check stock OK → Thread A insert → Thread B insert → minus
+- **Solution**: Perlu locking atau transaction isolation level
 
-**Masalah:**
-Loop di dalam map function yang memanggil query per item:
-```php
-$sources->map(function ($source) use (...) {
-    // Multiple queries per iteration:
-    // 1. GradeCompany lookup
-    // 2. Budget pool calculation (potentially per parent)
-    // 3. Location budget lookup
-    // 4. Batch stock query
-});
-```
+### G-2: getAvailableStock() Returns Negative Values
+**Severity: MEDIUM**
+- **Location**: `BarangKeluarService.php:398-404`
+- **Code**:
+  ```php
+  public function getAvailableStock(int $gradeCompanyId, int $locationId): float
+  {
+      return (float) InventoryTransaction::where('grade_company_id', $gradeCompanyId)
+          ->where('location_id', $locationId)
+          ->sum('quantity_change_grams'); // Bisa negatif!
+  }
+  ```
+- **Issue**: Function returns negative values instead of 0, allowing operations on already-minus stock
+- **Impact**: Minus stock bisa semakin minus
 
-**Solusi:**
-Buat batch query untuk menghitung semua budget pools di awal sebelum map().
-
-**Priority: P2** — Performance issue.
-
----
-
-### BK-05: Transfer IDM Handler dengan Code Generation
-
-**Lokasi:** `TransferIdmService.php`
-
-**Masalah:**
-Service ini punya logic untuk auto-generate transfer code dengan pattern. Perlu dicek apakah sudah menggunakan database transaction dengan benar.
-
-**Solusi:**
-Audit TransferIdmService untuk ensure consistency dengan service lain.
-
-**Priority: P2** — Consistency issue.
+### G-3: No Database Transaction Isolation
+**Severity: MEDIUM**
+- **Issue**: Tidak ada penggunaan `SELECT FOR UPDATE` atau transaction isolation level
+- **Impact**: Race conditions pada concurrent transactions
 
 ---
 
-### BK-06: updateTransfer() Orphan Method
+## SUMMARY - Risk Matrix
 
-**Lokasi:** `BarangKeluarService.php:434-466`
-
-**Masalah:**
-Method `updateTransfer()` ada tapi isinya incomplete (komentar "Refactor needed") dan tidak dipanggil. Yang dipanggil adalah `updateTransferInternal()`, `updateExternalTransfer()`, `updateReceiveExternal()`.
-
-**Solusi:**
-Hapus `updateTransfer()` jika memang tidak digunakan.
-
-**Priority: P3** — Dead code.
-
----
-
-### BK-07: Redirect dengan withInput() Setelah Validasi Gagal
-
-**Lokasi:** `PenjualanController.php:128-130`, `TransferInternalController.php:149-151`
-
-**Masalah:**
-Redirect dengan `withInput()` setelah gagal stok check. Ini potentially expose sensitive data jika ada error message dengan data lengkap.
-
-**Solusi:**
-Pastikan error message tidak expose internal data. Consider menggunakan session flash untuk error saja tanpa input.
-
-**Priority: P3** — Information disclosure low risk.
+| ID | Issue | Severity | Impact | Status |
+|----|-------|----------|--------|--------|
+| V-1.1 | Race Condition Penjualan | HIGH | Stock minus | Need Fix |
+| V-1.2 | Edit Penjualan Tanpa Validasi Stok | HIGH | Stock minus | Need Fix |
+| V-1.3 | Delete Penjualan Tidak Revert Stok | MEDIUM | Stock mismatch | Need Fix |
+| V-2.1 | Edit Transfer Internal Ganti Grade | HIGH | Minus di grade lama | Need Fix |
+| V-2.2 | Delete Transfer Internal Tidak Revert | HIGH | Stock minus | Need Fix |
+| V-3.1 | Edit Transfer External Ganti Grade | HIGH | Minus di grade lama | Need Fix |
+| V-3.2 | Delete Transfer External Tidak Revert | HIGH | Stock minus | Need Fix |
+| V-4.1 | Edit Receive External Validation | MEDIUM | Potential minus | Need Fix |
+| V-4.2 | Delete Receive External Tidak Revert | MEDIUM | Stock mismatch | Need Fix |
+| V-6.1 | Edit Transfer IDM Item Management | HIGH | Item tersesat | Need Fix |
+| V-6.2 | Delete Transfer IDM Orphan | MEDIUM | Item inconsistency | Need Fix |
+| G-1 | Race Condition - Non Atomic Check | MEDIUM | Stock minus | Need Fix |
+| G-2 | getAvailableStock Returns Negative | MEDIUM | Uncontrolled minus | Need Fix |
+| G-3 | No Transaction Isolation | MEDIUM | Race conditions | Consider |
 
 ---
 
-### BK-08: Missing Validation pada Edit/Update
+## Key Recommendations
 
-**Lokasi:** `PenjualanController.php:153-166`
+1. **REMOVE EDIT functionality** dari semua modul Barang Keluar (mirip dengan yang sudah dilakukan di Grading Goods dan Barang Masuk)
 
-**Masalah:**
-`update()` method di PenjualanController tidak menggunakan Form Request, hanya inline validation. Ini inconsistent dengan `sell()` yang menggunakan `SellRequest`.
+2. **IMPLEMENT HARD DELETE with STOCK REVERT** untuk semua delete operations:
+   - Saat delete, hitung kembali perubahan stok dan revert
+   - Atau: gunakan soft delete dan biarkan admin handle manual adjustment
 
-**Solusi:**
-Gunakan Form Request untuk konsistensi.
+3. **IMPLEMENT ATOMIC STOCK CHECK** menggunakan:
+   - Database transaction dengan `lockForUpdate()`
+   - Atau:乐观锁 dengan version field
 
-**Priority: P3** — Inconsistency.
+4. **USE TRANSACTION ISOLATION LEVEL** SERIALIZABLE untuk critical stock operations
 
----
-
-### BK-09: Soft Delete dengan deleted_by tapi tidak ada Kolom deleted_by
-
-**Lokasi:** `TransferInternalController.php:300-320`
-
-**Masalah:**
-Kode mencoba set `deleted_by` sebelum delete, tapi perlu pastikan kolom `deleted_by` ada di tabel `stock_transfers`.
-
-**Solusi:**
-Cek schema atau buat migration jika diperlukan.
-
-**Priority: P3** — Potential runtime error.
+5. **ADD MONITORING** untuk detect minus stock conditions early
 
 ---
 
-### BK-10: Global Budgeting Logic Kompleks dan Sulit di-Maintain
-
-**Lokasi:** `BarangKeluarService.php:652-712`
-
-**Masalah:**
-`getGradingSourcesWithStock()` memiliki logic complex dengan mutable `$budgetPools` dan `$locationBudgets` yang di-mutate dalam loop. Ini:
-- Sulit di-test
-- Sulit di-debug
-- Potentially inconsistent jika ada exception mid-loop
-
-**Solusi:**
-Refactor untuk gunakan state object atau query yang lebih straightforward.
-
-**Priority: P2** — Technical debt.
-
----
-
-## Summary Temuan
-
-| ID | Issue | Severity | Lokasi | Solusi | Status |
-|----|-------|----------|--------|--------|--------|
-| BK-01 | Error message terekspos (no try-catch) | 🟡 MEDIUM | Semua controller | Tambah try-catch | ✅ Done |
-| BK-02 | getGradesByFilter() tidak digunakan | 🟢 LOW | BarangKeluarService.php | Hapus atau integrate | 🔴 Open |
-| BK-03 | Inconsistent stock check logic | 🟡 MEDIUM | Service vs Controller | Centralize di service | ✅ Done |
-| BK-04 | N+1 query di getGradingSourcesWithStock | 🟡 MEDIUM | BarangKeluarService.php | Batch query | ✅ Done |
-| BK-05 | TransferIdmService consistency | 🟡 MEDIUM | TransferIdmService.php | Audit transaction handling | 🔴 Open |
-| BK-06 | updateTransfer() orphan method | 🟢 LOW | BarangKeluarService.php | Hapus dead code | 🔴 Open |
-| BK-07 | withInput() expose data | 🟢 LOW | Controller methods | Review error messages | 🔴 Open |
-| BK-08 | Inline validation vs Form Request | 🟢 LOW | PenjualanController | Gunakan Form Request | 🔴 Open |
-| BK-09 | deleted_by column check | 🟢 LOW | TransferInternalController | Verify schema | 🔴 Open |
-| BK-10 | Global Budgeting logic complex | 🟡 MEDIUM | BarangKeluarService.php | Refactor untuk testability | ✅ Done |
-
----
-
-## Pending Questions / Butuh Konfirmasi
-
-1. **Apakah getGradesByFilter() masih diperlukan?** Jika tidak, sebaiknya dihapus.
-
-2. **Apakah TransferIdmService sudah consistent dengan pattern service lain?** Perlu review terhadap transaction handling.
-
-3. **Apakah Global Budgeting logic sudah sesuai ekspektasi bisnis?** Logic saat ini kompleks dan perlu confirm apakah berjalan benar.
-
-4. **Error messages yang show stock numbers — apakah acceptable?** Beberapa error message menampilkan jumlah stok actual untuk debugging user, perlu confirm apakah ini desired behavior.
-
-5. **Apakah perlu ada fitur "stock adjustment" untuk koreksi manual?** Saat ini koreksi hanya bisa lewat edit/delete transaksi original.
-
----
-
-## Existing Documentation untuk Referensi
-
-Dokumentasi ini dibuat mengikuti format analisis yang sama dengan:
-- `docs/tracking-stok/tracking-stok-analysis.md`
-- `docs/barang-masuk/barang-masuk-analysis.md`
-- `docs/manajemen-grading/grading-analysis.md`
+*Document created: 2026-05-09*
+*Project: gudang-walet-laravel-10*

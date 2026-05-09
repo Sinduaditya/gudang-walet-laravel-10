@@ -9,6 +9,8 @@ use App\Models\GradeCompany;
 use App\Services\BarangKeluar\BarangKeluarService;
 use App\Http\Requests\BarangKeluar\TransferRequest;
 use App\Models\StockTransfer;
+use App\Exports\TransferInternalExport;
+use Maatwebsite\Excel\Facades\Excel;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -349,6 +351,24 @@ class TransferInternalController extends Controller
         } catch (\Exception $e) {
             \Illuminate\Support\Facades\Log::error('TransferInternalController destroy error: ' . $e->getMessage());
             return redirect()->back()->with('error', 'Terjadi kesalahan saat menghapus transfer.');
+        }
+    }
+
+    public function export(Request $request)
+    {
+        try {
+            $filters = [
+                'start_date'      => $request->get('start_date'),
+                'end_date'        => $request->get('end_date'),
+                'supplier_id'     => $request->get('supplier_id'),
+                'grade_company_id'=> $request->get('grade_company_id'),
+            ];
+
+            $fileName = 'transfer_internal_' . date('Y-m-d') . '.xlsx';
+            return Excel::download(new TransferInternalExport($filters), $fileName);
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('TransferInternalController export error: ' . $e->getMessage());
+            return redirect()->back()->with('error', 'Terjadi kesalahan saat export data.');
         }
     }
 }
