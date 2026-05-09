@@ -20,6 +20,7 @@
             $isManajemenIdm = request()->routeIs('manajemen-idm.*');
             $isTransferIdm = request()->routeIs('transfer-idm.*');
             $isBarangKeluar = request()->routeIs('barang.keluar.*');
+            $isSortMaterials = request()->routeIs('sort-materials.*');
             $isTrackingStock = request()->routeIs('tracking-stock.*');
             $isMasterGradeCompany = request()->routeIs('grade-company.*');
             $isMasterSupplier = request()->routeIs('suppliers.*');

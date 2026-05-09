@@ -222,6 +222,7 @@ Route::middleware(['auth'])->group(function () {
         Route::resource('parent-grade-companies', ParentGradeCompanyController::class);
         Route::get('sort-materials/export', [\App\Http\Controllers\SortMaterial\SortMaterialController::class, 'export'])->name('sort-materials.export');
         Route::resource('sort-materials', SortMaterialController::class);
+        Route::post('sort-materials/global', [SortMaterialController::class, 'storeGlobal'])->name('sort-materials.store-global');
         Route::resource('suppliers', SupplierController::class);
 
         // System Log
