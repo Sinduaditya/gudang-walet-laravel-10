@@ -228,11 +228,12 @@ class DashboardService
             ->get()
             ->map(function ($receipt) {
                 $totalWeight = $receipt->receiptItems->sum('warehouse_weight_grams') / 1000;
+                $supplierName = e($receipt->supplier->name ?? 'Unknown Supplier');
                 return [
                     'type' => 'incoming',
                     'icon' => 'plus',
                     'color' => 'green',
-                    'message' => "Barang masuk <strong>{$totalWeight}kg</strong> dari <strong class=\"text-blue-600\">{$receipt->supplier->name}</strong>",
+                    'message' => "Barang masuk <strong>{$totalWeight}kg</strong> dari <strong class=\"text-blue-600\">{$supplierName}</strong>",
                     'time' => Carbon::parse($receipt->unloading_date)->diffForHumans(),
                     'created_at' => Carbon::parse($receipt->unloading_date),
                 ];
@@ -245,7 +246,7 @@ class DashboardService
             ->get()
             ->map(function ($grading) {
                 $weight = $grading->weight_grams / 1000;
-                $gradeName = $grading->gradeCompany ? $grading->gradeCompany->name : 'Unknown Grade';
+                $gradeName = $grading->gradeCompany ? e($grading->gradeCompany->name) : 'Unknown Grade';
                 return [
                     'type' => 'grading',
                     'icon' => 'grid',
@@ -264,11 +265,12 @@ class DashboardService
             ->get()
             ->map(function ($transaction) {
                 $weight = abs($transaction->quantity_change_grams) / 1000;
+                $locationName = e($transaction->location->name ?? 'Unknown Location');
                 return [
                     'type' => 'outgoing',
                     'icon' => 'arrow-right',
                     'color' => 'red',
-                    'message' => "Barang keluar <strong>{$weight}kg</strong> dikirim ke <strong class=\"text-blue-600\">{$transaction->location->name}</strong>.",
+                    'message' => "Barang keluar <strong>{$weight}kg</strong> dikirim ke <strong class=\"text-blue-600\">{$locationName}</strong>.",
                     'time' => Carbon::parse($transaction->transaction_date)->diffForHumans(),
                     'created_at' => Carbon::parse($transaction->transaction_date),
                 ];
