@@ -175,18 +175,37 @@ class PenjualanController extends Controller
                 $tx = InventoryTransaction::lockForUpdate()->findOrFail($id);
                 $oldQuantity = $tx->quantity_change_grams;
 
-                InventoryTransaction::create([
-                    'transaction_date' => now(),
-                    'grade_company_id' => $tx->grade_company_id,
-                    'location_id' => $tx->location_id,
-                    'quantity_change_grams' => abs($oldQuantity),
-                    'supplier_id' => $tx->supplier_id,
-                    'transaction_type' => 'SALE_REVERT',
-                    'reference_id' => $tx->id,
-                    'sorting_result_id' => $tx->sorting_result_id,
-                    'notes' => 'Revert dari delete penjualan ID: ' . $id,
-                    'created_by' => auth()->id(),
-                ]);
+                // Check if SALE_REVERT already exists for this transaction to prevent double revert
+                $existingRevert = \App\Models\InventoryTransaction::where('reference_id', $tx->id)
+                    ->where('transaction_type', 'SALE_REVERT')
+                    ->first();
+
+                if (!$existingRevert) {
+                    InventoryTransaction::create([
+                        'transaction_date' => now(),
+                        'grade_company_id' => $tx->grade_company_id,
+                        'location_id' => $tx->location_id,
+                        'quantity_change_grams' => abs($oldQuantity),
+                        'supplier_id' => $tx->supplier_id,
+                        'transaction_type' => 'SALE_REVERT',
+                        'reference_id' => $tx->id,
+                        'sorting_result_id' => $tx->sorting_result_id,
+                        'notes' => 'Revert dari delete penjualan ID: ' . $id,
+                        'created_by' => auth()->id(),
+                    ]);
+                }
+
+                // Also delete linked SortMaterial if exists (to avoid double revert)
+                if ($tx->sorting_result_id) {
+                    $sortMaterial = \App\Models\SortMaterial::where('sorting_result_id', $tx->sorting_result_id)->first();
+                    if ($sortMaterial) {
+                        $sortMaterial->deleted_by = auth()->id();
+                        $sortMaterial->save();
+                        $sortMaterial->delete();
+                    }
+                    // Delete sorting_result (cascade nullify inventory_transactions reference)
+                    \App\Models\SortingResult::where('id', $tx->sorting_result_id)->delete();
+                }
 
                 $tx->deleted_by = auth()->id();
                 $tx->save();

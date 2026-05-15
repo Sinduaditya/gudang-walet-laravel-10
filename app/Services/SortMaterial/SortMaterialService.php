@@ -20,7 +20,7 @@ class SortMaterialService
     /**
      * Parent grades yang menggunakan sistem Sortir Global
      */
-    private const GLOBAL_PARENT_GRADES = ['ALU', 'AF', 'Indomie P'];
+    private const GLOBAL_PARENT_GRADES = ['ALU', 'AA2 AF JUAL', 'AF', 'Indomie P'];
 
     /**
      * Destination options untuk tracking aliran barang
@@ -29,7 +29,7 @@ class SortMaterialService
         'mangkok' => 'Mangkok',
         'idm' => 'IDM',
         'aa' => 'AA',
-        'af' => 'AF',
+        'af' => 'Lempeng',
     ];
 
     public function getAll(?string $search = null)
@@ -88,11 +88,34 @@ class SortMaterialService
     {
         return DB::transaction(function () use ($id) {
             $sortMaterial = $this->getById($id);
-            $sortMaterial->parentGradeCompany->decrement('stock', $sortMaterial->weight);
+            $originalWeight = $sortMaterial->weight;
+            $originalDestination = $sortMaterial->destination;
+            $sortingResultId = $sortMaterial->sorting_result_id;
 
-            // Delete related sorting_result (cascade deletes inventory_transactions via FK)
-            if ($sortMaterial->sorting_result_id) {
-                SortingResult::where('id', $sortMaterial->sorting_result_id)->delete();
+            // Find the original SALE_OUT transaction from this sorting
+            if ($sortingResultId) {
+                $originalTx = InventoryTransaction::where('sorting_result_id', $sortingResultId)
+                    ->where('transaction_type', 'SALE_OUT')
+                    ->first();
+
+                if ($originalTx) {
+                    // Create revert transaction to restore stock
+                    InventoryTransaction::create([
+                        'transaction_date' => now(),
+                        'grade_company_id' => $originalTx->grade_company_id,
+                        'location_id' => $originalTx->location_id,
+                        'supplier_id' => $originalTx->supplier_id,
+                        'quantity_change_grams' => abs($originalTx->quantity_change_grams),
+                        'transaction_type' => 'SALE_REVERT',
+                        'reference_id' => $originalTx->id,
+                        'sorting_result_id' => $sortingResultId,
+                        'notes' => 'Revert delete sortir bahan ID: ' . $id . ' - destination: ' . ($originalDestination ?? 'unknown'),
+                        'created_by' => auth()->id(),
+                    ]);
+                }
+
+                // Delete sorting_result (cascade nullifies inventory_transactions reference)
+                SortingResult::where('id', $sortingResultId)->delete();
             }
 
             $sortMaterial->deleted_by = auth()->id();
@@ -185,15 +208,49 @@ class SortMaterialService
     }
 
     /**
-     * Get list destinations untuk dropdown
+     * Check apakah grade termasuk AA2 AF JUAL (parent grade AA2 AF JUAL)
      */
-    public function getDestinations(): array
+    public function isAfJual(GradeCompany $grade): bool
     {
-        return self::DESTINATIONS;
+        return $grade->parentGradeCompany && $grade->parentGradeCompany->name === 'AA2 AF JUAL';
     }
 
     /**
-     * Proses sortir masuk stok (GRADING_IN) + auto SALE_OUT sisa
+     * Check apakah grade termasuk ALU atau AA2 AF JUAL (SALE_OUT only, no GRADING_IN)
+     */
+    public function isGlobalSortExit(GradeCompany $grade): bool
+    {
+        return $this->isAlu($grade) || $this->isAfJual($grade);
+    }
+
+    /**
+     * Get list destinations untuk dropdown
+     * Returns different destinations based on parent grade name
+     */
+    public function getDestinations(?string $parentGradeName = null): array
+    {
+        // Default destinations (ALU and others)
+        $defaultDestinations = [
+            'mangkok' => 'Mangkok',
+            'idm' => 'IDM',
+            'aa' => 'AA',
+            'af' => 'Lempeng',
+        ];
+
+        // AA2 AF JUAL only has IDM as destination
+        if ($parentGradeName === 'AA2 AF JUAL') {
+            return [
+                'idm' => 'IDM',
+            ];
+        }
+
+        return $defaultDestinations;
+    }
+
+    /**
+     * Proses sortir masuk stok
+     * - ALU: SALE_OUT (kurangi stock) + SortMaterial tracking
+     * - AF/Indomie P: GRADING_IN (tambah stock) + SALE_OUT sisa
      */
     public function processSortirMasukStok(array $data): array
     {
@@ -222,13 +279,13 @@ class SortMaterialService
 
             $sisaWeight = $globalStock - $inputWeight;
 
-            // 1. Create SortingResult + GRADING_IN
+            // Create SortingResult for tracking
             $sortingData = [
                 'grading_date' => $sortDate,
                 'grade_company_id' => $grade->id,
                 'weight_grams' => $inputWeight,
                 'quantity' => 1,
-                'notes' => 'Sortir Global - Masuk Stok',
+                'notes' => 'Sortir Global - ' . ($destination ? ucfirst($destination) : 'Masuk Stok'),
                 'created_by' => Auth::id(),
             ];
 
@@ -238,46 +295,62 @@ class SortMaterialService
 
             $sortingResultCreate = SortingResult::create($sortingData);
 
-            $gradingIn = InventoryTransaction::create([
-                'transaction_date' => $sortDate,
-                'grade_company_id' => $grade->id,
-                'location_id' => $gudangUtama->id,
-                'supplier_id' => $supplierId,
-                'quantity_change_grams' => abs($inputWeight),
-                'transaction_type' => 'GRADING_IN',
-                'reference_id' => $sortingResultCreate->id,
-                'sorting_result_id' => $sortingResultCreate->id,
-                'created_by' => Auth::id(),
-            ]);
+            $transactionOut = null;
+            $transactionIn = null;
 
-            $saleOut = null;
-
-            // 2. Auto SALE_OUT sisa
-            if ($this->isAlu($grade) || $sisaWeight > 0) {
-                $saleOut = InventoryTransaction::create([
+            if ($this->isAlu($grade) || $this->isAfJual($grade)) {
+                // ALU & AA2 AF JUAL: SALE_OUT saja (kurangi stock dari source)
+                $transactionOut = InventoryTransaction::create([
                     'transaction_date' => $sortDate,
                     'grade_company_id' => $grade->id,
                     'location_id' => $gudangUtama->id,
                     'supplier_id' => $supplierId,
-                    'quantity_change_grams' => -abs($sisaWeight),
+                    'quantity_change_grams' => -abs($inputWeight),
                     'transaction_type' => 'SALE_OUT',
                     'reference_id' => $sortingResultCreate->id,
                     'sorting_result_id' => $sortingResultCreate->id,
-                    'notes' => 'Sortir Global - Sisa dari proses masuk stok',
+                    'notes' => 'Sortir Global - ' . ($this->isAlu($grade) ? 'ALU' : 'AA2 AF JUAL') . ' keluar ke ' . ($destination ? ucfirst($destination) : 'stok'),
                     'created_by' => Auth::id(),
                 ]);
+            } else {
+                // AF/Indomie P: GRADING_IN (tambah stock) + SALE_OUT sisa
+                $transactionIn = InventoryTransaction::create([
+                    'transaction_date' => $sortDate,
+                    'grade_company_id' => $grade->id,
+                    'location_id' => $gudangUtama->id,
+                    'supplier_id' => $supplierId,
+                    'quantity_change_grams' => abs($inputWeight),
+                    'transaction_type' => 'GRADING_IN',
+                    'reference_id' => $sortingResultCreate->id,
+                    'sorting_result_id' => $sortingResultCreate->id,
+                    'created_by' => Auth::id(),
+                ]);
+
+                if ($sisaWeight > 0) {
+                    $transactionOut = InventoryTransaction::create([
+                        'transaction_date' => $sortDate,
+                        'grade_company_id' => $grade->id,
+                        'location_id' => $gudangUtama->id,
+                        'supplier_id' => $supplierId,
+                        'quantity_change_grams' => -abs($sisaWeight),
+                        'transaction_type' => 'SALE_OUT',
+                        'reference_id' => $sortingResultCreate->id,
+                        'sorting_result_id' => $sortingResultCreate->id,
+                        'notes' => 'Sortir Global - Sisa dari proses masuk stok (AF/Indomie P)',
+                        'created_by' => Auth::id(),
+                    ]);
+                }
             }
 
             // Update parent stock
             $this->updateParentGradeStock($grade->parent_grade_company_id);
 
-            // 3. Create SortMaterial record for tracking stock "Sortir"
-            // Map destination name to Parent Grade ID
+            // Create SortMaterial record for tracking stock "Sortir"
             $destinationMap = [
-                'mangkok' => 2,   // MANGKOK
-                'idm' => 3,      // IDM
-                'aa' => 5,       // AA1 / BULU
-                'af' => 4,        // AA2 AF JUAL
+                'mangkok' => 2,
+                'idm' => 3,
+                'aa' => 5,
+                'af' => 1, // LEMPENG
             ];
 
             $targetParentId = isset($destinationMap[$destination])
@@ -295,8 +368,8 @@ class SortMaterialService
             ]);
 
             return [
-                'grading_in' => $gradingIn,
-                'sale_out' => $saleOut,
+                'grading_in' => $transactionIn,
+                'sale_out' => $transactionOut,
                 'sorting_result' => $sortingResultCreate,
                 'sort_material' => $sortMaterial,
             ];
