@@ -22,23 +22,33 @@ class SortMaterialController extends Controller
     {
         $search = $request->input('search');
         $sortMaterials = $this->sortMaterialService->getAll($search);
-        $parentGradeCompanies = \App\Models\ParentGradeCompany::all();
-        $gradeCompanies = \App\Models\GradeCompany::all(['id', 'name', 'parent_grade_company_id']);
-        $grades = $this->sortMaterialService->getGradesWithGlobalStock();
-        $destinations = $this->sortMaterialService->getDestinations();
 
-        return view('admin.sort-materials.index', compact('sortMaterials', 'search', 'parentGradeCompanies', 'gradeCompanies', 'grades', 'destinations'));
+        return view('admin.sort-materials.index', compact('sortMaterials', 'search'));
     }
 
     public function create()
     {
         $parentGradeCompanies = \App\Models\ParentGradeCompany::all();
         $gradeCompanies = \App\Models\GradeCompany::all(['id', 'name', 'parent_grade_company_id']);
-        $destinations = $this->sortMaterialService->getDestinations();
+
+        // Get all grades with global stock (for filtering in dropdown)
+        $gradesWithGlobalStock = $this->sortMaterialService->getGradesWithGlobalStock();
 
         // ALU grades dengan global stock
-        $aluGrades = $this->sortMaterialService->getGradesWithGlobalStock()->filter(function($g) {
+        $aluGrades = $gradesWithGlobalStock->filter(function($g) {
             return $g->parentGradeCompany && $g->parentGradeCompany->name === 'ALU';
+        })->values();
+
+        // AA2 AF JUAL grades dengan global stock
+        $afJualGrades = $gradesWithGlobalStock->filter(function($g) {
+            return $g->parentGradeCompany && $g->parentGradeCompany->name === 'AA2 AF JUAL';
+        })->values();
+
+        // Grades dengan stock untuk parent lain (non-ALU, non-AA2 AF JUAL)
+        $normalGradesWithStock = $gradesWithGlobalStock->filter(function($g) {
+            return $g->parentGradeCompany &&
+                $g->parentGradeCompany->name !== 'ALU' &&
+                $g->parentGradeCompany->name !== 'AA2 AF JUAL';
         })->values();
 
         // Map parent grade id ke nama untuk JS
@@ -47,7 +57,14 @@ class SortMaterialController extends Controller
             $parentGradeNames[$pg->id] = $pg->name;
         }
 
-        return view('admin.sort-materials.create', compact('parentGradeCompanies', 'gradeCompanies', 'aluGrades', 'parentGradeNames', 'destinations'));
+        return view('admin.sort-materials.create', compact(
+            'parentGradeCompanies',
+            'gradeCompanies',
+            'aluGrades',
+            'afJualGrades',
+            'normalGradesWithStock',
+            'parentGradeNames'
+        ));
     }
 
     public function store(Request $request)
@@ -66,23 +83,9 @@ class SortMaterialController extends Controller
 
         $parentGrade = \App\Models\ParentGradeCompany::find($request->parent_grade_company_id);
 
-        // If ALU, use global sorting logic
-        if ($parentGrade && $parentGrade->name === 'ALU') {
+        // If ALU or AA2 AF JUAL, use global sorting logic (masuk stok only)
+        if ($parentGrade && ($parentGrade->name === 'ALU' || $parentGrade->name === 'AA2 AF JUAL')) {
             try {
-                $aluAction = $request->input('alu_action');
-
-                // Check if it's a penjualan action (from the hidden field)
-                if ($aluAction === 'penjualan') {
-                    $data = [
-                        'grade_company_id' => $request->grade_company_id,
-                        'weight_grams' => $request->weight,
-                        'sort_date' => $request->sort_date,
-                    ];
-                    $this->sortMaterialService->processPenjualanLangsung($data);
-                    return redirect()->route('sort-materials.index')->with('success', 'Penjualan langsung ALU berhasil.');
-                }
-
-                // Default: masuk stok
                 $data = [
                     'grade_company_id' => $request->grade_company_id,
                     'weight_grams' => $request->weight,
