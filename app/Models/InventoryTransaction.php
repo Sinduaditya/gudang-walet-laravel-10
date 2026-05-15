@@ -81,7 +81,11 @@ class InventoryTransaction extends Model
      */
     public function scopeIncoming($query)
     {
-        return $query->whereIn('transaction_type', ['PURCHASE_IN', 'TRANSFER_IN']);
+        return $query->whereIn('transaction_type', [
+            'PURCHASE_IN', 'TRANSFER_IN', 'GRADING_IN',
+            'RECEIVE_EXTERNAL_IN', 'RECEIVE_INTERNAL_IN',
+            'EXTERNAL_TRANSFER_IN', 'ADJUSTMENT_IN'
+        ]);
     }
 
     public function supplier()

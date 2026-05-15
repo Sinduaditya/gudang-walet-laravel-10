@@ -145,6 +145,7 @@ class SortMaterialService
         $globalStocks = InventoryTransaction::select('grade_company_id')
             ->selectRaw('SUM(quantity_change_grams) as total_stock')
             ->whereIn('grade_company_id', $childGradeIds)
+            ->whereNull('deleted_at')
             ->groupBy('grade_company_id')
             ->pluck('total_stock', 'grade_company_id')
             ->toArray();
@@ -171,6 +172,7 @@ class SortMaterialService
     public function getGlobalStock(int $gradeCompanyId): float
     {
         return (float) InventoryTransaction::where('grade_company_id', $gradeCompanyId)
+            ->whereNull('deleted_at')
             ->sum('quantity_change_grams');
     }
 

@@ -70,7 +70,7 @@ class TrackingStockService
 
     public function calculateGlobalStock(int $gradeId): int
     {
-        return (int) round(InventoryTransaction::where('grade_company_id', $gradeId)->sum('quantity_change_grams'));
+        return (int) round(InventoryTransaction::where('grade_company_id', $gradeId)->whereNull('deleted_at')->sum('quantity_change_grams'));
     }
 
     public function calculateParentGlobalStock(int $parentId): int
@@ -79,7 +79,7 @@ class TrackingStockService
         $gradeIds = GradeCompany::where('parent_grade_company_id', $parentId)->pluck('id');
 
         // Sum quantity changes for all these grades
-        return (int) round(InventoryTransaction::whereIn('grade_company_id', $gradeIds)->sum('quantity_change_grams'));
+        return (int) round(InventoryTransaction::whereIn('grade_company_id', $gradeIds)->whereNull('deleted_at')->sum('quantity_change_grams'));
     }
 
     public function calculateParentPositiveStock(int $parentId): int
@@ -91,6 +91,7 @@ class TrackingStockService
         }
 
         $total = InventoryTransaction::whereIn('grade_company_id', $gradeIds)
+            ->whereNull('deleted_at')
             ->selectRaw('SUM(quantity_change_grams) as total')
             ->value('total') ?? 0;
 
@@ -106,6 +107,7 @@ class TrackingStockService
         }
 
         $total = InventoryTransaction::whereIn('grade_company_id', $gradeIds)
+            ->whereNull('deleted_at')
             ->selectRaw('SUM(quantity_change_grams) as total')
             ->value('total') ?? 0;
 
@@ -125,6 +127,7 @@ class TrackingStockService
         $results = InventoryTransaction::select('grade_company_id')
             ->selectRaw('SUM(quantity_change_grams) as total_stock')
             ->whereIn('grade_company_id', $gradeIds)
+            ->whereNull('deleted_at')
             ->groupBy('grade_company_id')
             ->pluck('total_stock', 'grade_company_id')
             ->toArray();
@@ -183,6 +186,7 @@ class TrackingStockService
             ->select('location_id', 'supplier_id') // Select supplier juga
             ->selectRaw('SUM(quantity_change_grams) as total_stock')
             ->where('grade_company_id', $gradeId)
+            ->whereNull('deleted_at')
             ->groupBy('location_id', 'supplier_id');
 
         // Jika ada search berdasarkan nama lokasi

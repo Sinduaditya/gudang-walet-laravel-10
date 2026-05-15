@@ -202,12 +202,31 @@ class TransferIdmService
             $transfer->save();
 
             // Sync items: Delete all existing details and recreate
-            $transfer->details()->delete();
 
             // Revert Inventory Transactions for this transfer before recreating
-            InventoryTransaction::where('transaction_type', 'IDM_TRANSFER_OUT')
+            // Create reversal transactions instead of hard delete
+            $oldTransactions = InventoryTransaction::where('transaction_type', 'IDM_TRANSFER_OUT')
                 ->where('reference_id', $transfer->id)
-                ->delete();
+                ->get();
+
+            foreach ($oldTransactions as $oldTx) {
+                // Create reversal transaction
+                InventoryTransaction::create([
+                    'transaction_date' => now(),
+                    'grade_company_id' => $oldTx->grade_company_id,
+                    'location_id' => $oldTx->location_id,
+                    'supplier_id' => $oldTx->supplier_id,
+                    'quantity_change_grams' => abs($oldTx->quantity_change_grams),
+                    'transaction_type' => 'IDM_TRANSFER_REVERT',
+                    'reference_id' => $transfer->id,
+                    'sorting_result_id' => $oldTx->sorting_result_id,
+                    'created_by' => Auth::id(),
+                ]);
+                // Soft delete the old transaction
+                $oldTx->deleted_by = Auth::id();
+                $oldTx->save();
+                $oldTx->delete();
+            }
 
             $gudangUtama = Location::where('name', 'Gudang Utama')->first();
             $userId = Auth::id();

@@ -80,23 +80,23 @@ class BarangKeluarService
 
         $gradeCompanyId = $sortingResult->grade_company_id;
 
-        // 2. Hitung Stok khusus Batch ini (di lokasi tertentu jika ada)
-        $batchQuery = InventoryTransaction::where('sorting_result_id', $sortingResultId);
+        // 2. Hitung Stok khusus Batch ini (di lokasi tertentu jika ada) - exclude soft deleted
+        $batchQuery = InventoryTransaction::where('sorting_result_id', $sortingResultId)->whereNull('deleted_at');
         if ($locationId) {
             $batchQuery->where('location_id', $locationId);
         }
         $batchStock = (float) $batchQuery->sum('quantity_change_grams');
 
-        // 3. Hitung Total Stok Grade ini di lokasi tersebut
-        $gradeQuery = InventoryTransaction::where('grade_company_id', $gradeCompanyId);
+        // 3. Hitung Total Stok Grade ini di lokasi tersebut - exclude soft deleted
+        $gradeQuery = InventoryTransaction::where('grade_company_id', $gradeCompanyId)->whereNull('deleted_at');
         if ($locationId) {
             $gradeQuery->where('location_id', $locationId);
         }
         $totalGradeLocationStock = (float) $gradeQuery->sum('quantity_change_grams');
 
-        // 4. Hitung TOTAL STOK GRADE DI SELURUH GUDANG (Net Global)
-        // Ini kunci perbaikan: agar dropdown tidak melebihi stok asli keseluruhan
+        // 4. Hitung TOTAL STOK GRADE DI SELURUH GUDANG (Net Global) - exclude soft deleted
         $globalNetStock = (float) InventoryTransaction::where('grade_company_id', $gradeCompanyId)
+            ->whereNull('deleted_at')
             ->sum('quantity_change_grams');
 
         // Dropdown harus menampilkan angka terkecil dari 3 pengecekan:
@@ -109,28 +109,61 @@ class BarangKeluarService
     }
 
     /**
+     * Validate stock availability before transaction
+     */
+    private function validateStock(int $gradeCompanyId, int $locationId, float $weightGrams, ?int $sortingResultId = null): void
+    {
+        $weightGrams = abs($weightGrams);
+
+        // Get batch remaining stock
+        $batchRemaining = $this->getBatchRemainingStock($sortingResultId ?? 0, $locationId);
+        if ($sortingResultId && $batchRemaining < $weightGrams) {
+            throw new \Exception('Stok batch tidak mencukupi. Tersedia: ' . number_format($batchRemaining, 2) . ' gr.');
+        }
+
+        // Check location stock
+        $locationStock = $this->getAvailableStock($gradeCompanyId, $locationId);
+        if ($locationStock < $weightGrams) {
+            throw new \Exception('Stok lokasi tidak mencukupi. Tersedia: ' . number_format($locationStock, 2) . ' gr.');
+        }
+
+        // Check global stock
+        $globalStock = (float) InventoryTransaction::where('grade_company_id', $gradeCompanyId)
+            ->sum('quantity_change_grams');
+        if ($globalStock < $weightGrams) {
+            throw new \Exception('Stok global tidak mencukupi. Tersedia: ' . number_format($globalStock, 2) . ' gr.');
+        }
+    }
+
+    /**
      * Proses penjualan langsung:
      * - Catat transaksi keluar (SALE_OUT)
      *
      * @param array $data
      * @return InventoryTransaction
+     * @throws \Exception
      */
     public function sell(array $data): InventoryTransaction
     {
         return DB::transaction(function () use ($data) {
             $userId = Auth::id();
+            $weightGrams = abs($data['weight_grams']);
+            $sortingResultId = $data['sorting_result_id'] ?? null;
 
-            $supplierId = $this->getSupplierIdFromSortingResult($data['sorting_result_id'] ?? null);
+            // CRITICAL: Validate stock before selling
+            $this->validateStock($data['grade_company_id'], $data['location_id'], $weightGrams, $sortingResultId);
+
+            $supplierId = $this->getSupplierIdFromSortingResult($sortingResultId);
 
             return InventoryTransaction::create([
                 'transaction_date' => $data['transaction_date'] ?? now(),
                 'grade_company_id' => $data['grade_company_id'],
                 'location_id' => $data['location_id'],
-                'quantity_change_grams' => -abs($data['weight_grams']),
+                'quantity_change_grams' => -$weightGrams,
                 'supplier_id' => $supplierId,
                 'transaction_type' => 'SALE_OUT',
                 'reference_id' => null,
-                'sorting_result_id' => $data['sorting_result_id'] ?? null,
+                'sorting_result_id' => $sortingResultId,
                 'created_by' => $userId,
             ]);
         });
@@ -143,11 +176,17 @@ class BarangKeluarService
      *
      * @param array $data
      * @return StockTransfer
+     * @throws \Exception
      */
     public function transfer(array $data): StockTransfer
     {
         return DB::transaction(function () use ($data) {
             $userId = Auth::id();
+            $sortingResultId = $data['sorting_result_id'] ?? null;
+
+            // CRITICAL: Validate stock before transfer
+            $totalDeduction = abs($data['weight_grams']) + abs($data['susut_grams'] ?? 0);
+            $this->validateStock($data['grade_company_id'], $data['from_location_id'], $totalDeduction, $sortingResultId);
 
             // Buat record utama untuk transfer
             $transfer = StockTransfer::create([
@@ -158,7 +197,7 @@ class BarangKeluarService
                 'weight_grams' => $data['weight_grams'],
                 'susut_grams' => $data['susut_grams'] ?? 0,
                 'notes' => $data['notes'] ?? null,
-                'sorting_result_id' => $data['sorting_result_id'] ?? null,
+                'sorting_result_id' => $sortingResultId,
                 'created_by' => $userId,
             ]);
 
@@ -223,11 +262,17 @@ class BarangKeluarService
      *
      * @param array $data
      * @return StockTransfer
+     * @throws \Exception
      */
     public function externalTransfer(array $data): StockTransfer
     {
         return DB::transaction(function () use ($data) {
             $userId = Auth::id();
+            $sortingResultId = $data['sorting_result_id'] ?? null;
+
+            // CRITICAL: Validate stock before transfer
+            $totalDeduction = abs($data['weight_grams']) + abs($data['susut_grams'] ?? 0);
+            $this->validateStock($data['grade_company_id'], $data['from_location_id'], $totalDeduction, $sortingResultId);
 
             $transfer = StockTransfer::create([
                 'transfer_date' => $data['transfer_date'] ?? now(),
@@ -237,14 +282,14 @@ class BarangKeluarService
                 'weight_grams' => $data['weight_grams'],
                 'susut_grams' => $data['susut_grams'] ?? 0,
                 'notes' => $data['notes'] ?? null,
-                'sorting_result_id' => $data['sorting_result_id'] ?? null,
+                'sorting_result_id' => $sortingResultId,
                 'created_by' => $userId,
             ]);
 
             // Hitung total pengurangan (berat transfer + susut)
             $totalDeduction = abs($data['weight_grams']) + abs($data['susut_grams'] ?? 0);
 
-            $supplierId = $this->getSupplierIdFromSortingResult($data['sorting_result_id'] ?? null);
+            $supplierId = $this->getSupplierIdFromSortingResult($sortingResultId);
 
             // 1. EXTERNAL_TRANSFER_OUT (negatif) di Gudang Utama
             InventoryTransaction::create([
@@ -315,6 +360,11 @@ class BarangKeluarService
     {
         return DB::transaction(function () use ($data) {
             $userId = Auth::id();
+            $sortingResultId = $data['sorting_result_id'] ?? null;
+
+            // CRITICAL: Validate stock before receive external deduction
+            $totalDeduction = abs($data['weight_grams']) + abs($data['susut_grams'] ?? 0);
+            $this->validateStock($data['grade_company_id'], $data['from_location_id'], $totalDeduction, $sortingResultId);
 
             $transfer = StockTransfer::create([
                 'transfer_date' => $data['transfer_date'] ?? now(),
@@ -324,11 +374,11 @@ class BarangKeluarService
                 'weight_grams' => $data['weight_grams'],
                 'susut_grams' => $data['susut_grams'] ?? 0,
                 'notes' => $data['notes'] ?? null,
-                'sorting_result_id' => $data['sorting_result_id'] ?? null,
+                'sorting_result_id' => $sortingResultId,
                 'created_by' => $userId,
             ]);
 
-            $supplierId = $this->getSupplierIdFromSortingResult($data['sorting_result_id'] ?? null);
+            $supplierId = $this->getSupplierIdFromSortingResult($sortingResultId);
 
             // 1. RECEIVE_EXTERNAL_IN (positif) di Gudang Utama
             InventoryTransaction::create([
@@ -372,7 +422,8 @@ class BarangKeluarService
      */
     public function getStockPerLocation(?int $gradeCompanyId = null, ?int $locationId = null)
     {
-        $query = InventoryTransaction::selectRaw('grade_company_id, location_id, SUM(quantity_change_grams) AS current_stock_grams');
+        $query = InventoryTransaction::selectRaw('grade_company_id, location_id, SUM(quantity_change_grams) AS current_stock_grams')
+            ->whereNull('deleted_at');
 
         // Filter by grade jika diberikan
         if ($gradeCompanyId) {
@@ -399,6 +450,7 @@ class BarangKeluarService
     {
         $stock = (float) InventoryTransaction::where('grade_company_id', $gradeCompanyId)
             ->where('location_id', $locationId)
+            ->whereNull('deleted_at')
             ->sum('quantity_change_grams');
 
         if ($stock < 0) {
@@ -412,9 +464,13 @@ class BarangKeluarService
         return $stock;
     }
 
-    public function getDisplayStock(int $gradeCompanyId, int $locationId): float
+    public function getDisplayStock(int $gradeCompanyId, int $locationId, bool $allowNegative = false): float
     {
-        return max(0, $this->getAvailableStock($gradeCompanyId, $locationId));
+        $stock = $this->getAvailableStock($gradeCompanyId, $locationId);
+        if ($allowNegative) {
+            return $stock;
+        }
+        return max(0, $stock);
     }
     /**
      * Atomic sell operation with row-level locking to prevent race conditions.
@@ -478,15 +534,18 @@ class BarangKeluarService
 
         $batchStock = (float) InventoryTransaction::where('sorting_result_id', $sortingResultId)
             ->where('location_id', $locationId)
+            ->whereNull('deleted_at')
             ->lockForUpdate()
             ->sum('quantity_change_grams');
 
         $globalStock = (float) InventoryTransaction::where('grade_company_id', $sortingResult->grade_company_id)
+            ->whereNull('deleted_at')
             ->lockForUpdate()
             ->sum('quantity_change_grams');
 
         $locationStock = (float) InventoryTransaction::where('grade_company_id', $sortingResult->grade_company_id)
             ->where('location_id', $locationId)
+            ->whereNull('deleted_at')
             ->lockForUpdate()
             ->sum('quantity_change_grams');
 
@@ -499,6 +558,7 @@ class BarangKeluarService
     private function getGlobalStockWithLock(int $gradeCompanyId): float
     {
         return (float) InventoryTransaction::where('grade_company_id', $gradeCompanyId)
+            ->whereNull('deleted_at')
             ->lockForUpdate()
             ->sum('quantity_change_grams');
     }
@@ -510,6 +570,7 @@ class BarangKeluarService
     {
         return (float) InventoryTransaction::where('grade_company_id', $gradeCompanyId)
             ->where('location_id', $locationId)
+            ->whereNull('deleted_at')
             ->lockForUpdate()
             ->sum('quantity_change_grams');
     }
@@ -520,8 +581,9 @@ class BarangKeluarService
         // 1. Stok di gudang lokal
         $locationStock = $this->getAvailableStock($gradeCompanyId, $locationId);
 
-        // 2. Stok di seluruh sistem (Net Global)
+        // 2. Stok di seluruh sistem (Net Global) - exclude soft deleted
         $globalNetStock = (float) InventoryTransaction::where('grade_company_id', $gradeCompanyId)
+            ->whereNull('deleted_at')
             ->sum('quantity_change_grams');
 
         // Harus cukup di gudang lokal DAN cukup secara global
@@ -535,7 +597,12 @@ class BarangKeluarService
      */
     public function getStockSummaryByGrade()
     {
-        return InventoryTransaction::selectRaw('grade_company_id, SUM(quantity_change_grams) AS total_stock_grams')->groupBy('grade_company_id')->having('total_stock_grams', '>', 0)->with('gradeCompany')->get();
+        return InventoryTransaction::selectRaw('grade_company_id, SUM(quantity_change_grams) AS total_stock_grams')
+            ->whereNull('deleted_at')
+            ->groupBy('grade_company_id')
+            ->having('total_stock_grams', '>', 0)
+            ->with('gradeCompany')
+            ->get();
     }
 
     /**
@@ -801,12 +868,14 @@ class BarangKeluarService
         $budgetPools = [];
         foreach ($gradeIdsByParent as $parentId => $childIds) {
             $total = (float) InventoryTransaction::whereIn('grade_company_id', $childIds)
+                ->whereNull('deleted_at')
                 ->sum('quantity_change_grams');
             $budgetPools["parent_{$parentId}"] = $total;
         }
         // Handle orphan grades (no parent)
         foreach ($orphanGradeIds as $gradeId) {
             $total = (float) InventoryTransaction::where('grade_company_id', $gradeId)
+                ->whereNull('deleted_at')
                 ->sum('quantity_change_grams');
             $budgetPools["grade_{$gradeId}"] = $total;
         }
@@ -817,6 +886,7 @@ class BarangKeluarService
             ->selectRaw('SUM(quantity_change_grams) as total_stock')
             ->whereIn('grade_company_id', $allGradeIds)
             ->where('location_id', $locationId)
+            ->whereNull('deleted_at')
             ->groupBy('grade_company_id')
             ->pluck('total_stock', 'grade_company_id')
             ->toArray();
@@ -828,6 +898,7 @@ class BarangKeluarService
             ->selectRaw('SUM(quantity_change_grams) as batch_stock')
             ->whereIn('sorting_result_id', $sourceIds)
             ->where('location_id', $locationId)
+            ->whereNull('deleted_at')
             ->groupBy('sorting_result_id')
             ->pluck('batch_stock', 'sorting_result_id')
             ->toArray();
