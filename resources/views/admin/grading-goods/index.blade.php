@@ -219,6 +219,8 @@
                                             {{-- ✅ FIX: Gunakan receipt_item_id --}}
                                             <a href="{{ route('grading-goods.show', array_merge(['receiptItemId' => $grading->receipt_item_id], request()->query())) }}"
                                                 class="text-blue-600 hover:text-blue-800 font-medium">Detail</a>
+                                            <button onclick="openEditModal({{ $grading->receipt_item_id }})"
+                                                class="text-amber-600 hover:text-amber-800 font-medium">Edit</button>
                                             <button onclick="confirmDelete({{ $grading->receipt_item_id }})"
                                                 class="text-red-600 hover:text-red-800 font-medium">Hapus</button>
                                         </div>
@@ -266,6 +268,68 @@
         </div>
     </div>
 
+    <!-- Edit Modal -->
+    <div id="editModal" class="hidden fixed inset-0 bg-black bg-opacity-40 z-50 flex items-center justify-center">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[85vh] flex flex-col m-4">
+            <!-- Modal Header -->
+            <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center bg-gray-50 rounded-t-lg">
+                <h3 class="text-lg font-semibold text-gray-900" id="editModalTitle">Edit Jenis Barang Keluar</h3>
+                <button type="button" onclick="closeEditModal()" class="text-gray-400 hover:text-gray-600">
+                    <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+            
+            <!-- Modal Body (Scrollable if too many items) -->
+            <form id="editForm" onsubmit="submitEditForm(event)" class="flex flex-col flex-1 overflow-hidden">
+                @csrf
+                @method('PUT')
+                <div class="p-6 overflow-y-auto space-y-4 flex-1">
+                    <div id="editModalLoading" class="flex justify-center items-center py-8">
+                        <svg class="animate-spin h-8 w-8 text-blue-500" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <span class="ml-3 text-gray-600">Memuat data...</span>
+                    </div>
+                    
+                    <div id="editModalError" class="hidden bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded text-sm">
+                    </div>
+                    
+                    <div id="editModalContent" class="hidden space-y-4">
+                        <!-- Table of Grade Items -->
+                        <div class="overflow-x-auto border border-gray-200 rounded-lg">
+                            <table class="min-w-full divide-y divide-gray-200">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500">Grade</th>
+                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500">Berat</th>
+                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500">Jumlah</th>
+                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500">Kategori</th>
+                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500">Jenis Barang Keluar</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="editModalTableBody" class="bg-white divide-y divide-gray-200 text-sm text-gray-900">
+                                    <!-- Dynamic rows will be inserted here -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Modal Footer -->
+                <div class="px-6 py-4 border-t border-gray-200 bg-gray-50 flex justify-end gap-3 rounded-b-lg">
+                    <button type="button" onclick="closeEditModal()"
+                        class="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 text-sm font-medium">Batal</button>
+                    <button type="submit" id="editSubmitBtn" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm font-medium hidden">
+                        Simpan Perubahan
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     @push('scripts')
         <script>
             function confirmDelete(id) {
@@ -278,6 +342,152 @@
 
             function closeDeleteModal() {
                 document.getElementById('deleteModal').classList.add('hidden');
+            }
+
+            let currentReceiptItemId = null;
+
+            function openEditModal(receiptItemId) {
+                currentReceiptItemId = receiptItemId;
+                const modal = document.getElementById('editModal');
+                const loading = document.getElementById('editModalLoading');
+                const errorDiv = document.getElementById('editModalError');
+                const content = document.getElementById('editModalContent');
+                const submitBtn = document.getElementById('editSubmitBtn');
+                const tableBody = document.getElementById('editModalTableBody');
+
+                // Reset UI
+                errorDiv.classList.add('hidden');
+                errorDiv.innerText = '';
+                content.classList.add('hidden');
+                submitBtn.classList.add('hidden');
+                loading.classList.remove('hidden');
+                tableBody.innerHTML = '';
+
+                modal.classList.remove('hidden');
+
+                // Fetch data
+                const url = `{{ route('grading-goods.edit-ajax', ['receiptItemId' => ':id']) }}`.replace(':id', receiptItemId);
+                
+                fetch(url)
+                    .then(response => response.json())
+                    .then(result => {
+                        if (result.success) {
+                            loading.classList.add('hidden');
+                            content.classList.remove('hidden');
+                            submitBtn.classList.remove('hidden');
+
+                            if (result.data.length === 0) {
+                                tableBody.innerHTML = `<tr><td colspan="5" class="px-4 py-8 text-center text-gray-500">Tidak ada data grade.</td></tr>`;
+                                return;
+                            }
+
+                            result.data.forEach(item => {
+                                const row = document.createElement('tr');
+                                row.className = 'hover:bg-gray-50';
+                                
+                                const formattedWeight = new Intl.NumberFormat('id-ID').format(item.weight_grams);
+                                const formattedQty = new Intl.NumberFormat('id-ID').format(item.quantity);
+
+                                row.innerHTML = `
+                                    <td class="px-4 py-3 font-medium text-gray-900">${item.grade_name}</td>
+                                    <td class="px-4 py-3 font-mono">${formattedWeight} gr</td>
+                                    <td class="px-4 py-3 font-mono">${formattedQty}</td>
+                                    <td class="px-4 py-3" id="category-badge-${item.id}">
+                                        ${item.category_grade ? `<span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">${item.category_grade}</span>` : '<span class="text-gray-400 text-xs">-</span>'}
+                                    </td>
+                                    <td class="px-4 py-3">
+                                        <select name="outgoing_types[${item.id}]" onchange="checkCategoryMutualExclusivity(${item.id}, this, '${item.category_grade || ''}')" class="w-full border border-gray-300 rounded-md px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+                                            <option value="">Pilih Jenis Keluar</option>
+                                            <option value="penjualan_langsung" ${item.outgoing_type === 'penjualan_langsung' ? 'selected' : ''}>Penjualan Langsung</option>
+                                            <option value="internal" ${item.outgoing_type === 'internal' ? 'selected' : ''}>Internal</option>
+                                            <option value="external" ${item.outgoing_type === 'external' ? 'selected' : ''}>External</option>
+                                        </select>
+                                        ${item.category_grade ? `<p class="text-[10px] text-orange-600 mt-1 font-medium italic" id="warning-mut-excl-${item.id}">* Memilih jenis keluar akan menghapus kategori ${item.category_grade}</p>` : ''}
+                                    </td>
+                                `;
+                                tableBody.appendChild(row);
+                            });
+                        } else {
+                            throw new Error(result.message || 'Gagal memuat data.');
+                        }
+                    })
+                    .catch(err => {
+                        loading.classList.add('hidden');
+                        errorDiv.innerText = err.message || 'Terjadi kesalahan sistem.';
+                        errorDiv.classList.remove('hidden');
+                    });
+            }
+
+            function checkCategoryMutualExclusivity(itemId, selectEl, originalCategoryGrade) {
+                const warningMsg = document.getElementById(`warning-mut-excl-${itemId}`);
+                const badgeContainer = document.getElementById(`category-badge-${itemId}`);
+                if (selectEl.value !== "") {
+                    if (badgeContainer) {
+                        badgeContainer.innerHTML = '<span class="text-gray-400 text-xs line-through italic">- (akan dihapus)</span>';
+                    }
+                    if (warningMsg) {
+                        warningMsg.classList.add('text-red-600', 'font-bold');
+                        warningMsg.innerText = `* Kategori ${originalCategoryGrade} akan dihapus setelah disimpan`;
+                    }
+                } else {
+                    if (badgeContainer) {
+                        if (originalCategoryGrade) {
+                            badgeContainer.innerHTML = `<span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">${originalCategoryGrade}</span>`;
+                        } else {
+                            badgeContainer.innerHTML = '<span class="text-gray-400 text-xs">-</span>';
+                        }
+                    }
+                    if (warningMsg) {
+                        warningMsg.classList.remove('text-red-600', 'font-bold');
+                        warningMsg.className = "text-[10px] text-orange-600 mt-1 font-medium italic";
+                        warningMsg.innerText = `* Memilih jenis keluar akan menghapus kategori ${originalCategoryGrade}`;
+                    }
+                }
+            }
+
+            function closeEditModal() {
+                document.getElementById('editModal').classList.add('hidden');
+            }
+
+            function submitEditForm(event) {
+                event.preventDefault();
+                
+                const submitBtn = document.getElementById('editSubmitBtn');
+                const originalBtnText = submitBtn.innerText;
+                submitBtn.disabled = true;
+                submitBtn.innerText = 'Menyimpan...';
+
+                const errorDiv = document.getElementById('editModalError');
+                errorDiv.classList.add('hidden');
+                errorDiv.innerText = '';
+
+                const form = document.getElementById('editForm');
+                const formData = new FormData(form);
+
+                const url = `{{ route('grading-goods.update-ajax', ['receiptItemId' => ':id']) }}`.replace(':id', currentReceiptItemId);
+
+                fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                        'Accept': 'application/json'
+                    },
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(result => {
+                    if (result.success) {
+                        window.location.reload();
+                    } else {
+                        throw new Error(result.message || 'Gagal menyimpan data.');
+                    }
+                })
+                .catch(err => {
+                    submitBtn.disabled = false;
+                    submitBtn.innerText = originalBtnText;
+                    errorDiv.innerText = err.message || 'Terjadi kesalahan sistem.';
+                    errorDiv.classList.remove('hidden');
+                });
             }
         </script>
     @endpush

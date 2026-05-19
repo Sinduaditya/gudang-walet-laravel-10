@@ -78,6 +78,10 @@ Route::middleware(['auth'])->group(function () {
                 Route::get('/show/{receiptItemId}', [GradingGoodsController::class, 'show'])->name('show');
                 Route::delete('/delete/{receiptItemId}', [GradingGoodsController::class, 'destroy'])->name('destroy');
                 Route::delete('/cancel/{sortingResultId}', [GradingGoodsController::class, 'cancelStep2'])->name('cancel.step2');
+
+                // AJAX Edit & Update outgoing_type
+                Route::get('/edit-ajax/{receiptItemId}', [GradingGoodsController::class, 'editAjax'])->name('edit-ajax');
+                Route::put('/update-ajax/{receiptItemId}', [GradingGoodsController::class, 'updateAjax'])->name('update-ajax');
             });
 
         // Export Data Master to Excel
@@ -130,6 +134,7 @@ Route::middleware(['auth'])->group(function () {
                     Route::get('/export', [TransferExternalController::class, 'export'])->name('export');
                     Route::delete('/{id}', [TransferExternalController::class, 'destroy'])->name('destroy');
                 });
+                
                 // ========== RECEIVE INTERNAL ==========
                 Route::prefix('receive-internal')
                     ->name('receive-internal.')

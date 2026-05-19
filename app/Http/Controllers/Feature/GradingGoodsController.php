@@ -188,4 +188,66 @@ class GradingGoodsController extends Controller
 
         return redirect()->route('grading-goods.step1')->with('info', 'Proses grading dibatalkan.');
     }
+
+    public function editAjax($receiptItemId)
+    {
+        $sortingResults = $this->gradingGoodsService->getSortingResultsByReceiptItem($receiptItemId);
+
+        $data = $sortingResults->map(function ($result) {
+            return [
+                'id' => $result->id,
+                'grade_name' => $result->gradeCompany->name ?? '-',
+                'weight_grams' => $result->weight_grams,
+                'quantity' => $result->quantity,
+                'outgoing_type' => $result->outgoing_type,
+                'category_grade' => $result->category_grade,
+            ];
+        });
+
+        return response()->json([
+            'success' => true,
+            'data' => $data
+        ]);
+    }
+
+    public function updateAjax(Request $request, $receiptItemId)
+    {
+        $request->validate([
+            'outgoing_types' => 'required|array',
+            'outgoing_types.*' => 'nullable|in:penjualan_langsung,internal,external',
+        ]);
+
+        try {
+            \Illuminate\Support\Facades\DB::transaction(function () use ($request, $receiptItemId) {
+                foreach ($request->input('outgoing_types') as $sortingResultId => $outgoingType) {
+                    $sortingResult = \App\Models\SortingResult::where('receipt_item_id', $receiptItemId)
+                        ->where('id', $sortingResultId)
+                        ->first();
+
+                    if ($sortingResult) {
+                        $categoryGrade = $sortingResult->category_grade;
+                        if (!empty($outgoingType)) {
+                            $categoryGrade = null;
+                        }
+
+                        $sortingResult->update([
+                            'outgoing_type' => $outgoingType,
+                            'category_grade' => $categoryGrade,
+                        ]);
+                    }
+                }
+            });
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Jenis barang keluar berhasil diperbarui.'
+            ]);
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('GradingGoods updateAjax error: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal memperbarui data: ' . $e->getMessage()
+            ], 500);
+        }
+    }
 }
