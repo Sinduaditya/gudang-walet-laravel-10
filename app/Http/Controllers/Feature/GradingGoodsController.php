@@ -189,28 +189,21 @@ class GradingGoodsController extends Controller
         return redirect()->route('grading-goods.step1')->with('info', 'Proses grading dibatalkan.');
     }
 
-    public function editAjax($receiptItemId)
+    public function edit($receiptItemId)
     {
         $sortingResults = $this->gradingGoodsService->getSortingResultsByReceiptItem($receiptItemId);
 
-        $data = $sortingResults->map(function ($result) {
-            return [
-                'id' => $result->id,
-                'grade_name' => $result->gradeCompany->name ?? '-',
-                'weight_grams' => $result->weight_grams,
-                'quantity' => $result->quantity,
-                'outgoing_type' => $result->outgoing_type,
-                'category_grade' => $result->category_grade,
-            ];
-        });
+        if ($sortingResults->isEmpty()) {
+            return redirect()->route('grading-goods.index')
+                ->with('error', 'Data grading tidak ditemukan.');
+        }
 
-        return response()->json([
-            'success' => true,
-            'data' => $data
-        ]);
+        $grading = $sortingResults->first();
+
+        return view('admin.grading-goods.edit', compact('grading', 'sortingResults', 'receiptItemId'));
     }
 
-    public function updateAjax(Request $request, $receiptItemId)
+    public function update(Request $request, $receiptItemId)
     {
         $request->validate([
             'outgoing_types' => 'required|array',
@@ -238,16 +231,10 @@ class GradingGoodsController extends Controller
                 }
             });
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Jenis barang keluar berhasil diperbarui.'
-            ]);
+            return redirect()->route('grading-goods.index')->with('success', 'Jenis barang keluar berhasil diperbarui.');
         } catch (\Exception $e) {
-            \Illuminate\Support\Facades\Log::error('GradingGoods updateAjax error: ' . $e->getMessage());
-            return response()->json([
-                'success' => false,
-                'message' => 'Gagal memperbarui data: ' . $e->getMessage()
-            ], 500);
+            \Illuminate\Support\Facades\Log::error('GradingGoods update error: ' . $e->getMessage());
+            return redirect()->back()->with('error', 'Gagal memperbarui data: ' . $e->getMessage());
         }
     }
 }
