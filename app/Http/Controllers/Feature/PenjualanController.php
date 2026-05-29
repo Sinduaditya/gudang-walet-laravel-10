@@ -34,7 +34,7 @@ class PenjualanController extends Controller
             }
 
             // Ambil sumber grading dengan logika "Global Budgeting"
-            $gradingSources = $this->service->getGradingSourcesWithStock(\App\Models\SortingResult::OUTGOING_TYPE_INTERNAL, $defaultLocation->id);
+            $gradingSources = $this->service->getGradingSourcesWithStock(\App\Models\SortingResult::OUTGOING_TYPE_PENJUALAN_LANGSUNG, $defaultLocation->id);
 
             $gradesWithStock = $gradingSources->map(function ($source) {
                 return [

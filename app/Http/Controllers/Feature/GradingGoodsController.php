@@ -188,4 +188,53 @@ class GradingGoodsController extends Controller
 
         return redirect()->route('grading-goods.step1')->with('info', 'Proses grading dibatalkan.');
     }
+
+    public function edit($receiptItemId)
+    {
+        $sortingResults = $this->gradingGoodsService->getSortingResultsByReceiptItem($receiptItemId);
+
+        if ($sortingResults->isEmpty()) {
+            return redirect()->route('grading-goods.index')
+                ->with('error', 'Data grading tidak ditemukan.');
+        }
+
+        $grading = $sortingResults->first();
+
+        return view('admin.grading-goods.edit', compact('grading', 'sortingResults', 'receiptItemId'));
+    }
+
+    public function update(Request $request, $receiptItemId)
+    {
+        $request->validate([
+            'outgoing_types' => 'required|array',
+            'outgoing_types.*' => 'nullable|in:penjualan_langsung,internal,external',
+        ]);
+
+        try {
+            \Illuminate\Support\Facades\DB::transaction(function () use ($request, $receiptItemId) {
+                foreach ($request->input('outgoing_types') as $sortingResultId => $outgoingType) {
+                    $sortingResult = \App\Models\SortingResult::where('receipt_item_id', $receiptItemId)
+                        ->where('id', $sortingResultId)
+                        ->first();
+
+                    if ($sortingResult) {
+                        $categoryGrade = $sortingResult->category_grade;
+                        if (!empty($outgoingType)) {
+                            $categoryGrade = null;
+                        }
+
+                        $sortingResult->update([
+                            'outgoing_type' => $outgoingType,
+                            'category_grade' => $categoryGrade,
+                        ]);
+                    }
+                }
+            });
+
+            return redirect()->route('grading-goods.index')->with('success', 'Jenis barang keluar berhasil diperbarui.');
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('GradingGoods update error: ' . $e->getMessage());
+            return redirect()->back()->with('error', 'Gagal memperbarui data: ' . $e->getMessage());
+        }
+    }
 }
