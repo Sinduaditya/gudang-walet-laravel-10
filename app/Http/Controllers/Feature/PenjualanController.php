@@ -176,60 +176,49 @@ class PenjualanController extends Controller
         try {
             return DB::transaction(function () use ($id) {
                 $tx = InventoryTransaction::lockForUpdate()->findOrFail($id);
-                \Log::info("Transaction found: id=$tx->id, grade_company_id=$tx->grade_company_id, sorting_result_id=$tx->sorting_result_id, quantity_change_grams=$tx->quantity_change_grams");
+                \Log::info("Transaction found: id=$tx->id, grade_company_id=$tx->grade_company_id, sorting_result_id=$tx->sorting_result_id, quantity_change_grams=$tx->quantity_change_grams, deleted_at=" . ($tx->deleted_at ?? 'null'));
 
-                $oldQuantity = $tx->quantity_change_grams;
-                $oldGradeCompanyId = $tx->grade_company_id;
-                $oldLocationId = $tx->location_id;
-                $oldSortingResultId = $tx->sorting_result_id;
+                // If transaction is already soft-deleted, don't process again
+                if ($tx->deleted_at) {
+                    \Log::info("Transaction already soft-deleted, skipping");
+                    return redirect()->route('barang.keluar.sell.form')
+                        ->with('error', 'Transaksi sudah dihapus sebelumnya.');
+                }
 
-                // Check if SALE_REVERT already exists for this transaction to prevent double revert
+                // Check if SALE_REVERT already exists for this specific transaction
                 $existingRevert = \App\Models\InventoryTransaction::where('reference_id', $tx->id)
                     ->where('transaction_type', 'SALE_REVERT')
                     ->first();
                 \Log::info("Existing revert check: " . ($existingRevert ? "YES, revert_id=" . $existingRevert->id : "NO"));
 
-                if (!$existingRevert) {
-                    \Log::info("Creating SALE_REVERT with abs($oldQuantity)");
+                // Only create SALE_REVERT if:
+                // 1. No existing revert for this transaction
+                // 2. This is a SALE_OUT transaction (not already reverted)
+                if (!$existingRevert && $tx->transaction_type === 'SALE_OUT') {
+                    $revertAmount = abs($tx->quantity_change_grams);
+                    \Log::info("Creating SALE_REVERT with amount: $revertAmount");
 
-                    // Calculate max allowable revert for this sorting_result
-                    // Prevent double-revert: only restore up to the original deduction that hasn't been reverted yet
-                    $originalDeduction = \App\Models\InventoryTransaction::where('sorting_result_id', $oldSortingResultId)
-                        ->where('transaction_type', 'SALE_OUT')
-                        ->whereNull('deleted_at')
-                        ->sum('quantity_change_grams');
-                    $alreadyReverted = \App\Models\InventoryTransaction::where('sorting_result_id', $oldSortingResultId)
-                        ->where('transaction_type', 'SALE_REVERT')
-                        ->sum('quantity_change_grams');
-                    $maxRevert = abs($originalDeduction) - abs($alreadyReverted);
-                    $revertAmount = min(abs($oldQuantity), max(0, $maxRevert));
-                    \Log::info("Original deduction: $originalDeduction, already reverted: $alreadyReverted, maxRevert: $maxRevert, using: $revertAmount");
-
-                    if ($revertAmount > 0) {
-                        InventoryTransaction::create([
-                            'transaction_date' => now(),
-                            'grade_company_id' => $oldGradeCompanyId,
-                            'location_id' => $oldLocationId,
-                            'quantity_change_grams' => $revertAmount,
-                            'supplier_id' => $tx->supplier_id,
-                            'transaction_type' => 'SALE_REVERT',
-                            'reference_id' => $tx->id,
-                            'sorting_result_id' => $oldSortingResultId,
-                            'notes' => 'Revert dari delete penjualan ID: ' . $id,
-                            'created_by' => auth()->id(),
-                        ]);
-                        \Log::info("SALE_REVERT created successfully with amount: $revertAmount");
-                    } else {
-                        \Log::info("Skipping SALE_REVERT - no stock to restore (already fully reverted)");
-                    }
+                    InventoryTransaction::create([
+                        'transaction_date' => now(),
+                        'grade_company_id' => $tx->grade_company_id,
+                        'location_id' => $tx->location_id,
+                        'quantity_change_grams' => $revertAmount,
+                        'supplier_id' => $tx->supplier_id,
+                        'transaction_type' => 'SALE_REVERT',
+                        'reference_id' => $tx->id,
+                        'sorting_result_id' => null, // NULL agar tidak double-count di batch stock
+                        'notes' => 'Revert dari delete penjualan ID: ' . $id,
+                        'created_by' => auth()->id(),
+                    ]);
+                    \Log::info("SALE_REVERT created successfully");
                 } else {
-                    \Log::info("Skipping revert - already exists");
+                    \Log::info("Skipping SALE_REVERT - either already exists or not a SALE_OUT");
                 }
 
                 // Also delete linked SortMaterial if exists (to avoid double revert)
-                if ($oldSortingResultId) {
-                    \Log::info("Checking SortMaterial for sorting_result_id: $oldSortingResultId");
-                    $sortMaterial = \App\Models\SortMaterial::where('sorting_result_id', $oldSortingResultId)->first();
+                if ($tx->sorting_result_id) {
+                    \Log::info("Checking SortMaterial for sorting_result_id: $tx->sorting_result_id");
+                    $sortMaterial = \App\Models\SortMaterial::where('sorting_result_id', $tx->sorting_result_id)->first();
                     if ($sortMaterial) {
                         \Log::info("Found SortMaterial ID: $sortMaterial->id, deleting...");
                         $sortMaterial->deleted_by = auth()->id();
@@ -239,9 +228,6 @@ class PenjualanController extends Controller
                     } else {
                         \Log::info("No SortMaterial found for this sorting_result_id");
                     }
-                    // Don't touch SortingResult - it must remain for dropdown to work
-                } else {
-                    \Log::info("No sorting_result_id to check for SortMaterial");
                 }
 
                 \Log::info("Now soft-deleting transaction ID: $tx->id");
@@ -251,10 +237,10 @@ class PenjualanController extends Controller
                 \Log::info("Transaction soft-deleted");
 
                 // Debug: check stock after delete
-                $stockAfter = \App\Models\InventoryTransaction::where('grade_company_id', $oldGradeCompanyId)
+                $stockAfter = \App\Models\InventoryTransaction::where('grade_company_id', $tx->grade_company_id)
                     ->whereNull('deleted_at')
                     ->sum('quantity_change_grams');
-                \Log::info("Stock for grade_company_id $oldGradeCompanyId after delete: $stockAfter");
+                \Log::info("Stock for grade_company_id {$tx->grade_company_id} after delete: $stockAfter");
 
                 \Log::info("========== PENJUALAN DELETE END ==========");
                 return redirect()->route('barang.keluar.sell.form')
