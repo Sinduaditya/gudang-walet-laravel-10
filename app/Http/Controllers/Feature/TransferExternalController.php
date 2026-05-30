@@ -11,6 +11,7 @@ use App\Http\Requests\BarangKeluar\ExternalTransferRequest;
 use App\Exports\TransferExternalExport;
 use Maatwebsite\Excel\Facades\Excel;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class TransferExternalController extends Controller
@@ -253,12 +254,12 @@ class TransferExternalController extends Controller
             return DB::transaction(function () use ($id) {
                 $transfer = \App\Models\StockTransfer::lockForUpdate()->findOrFail($id);
                 $userId = auth()->id();
-                
+
                 $totalDeduction = abs($transfer->weight_grams) + abs($transfer->susut_grams ?? 0);
-                
+
                 $outTx = $transfer->transactions()->where("transaction_type", "EXTERNAL_TRANSFER_OUT")->first();
                 $inTx = $transfer->transactions()->where("transaction_type", "EXTERNAL_TRANSFER_IN")->first();
-                
+
                 if ($outTx) {
                     InventoryTransaction::create([
                         "transaction_date" => now(),
@@ -272,7 +273,7 @@ class TransferExternalController extends Controller
                         "created_by" => $userId,
                     ]);
                 }
-                
+
                 if ($inTx) {
                     InventoryTransaction::create([
                         "transaction_date" => now(),
@@ -286,12 +287,12 @@ class TransferExternalController extends Controller
                         "created_by" => $userId,
                     ]);
                 }
-                
+
                 $transfer->transactions()->delete();
                 $transfer->deleted_by = $userId;
                 $transfer->save();
                 $transfer->delete();
-                
+
                 return redirect()->route("barang.keluar.external-transfer.step1")
                     ->with("success", "Transfer eksternal berhasil dihapus dan stok dikembalikan.");
             });
@@ -300,7 +301,7 @@ class TransferExternalController extends Controller
                 "user_id" => auth()->id(),
                 "trace" => $e->getTraceAsString()
             ]);
-            return redirect()->back()->with("error", "Terjadi kesalahan saat menghapus transfer.");
+            return redirect()->back()->with("error", "Gagal menghapus transfer: " . $e->getMessage());
         }
     }
 
@@ -311,7 +312,7 @@ class TransferExternalController extends Controller
                 'start_date'      => $request->get('start_date'),
                 'end_date'        => $request->get('end_date'),
                 'supplier_id'     => $request->get('supplier_id'),
-                'grade_company_id'=> $request->get('grade_company_id'),
+                'grade_company_id' => $request->get('grade_company_id'),
             ];
 
             $fileName = 'transfer_eksternal_' . date('Y-m-d') . '.xlsx';
