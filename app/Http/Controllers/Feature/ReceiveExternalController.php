@@ -10,6 +10,7 @@ use App\Services\BarangKeluar\BarangKeluarService;
 use App\Exports\ReceiveExternalExport;
 use Maatwebsite\Excel\Facades\Excel;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class ReceiveExternalController extends Controller
