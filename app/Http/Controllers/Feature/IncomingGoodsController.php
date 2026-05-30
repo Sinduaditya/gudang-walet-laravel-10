@@ -235,7 +235,7 @@ class IncomingGoodsController extends Controller
                 'user_id' => auth()->id(),
                 'receipt_id' => $id,
             ]);
-            return back()->with('error', 'Terjadi kesalahan sistem. Silakan coba lagi atau hubungi administrator.');
+            return back()->with('error', $e->getMessage());
         }
     }
 

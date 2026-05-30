@@ -166,7 +166,7 @@ class GradingGoodsController extends Controller
                 'user_id' => auth()->id(),
                 'receipt_item_id' => $receiptItemId,
             ]);
-            return back()->with('error', 'Terjadi kesalahan sistem. Silakan coba lagi atau hubungi administrator.');
+            return back()->with('error', $e->getMessage());
         }
     }
 
