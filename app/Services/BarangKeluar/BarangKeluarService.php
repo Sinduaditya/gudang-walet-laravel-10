@@ -129,6 +129,7 @@ class BarangKeluarService
 
         // Check global stock
         $globalStock = (float) InventoryTransaction::where('grade_company_id', $gradeCompanyId)
+            ->whereNull('deleted_at')
             ->sum('quantity_change_grams');
         if ($globalStock < $weightGrams) {
             throw new \Exception('Stok global tidak mencukupi. Tersedia: ' . number_format($globalStock, 2) . ' gr.');

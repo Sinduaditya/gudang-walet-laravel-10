@@ -200,7 +200,22 @@ class GradingGoodsController extends Controller
 
         $grading = $sortingResults->first();
 
-        return view('admin.grading-goods.edit', compact('grading', 'sortingResults', 'receiptItemId'));
+        // Kumpulkan sorting_result_id yang sudah punya transaksi aktif (terkunci)
+        $activeTransactionTypes = [
+            'SALE_OUT',
+            'EXTERNAL_TRANSFER_OUT',
+            'TRANSFER_OUT',
+            'RECEIVE_EXTERNAL_OUT',
+        ];
+        $sortingResultIds = $sortingResults->pluck('id')->toArray();
+        $lockedIds = \App\Models\InventoryTransaction::whereIn('sorting_result_id', $sortingResultIds)
+            ->whereIn('transaction_type', $activeTransactionTypes)
+            ->whereNull('deleted_at')
+            ->pluck('sorting_result_id')
+            ->unique()
+            ->toArray();
+
+        return view('admin.grading-goods.edit', compact('grading', 'sortingResults', 'receiptItemId', 'lockedIds'));
     }
 
     public function update(Request $request, $receiptItemId)
@@ -210,31 +225,57 @@ class GradingGoodsController extends Controller
             'outgoing_types.*' => 'nullable|in:penjualan_langsung,internal,external',
         ]);
 
+        // Tipe transaksi yang menandakan batch sudah dipakai (tidak boleh ganti outgoing_type)
+        $activeTransactionTypes = [
+            'SALE_OUT',
+            'EXTERNAL_TRANSFER_OUT',
+            'TRANSFER_OUT',
+            'RECEIVE_EXTERNAL_OUT',
+        ];
+
         try {
-            \Illuminate\Support\Facades\DB::transaction(function () use ($request, $receiptItemId) {
+            \Illuminate\Support\Facades\DB::transaction(function () use ($request, $receiptItemId, $activeTransactionTypes) {
                 foreach ($request->input('outgoing_types') as $sortingResultId => $outgoingType) {
                     $sortingResult = \App\Models\SortingResult::where('receipt_item_id', $receiptItemId)
                         ->where('id', $sortingResultId)
                         ->first();
 
-                    if ($sortingResult) {
-                        $categoryGrade = $sortingResult->category_grade;
-                        if (!empty($outgoingType)) {
-                            $categoryGrade = null;
-                        }
-
-                        $sortingResult->update([
-                            'outgoing_type' => $outgoingType,
-                            'category_grade' => $categoryGrade,
-                        ]);
+                    if (!$sortingResult) {
+                        continue;
                     }
+
+                    // ─── GUARD: Blokir jika outgoing_type berubah DAN sudah ada transaksi aktif ───
+                    $isChangingType = $outgoingType !== $sortingResult->outgoing_type;
+                    if ($isChangingType && !empty($outgoingType)) {
+                        $hasActiveTransaction = \App\Models\InventoryTransaction::where('sorting_result_id', $sortingResultId)
+                            ->whereIn('transaction_type', $activeTransactionTypes)
+                            ->whereNull('deleted_at')
+                            ->exists();
+
+                        if ($hasActiveTransaction) {
+                            throw new \Exception(
+                                'Grade "' . ($sortingResult->gradeCompany->name ?? $sortingResultId) . '" tidak dapat diubah tipe keluarnya karena sudah ada transaksi aktif (penjualan/transfer). Hapus transaksi terkait terlebih dahulu.'
+                            );
+                        }
+                    }
+                    // ──────────────────────────────────────────────────────────────────────────────
+
+                    $categoryGrade = $sortingResult->category_grade;
+                    if (!empty($outgoingType)) {
+                        $categoryGrade = null;
+                    }
+
+                    $sortingResult->update([
+                        'outgoing_type' => $outgoingType,
+                        'category_grade' => $categoryGrade,
+                    ]);
                 }
             });
 
             return redirect()->route('grading-goods.index')->with('success', 'Jenis barang keluar berhasil diperbarui.');
         } catch (\Exception $e) {
             \Illuminate\Support\Facades\Log::error('GradingGoods update error: ' . $e->getMessage());
-            return redirect()->back()->with('error', 'Gagal memperbarui data: ' . $e->getMessage());
+            return redirect()->back()->with('error', $e->getMessage());
         }
     }
 }
