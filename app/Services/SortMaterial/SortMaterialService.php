@@ -319,16 +319,27 @@ class SortMaterialService
             $sortMaterial = $this->getById($id);
 
             if ($sortMaterial->type === SortMaterial::TYPE_MASUK) {
-                // VALIDASI: Apakah jika dihapus, stok sortir grade company ini menjadi negatif?
+                // 1. VALIDASI DETAIL GRADE: Apakah jika dihapus, stok detail grade company ini menjadi negatif?
                 if ($sortMaterial->grade_company_id) {
                     $availableGradeStock = $this->getSortStockByGrade($sortMaterial->grade_company_id);
                     if ($availableGradeStock < $sortMaterial->weight) {
                         throw new \Exception(
-                            "Data sortir masuk tidak dapat dihapus karena barang dari grade '" .
+                            "Data sortir masuk tidak dapat dihapus karena barang dari detail grade '" .
                             ($sortMaterial->gradeCompany->name ?? 'Unknown') . "' ini " .
                             "telah diproses/dijual di Penjualan Langsung. Silakan hapus transaksi penjualan sortir terlebih dahulu."
                         );
                     }
+                }
+
+                // 2. VALIDASI PARENT GRADE (Dua Lapis): Apakah jika dihapus, total sisa stok parent menjadi negatif?
+                $availableParentStock = $this->getNetSortStock($sortMaterial->parent_grade_company_id);
+                if ($availableParentStock < $sortMaterial->weight) {
+                    throw new \Exception(
+                        "Data sortir masuk tidak dapat dihapus karena sisa stok yang tersedia di parent '" .
+                        ($sortMaterial->parentGradeCompany->name ?? 'Unknown') . "' hanya tinggal " .
+                        number_format($availableParentStock, 2) . " gr (tidak mencukupi untuk membatalkan masuk sebesar " .
+                        number_format($sortMaterial->weight, 2) . " gr). Barang ini kemungkinan sudah dipecah stok atau dijual."
+                    );
                 }
 
                 // Kembalikan stok ke parent grade (dikurangi karena dibatalkan masuknya)
