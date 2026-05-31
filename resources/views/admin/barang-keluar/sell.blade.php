@@ -244,14 +244,14 @@
                                         @enderror
                                     </div>
 
-                                    {{-- Required Child Grade --}}
+                                    {{-- Optional Child Grade --}}
                                     <div>
                                         <label class="block font-semibold text-gray-700 mb-2">
-                                            Detail Grade Company <span class="text-red-500">*</span>
+                                            Detail Grade Company <span class="text-gray-400 font-normal text-xs">(Opsional - Kosongkan jika jual dari Parent)</span>
                                         </label>
-                                        <select name="grade_company_id" id="sort_grade_company_id" required
+                                        <select name="grade_company_id" id="sort_grade_company_id"
                                             class="w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-purple-500 focus:border-transparent">
-                                            <option value="">-- Pilih Detail Grade (Pilih Parent Dahulu) --</option>
+                                            <option value="">-- Jual Langsung dari Parent --</option>
                                             @foreach($sortGradesWithStock as $child)
                                                 <option value="{{ $child['id'] }}" 
                                                     data-parent-id="{{ $child['parent_grade_company_id'] }}"
@@ -827,6 +827,25 @@
             const sortStockValue = document.getElementById('sort-stock-value');
             const sortGradeSelect = document.getElementById('sort_grade_company_id');
 
+            function updateSortStockDisplay() {
+                const parentOpt = sortParentSelect.options[sortParentSelect.selectedIndex];
+                const gradeOpt = sortGradeSelect.options[sortGradeSelect.selectedIndex];
+                
+                if (gradeOpt && gradeOpt.value) {
+                    const stock = parseFloat(gradeOpt.dataset.stock || 0);
+                    sortStockValue.textContent = new Intl.NumberFormat('id-ID').format(stock) + ' gr (Detail Grade)';
+                    sortStockValue.className = "font-semibold text-purple-600";
+                } else if (parentOpt && parentOpt.value) {
+                    const stock = parseFloat(parentOpt.getAttribute('data-stock') || 0);
+                    sortStockValue.textContent = new Intl.NumberFormat('id-ID').format(stock) + ' gr (Total Parent)';
+                    sortStockValue.className = "font-semibold text-blue-600";
+                } else {
+                    sortStockValue.textContent = '-';
+                    sortStockValue.className = "font-semibold text-gray-500";
+                }
+                document.getElementById('sort-check-result').classList.add('hidden');
+            }
+
             // Dynamic filter for child grade selection based on selected parent
             sortParentSelect.addEventListener('change', function() {
                 const selectedParentId = this.value;
@@ -834,9 +853,7 @@
 
                 // Reset child grade
                 sortGradeSelect.value = "";
-                sortStockValue.textContent = '-';
-                sortStockValue.className = "font-semibold text-gray-500";
-
+                
                 options.forEach(option => {
                     if (option.value === "") return;
                     const optionParentId = option.dataset.parentId;
@@ -849,37 +866,22 @@
                     }
                 });
 
-                document.getElementById('sort-check-result').classList.add('hidden');
+                updateSortStockDisplay();
             });
 
             // Display stock when specific child grade is selected
-            sortGradeSelect.addEventListener('change', function() {
-                const selectedOption = this.options[this.selectedIndex];
-                if (selectedOption.value) {
-                    const stock = parseFloat(selectedOption.dataset.stock || 0);
-                    sortStockValue.textContent = new Intl.NumberFormat('id-ID').format(stock) + ' gr';
-                    sortStockValue.className = "font-semibold text-green-600";
-                } else {
-                    sortStockValue.textContent = '-';
-                    sortStockValue.className = "font-semibold text-gray-500";
-                }
-                document.getElementById('sort-check-result').classList.add('hidden');
-            });
+            sortGradeSelect.addEventListener('change', updateSortStockDisplay);
 
             function checkSortStock() {
+                const parentId = sortParentSelect.value;
                 const gradeId = sortGradeSelect.value;
                 const weight = parseFloat(document.getElementById('sort_weight').value || 0);
                 const resultEl = document.getElementById('sort-check-result');
 
                 resultEl.classList.remove('hidden', 'text-red-600', 'text-green-600');
 
-                if (!sortParentSelect.value) {
+                if (!parentId) {
                     resultEl.textContent = 'Pilih parent grade terlebih dahulu.';
-                    resultEl.classList.add('text-red-600');
-                    return;
-                }
-                if (!gradeId) {
-                    resultEl.textContent = 'Pilih detail grade company terlebih dahulu.';
                     resultEl.classList.add('text-red-600');
                     return;
                 }
@@ -889,14 +891,24 @@
                     return;
                 }
 
-                const selectedOption = sortGradeSelect.options[sortGradeSelect.selectedIndex];
-                const available = parseFloat(selectedOption.dataset.stock || 0);
+                let available = 0;
+                let targetName = '';
+
+                if (gradeId) {
+                    const selectedOption = sortGradeSelect.options[sortGradeSelect.selectedIndex];
+                    available = parseFloat(selectedOption.dataset.stock || 0);
+                    targetName = 'grade ini';
+                } else {
+                    const selectedParentOption = sortParentSelect.options[sortParentSelect.selectedIndex];
+                    available = parseFloat(selectedParentOption.getAttribute('data-stock') || 0);
+                    targetName = 'parent grade ini';
+                }
 
                 if (available >= weight) {
-                    resultEl.textContent = `✓ Stok mencukupi! Tersedia ${new Intl.NumberFormat('id-ID').format(available)} gram untuk grade ini.`;
+                    resultEl.textContent = `✓ Stok mencukupi! Tersedia ${new Intl.NumberFormat('id-ID').format(available)} gram untuk ${targetName}.`;
                     resultEl.classList.add('text-green-600');
                 } else {
-                    resultEl.textContent = `⚠ Stok tidak mencukupi! Hanya tersedia ${new Intl.NumberFormat('id-ID').format(available)} gram untuk grade ini.`;
+                    resultEl.textContent = `⚠ Stok tidak mencukupi! Hanya tersedia ${new Intl.NumberFormat('id-ID').format(available)} gram untuk ${targetName}.`;
                     resultEl.classList.add('text-red-600');
                 }
             }

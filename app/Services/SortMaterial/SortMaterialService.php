@@ -141,21 +141,13 @@ class SortMaterialService
         return DB::transaction(function () use ($data) {
             $destination = $data['destination'] ?? null;
             
-            $destinationMap = [
-                'mangkok' => 2,
-                'idm' => 3,
-                'aa' => 5,
-                'af' => 1, // LEMPENG
-            ];
-
-            // Jika ada tujuan sortir (destination), arahkan parent_grade_company_id ke target parent grade!
-            $targetParentId = isset($destinationMap[$destination])
-                ? $destinationMap[$destination]
-                : $data['parent_grade_company_id'];
+            // Jika ada tujuan sortir (destination), arahkan parent_grade_company_id ke target parent grade ID!
+            $targetParentId = $destination ?: $data['parent_grade_company_id'];
 
             // Tambahkan keterangan deskripsi jika ada tujuan
             if ($destination && empty($data['description'])) {
-                $data['description'] = 'Sortir Global - Masuk Stok (' . ucfirst($destination) . ')';
+                $targetParent = ParentGradeCompany::find($targetParentId);
+                $data['description'] = 'Sortir Global - Masuk Stok (' . ($targetParent->name ?? '') . ')';
             }
 
             $sortMaterial = SortMaterial::create(array_merge($data, [
@@ -176,30 +168,106 @@ class SortMaterialService
     // =============================================
 
     /**
+     * Memproses aktivitas grading/pecah stok sortir internal.
+     * Mengurangi stok parent mentah (source) dan menambah stok pecahan detail grade tujuan (targets).
+     */
+    public function processInternalGrading(array $data): bool
+    {
+        return DB::transaction(function () use ($data) {
+            $sourceParentId = $data['source_parent_grade_company_id'];
+            $totalWeight = (float) $data['total_weight'];
+            $processDate = $data['process_date'] ?? now();
+            
+            // 1. Validasi Stok Sumber
+            $availableSourceStock = $this->getNetSortStock($sourceParentId);
+            if ($availableSourceStock < $totalWeight) {
+                $sourceParent = ParentGradeCompany::findOrFail($sourceParentId);
+                throw new \Exception("Stok parent asal '" . $sourceParent->name . "' ({$availableSourceStock}g) tidak mencukupi untuk diproses sebesar {$totalWeight}g.");
+            }
+
+            // Validasi jumlah berat target harus tepat sama dengan total berat yang diproses
+            $targetWeightSum = 0.00;
+            foreach ($data['targets'] as $target) {
+                $targetWeightSum += (float) $target['weight'];
+            }
+
+            // Menggunakan margin toleransi kecil untuk floating point (0.01g)
+            if (abs($targetWeightSum - $totalWeight) > 0.01) {
+                throw new \Exception("Jumlah berat hasil pecahan (" . number_format($targetWeightSum, 2) . " gr) harus tepat sama dengan total berat yang diproses (" . number_format($totalWeight, 2) . " gr).");
+            }
+
+            // 2. Buat Record "KELUAR" untuk Sumber Parent
+            SortMaterial::create([
+                'type'                    => SortMaterial::TYPE_KELUAR,
+                'parent_grade_company_id' => $sourceParentId,
+                'grade_company_id'        => null, // Kosong karena memotong stok mentah level parent
+                'weight'                  => $totalWeight,
+                'sort_date'               => $processDate,
+                'sale_date'               => $processDate,
+                'description'             => 'Aktivitas Grading Internal (Pengurangan Sumber)',
+            ]);
+            ParentGradeCompany::find($sourceParentId)->decrement('stock', $totalWeight);
+
+            // 3. Buat Record "MASUK" untuk Setiap Target Hasil Pecahan
+            foreach ($data['targets'] as $target) {
+                $targetParentId = $target['parent_grade_company_id'];
+                $targetGradeId = $target['grade_company_id'] ?: null;
+                $weight = (float) $target['weight'];
+
+                SortMaterial::create([
+                    'type'                    => SortMaterial::TYPE_MASUK,
+                    'parent_grade_company_id' => $targetParentId,
+                    'grade_company_id'        => $targetGradeId,
+                    'weight'                  => $weight,
+                    'sort_date'               => $processDate,
+                    'description'             => 'Hasil Grading Internal dari Parent ' . ParentGradeCompany::find($sourceParentId)->name,
+                ]);
+                ParentGradeCompany::find($targetParentId)->increment('stock', $weight);
+            }
+
+            return true;
+        });
+    }
+
+    /**
      * Jual barang dari stok sortir bahan
      */
     public function sellFromSort(array $data): SortMaterial
     {
         return DB::transaction(function () use ($data) {
             $gradeCompanyId = $data['grade_company_id'] ?? null;
-            
-            if (!$gradeCompanyId) {
-                throw new \Exception("Grade Company harus dipilih untuk melakukan penjualan sortir.");
-            }
-
-            $grade = GradeCompany::findOrFail($gradeCompanyId);
-            $parentGrade = ParentGradeCompany::lockForUpdate()->findOrFail($grade->parent_grade_company_id);
-
+            $parentGradeId = $data['parent_grade_company_id'] ?? null;
             $weight = (float) $data['weight'];
 
-            // Validasi stok di tingkat Grade Company secara dinamis
-            $availableGradeStock = $this->getSortStockByGrade($gradeCompanyId);
-            if ($availableGradeStock < $weight) {
-                throw new \Exception(
-                    "Stok sortir untuk grade '{$grade->name}' tidak mencukupi. Tersedia: " .
-                    number_format($availableGradeStock, 0) . " gr, diminta: " .
-                    number_format($weight, 0) . " gr."
-                );
+            if (!$parentGradeId) {
+                throw new \Exception("Parent Grade harus dipilih untuk melakukan penjualan sortir.");
+            }
+
+            $parentGrade = ParentGradeCompany::lockForUpdate()->findOrFail($parentGradeId);
+
+            if ($gradeCompanyId) {
+                $grade = GradeCompany::findOrFail($gradeCompanyId);
+                // Validasi stok di tingkat Grade Company secara dinamis
+                $availableGradeStock = $this->getSortStockByGrade($gradeCompanyId);
+                if ($availableGradeStock < $weight) {
+                    throw new \Exception(
+                        "Stok sortir untuk grade '{$grade->name}' tidak mencukupi. Tersedia: " .
+                        number_format($availableGradeStock, 0) . " gr, diminta: " .
+                        number_format($weight, 0) . " gr."
+                    );
+                }
+                $parentId = $grade->parent_grade_company_id;
+            } else {
+                // Validasi stok sortir langsung dari parent grade stock
+                $availableParentStock = $this->getNetSortStock($parentGradeId);
+                if ($availableParentStock < $weight) {
+                    throw new \Exception(
+                        "Stok sortir parent grade '{$parentGrade->name}' tidak mencukupi. Tersedia: " .
+                        number_format($availableParentStock, 0) . " gr, diminta: " .
+                        number_format($weight, 0) . " gr."
+                    );
+                }
+                $parentId = $parentGradeId;
             }
 
             $sortMaterial = SortMaterial::create([
@@ -207,8 +275,8 @@ class SortMaterialService
                 'weight'                  => $weight,
                 'sort_date'               => $data['sale_date'] ?? now(),
                 'sale_date'               => $data['sale_date'] ?? now(),
-                'parent_grade_company_id' => $grade->parent_grade_company_id,
-                'grade_company_id'        => $gradeCompanyId,
+                'parent_grade_company_id' => $parentId,
+                'grade_company_id'        => $gradeCompanyId ?: null,
                 'notes'                   => $data['notes'] ?? null,
                 'description'             => 'Penjualan dari Sortir Bahan',
             ]);

@@ -95,7 +95,7 @@
                     {{-- Destination Select (Dynamically visible for ALU & AA2 AF JUAL) --}}
                     <div id="destination_container" class="hidden">
                         <label class="block font-semibold text-gray-700 mb-2" for="destination">
-                            Tujuan Sortir (Destination) <span class="text-red-500">*</span>
+                            Tujuan Sortir (Destination) <span class="text-gray-400 font-normal text-xs">(Opsional)</span>
                         </label>
                         <select name="destination" id="destination"
                             class="w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent">
@@ -157,6 +157,15 @@
                 const destContainer = document.getElementById('destination_container');
                 const destSelect = document.getElementById('destination');
                 
+                // Ambil daftar parent grade dari database secara dinamis
+                const parentGradeCompanies = @json($parentGradeCompanies);
+
+                // Temukan parent grade tujuan secara dinamis berdasarkan nama
+                const mangkok = parentGradeCompanies.find(p => p.name.toUpperCase().includes('MANGKOK'));
+                const idm = parentGradeCompanies.find(p => p.name.toUpperCase().includes('IDM'));
+                const aa = parentGradeCompanies.find(p => p.name.toUpperCase().includes('AA1') || p.name.toUpperCase().includes('AA'));
+                const lempeng = parentGradeCompanies.find(p => p.name.toUpperCase().includes('LEMPENG'));
+
                 // Backup all grade options
                 const gradeOptions = Array.from(gradeSelect.options);
 
@@ -192,23 +201,23 @@
                     // Handle destination dropdown visibility
                     if (parentName === 'ALU') {
                         destContainer.classList.remove('hidden');
-                        destSelect.setAttribute('required', 'required');
+                        destSelect.removeAttribute('required');
                         
-                        destSelect.innerHTML = `
-                            <option value="">-- Pilih Tujuan --</option>
-                            <option value="mangkok" ${ "{{ old('destination') }}" === 'mangkok' ? 'selected' : '' }>Mangkok</option>
-                            <option value="idm" ${ "{{ old('destination') }}" === 'idm' ? 'selected' : '' }>IDM</option>
-                            <option value="aa" ${ "{{ old('destination') }}" === 'aa' ? 'selected' : '' }>AA</option>
-                            <option value="af" ${ "{{ old('destination') }}" === 'af' ? 'selected' : '' }>Lempeng (AF)</option>
-                        `;
+                        let optionsHtml = '<option value="">-- Pilih Tujuan --</option>';
+                        if (mangkok) optionsHtml += `<option value="${mangkok.id}" ${ "{{ old('destination') }}" == mangkok.id ? 'selected' : '' }>${mangkok.name}</option>`;
+                        if (idm) optionsHtml += `<option value="${idm.id}" ${ "{{ old('destination') }}" == idm.id ? 'selected' : '' }>${idm.name}</option>`;
+                        if (aa) optionsHtml += `<option value="${aa.id}" ${ "{{ old('destination') }}" == aa.id ? 'selected' : '' }>${aa.name}</option>`;
+                        if (lempeng) optionsHtml += `<option value="${lempeng.id}" ${ "{{ old('destination') }}" == lempeng.id ? 'selected' : '' }>${lempeng.name}</option>`;
+                        
+                        destSelect.innerHTML = optionsHtml;
                     } else if (parentName === 'AA2 AF JUAL') {
                         destContainer.classList.remove('hidden');
-                        destSelect.setAttribute('required', 'required');
+                        destSelect.removeAttribute('required');
                         
-                        destSelect.innerHTML = `
-                            <option value="">-- Pilih Tujuan --</option>
-                            <option value="idm" ${ "{{ old('destination') }}" === 'idm' ? 'selected' : '' }>IDM</option>
-                        `;
+                        let optionsHtml = '<option value="">-- Pilih Tujuan --</option>';
+                        if (idm) optionsHtml += `<option value="${idm.id}" ${ "{{ old('destination') }}" == idm.id ? 'selected' : '' }>${idm.name}</option>`;
+                        
+                        destSelect.innerHTML = optionsHtml;
                     } else {
                         destContainer.classList.add('hidden');
                         destSelect.removeAttribute('required');

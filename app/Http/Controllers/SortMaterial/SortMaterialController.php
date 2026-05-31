@@ -59,6 +59,43 @@ class SortMaterialController extends Controller
         }
     }
 
+    public function showGradingForm()
+    {
+        // Hanya ambil parent grade company yang memiliki stok sortir > 0
+        $parentGradeCompanies = \App\Models\ParentGradeCompany::where('stock', '>', 0)->orderBy('name')->get();
+        // Ambil semua detail grade company untuk dropdown target pecahan
+        $gradeCompanies       = \App\Models\GradeCompany::orderBy('name')->get(['id', 'name', 'parent_grade_company_id']);
+        // Dan semua parent grade untuk dropdown target pecahan
+        $allParentGrades      = \App\Models\ParentGradeCompany::orderBy('name')->get();
+
+        return view('admin.sort-materials.grading', compact(
+            'parentGradeCompanies',
+            'gradeCompanies',
+            'allParentGrades'
+        ));
+    }
+
+    public function processGrading(Request $request)
+    {
+        $request->validate([
+            'process_date'                    => 'required|date',
+            'source_parent_grade_company_id'  => 'required|exists:parent_grade_companies,id',
+            'total_weight'                    => 'required|numeric|min:0.01',
+            'targets'                         => 'required|array|min:1',
+            'targets.*.parent_grade_company_id'=> 'required|exists:parent_grade_companies,id',
+            'targets.*.grade_company_id'      => 'nullable|exists:grades_company,id',
+            'targets.*.weight'                => 'required|numeric|min:0.01',
+        ]);
+
+        try {
+            $this->sortMaterialService->processInternalGrading($request->all());
+            return redirect()->route('sort-materials.index')
+                ->with('success', 'Aktivitas grading internal sortir berhasil diproses.');
+        } catch (\Exception $e) {
+            return redirect()->back()->withInput()->with('error', $e->getMessage());
+        }
+    }
+
     public function destroy(int $id)
     {
         try {

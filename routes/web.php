@@ -220,6 +220,8 @@ Route::middleware(['auth'])->group(function () {
         Route::resource('grade-company', GradeCompanyController::class);
 
         Route::resource('parent-grade-companies', ParentGradeCompanyController::class);
+        Route::get('sort-materials/grading', [SortMaterialController::class, 'showGradingForm'])->name('sort-materials.grading');
+        Route::post('sort-materials/grading', [SortMaterialController::class, 'processGrading'])->name('sort-materials.grading.store');
         Route::get('sort-materials/export', [SortMaterialController::class, 'export'])->name('sort-materials.export');
         Route::resource('sort-materials', SortMaterialController::class)->only(['index', 'create', 'store', 'destroy']);
         Route::resource('suppliers', SupplierController::class);

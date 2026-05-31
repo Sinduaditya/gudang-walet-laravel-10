@@ -191,14 +191,13 @@ class PenjualanController extends Controller
     {
         $request->validate([
             'parent_grade_company_id' => 'required|exists:parent_grade_companies,id',
-            'grade_company_id'        => 'required|exists:grades_company,id',
+            'grade_company_id'        => 'nullable|exists:grades_company,id',
             'weight'                  => 'required|numeric|min:0.01',
             'sale_date'               => 'nullable|date',
             'notes'                   => 'nullable|string|max:500',
         ], [
             'parent_grade_company_id.required' => 'Parent Grade harus dipilih.',
             'parent_grade_company_id.exists'   => 'Parent Grade tidak valid.',
-            'grade_company_id.required'        => 'Detail Grade Company harus dipilih.',
             'grade_company_id.exists'          => 'Detail Grade Company tidak valid.',
             'weight.required'                  => 'Berat harus diisi.',
             'weight.min'                       => 'Berat minimal 0.01 gram.',
