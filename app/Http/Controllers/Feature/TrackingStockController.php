@@ -53,8 +53,12 @@ class TrackingStockController extends Controller
             $gradeIds = $gradeCompanies->pluck('id')->toArray();
             $stockMap = $this->trackingStockService->calculateGlobalStockBulk($gradeIds);
 
+            // Dynamic sortir stock from SortMaterialService
+            $sortService = app(\App\Services\SortMaterial\SortMaterialService::class);
+
             foreach ($gradeCompanies as $item) {
                 $item->total_stock = $stockMap[$item->id] ?? 0;
+                $item->sort_stock  = $sortService->getSortStockByGrade($item->id); // Dynamic sortir stock
             }
 
             $globalStock = $this->trackingStockService->calculateParentGlobalStock($id);

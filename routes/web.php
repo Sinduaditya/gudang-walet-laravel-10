@@ -110,6 +110,11 @@ Route::middleware(['auth'])->group(function () {
                 // History actions
                 Route::delete('sell/{id}', [PenjualanController::class, 'destroy'])->name('sell.destroy');
 
+                // ========== PENJUALAN DARI SORTIR BAHAN ==========
+                Route::post('sell-sortir', [PenjualanController::class, 'sellFromSort'])->name('sell.sortir.store');
+                Route::get('sell-sortir/export', [PenjualanController::class, 'exportSortSale'])->name('sell.sortir.export');
+                Route::delete('sell-sortir/{id}', [PenjualanController::class, 'destroySortSale'])->name('sell.sortir.destroy');
+
                 // ========== TRANSFER INTERNAL ==========
                 Route::prefix('transfer')
                     ->name('transfer.')
@@ -215,9 +220,8 @@ Route::middleware(['auth'])->group(function () {
         Route::resource('grade-company', GradeCompanyController::class);
 
         Route::resource('parent-grade-companies', ParentGradeCompanyController::class);
-        Route::get('sort-materials/export', [\App\Http\Controllers\SortMaterial\SortMaterialController::class, 'export'])->name('sort-materials.export');
-        Route::resource('sort-materials', SortMaterialController::class);
-        Route::post('sort-materials/global', [SortMaterialController::class, 'storeGlobal'])->name('sort-materials.store-global');
+        Route::get('sort-materials/export', [SortMaterialController::class, 'export'])->name('sort-materials.export');
+        Route::resource('sort-materials', SortMaterialController::class)->only(['index', 'create', 'store', 'destroy']);
         Route::resource('suppliers', SupplierController::class);
 
         // System Log

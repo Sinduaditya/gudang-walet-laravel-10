@@ -26,6 +26,7 @@ class SortMaterialExport implements FromQuery, WithHeadings, WithMapping, Should
     public function query()
     {
         $query = SortMaterial::with(['parentGradeCompany', 'gradeCompany'])
+            ->where('type', SortMaterial::TYPE_MASUK)
             ->orderBy('sort_date', 'desc');
 
         if ($this->search) {
@@ -54,7 +55,7 @@ class SortMaterialExport implements FromQuery, WithHeadings, WithMapping, Should
             \Carbon\Carbon::parse($item->sort_date)->format('d M Y'),
             $item->parentGradeCompany->name ?? '-',
             $item->gradeCompany->name ?? '-',
-            number_format($item->weight, 0, ',', '.'),
+            number_format($item->weight, 2, ',', '.'),
             $item->description ?? '-',
         ];
     }

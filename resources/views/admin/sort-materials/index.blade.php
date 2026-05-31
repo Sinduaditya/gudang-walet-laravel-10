@@ -125,7 +125,7 @@
                                         {{ $item->gradeCompany ? $item->gradeCompany->name : '-' }}
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                        {{ number_format($item->weight, 0, ',', '.') }}
+                                        {{ number_format($item->weight, 2, ',', '.') }}
                                     </td>
                                     <td class="px-6 py-4 text-sm text-gray-600 max-w-xs">
                                         @if ($item->description)
@@ -145,7 +145,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="6" class="px-6 py-12 text-center text-sm text-gray-500">
+                                    <td colspan="7" class="px-6 py-12 text-center text-sm text-gray-500">
                                         @if (request('search'))
                                             Tidak ada data yang sesuai dengan pencarian
                                             "{{ request('search') }}".

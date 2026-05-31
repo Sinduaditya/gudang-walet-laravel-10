@@ -10,7 +10,7 @@
             <div class="mb-6 flex items-center justify-between">
                 <div>
                     <h1 class="text-2xl font-bold text-gray-900">Penjualan Langsung</h1>
-                    <p class="mt-1 text-sm text-gray-600">Catat penjualan barang ke customer</p>
+                    <p class="mt-1 text-sm text-gray-600">Catat penjualan barang dari Stok Grading atau Stok Sortir Bahan ke customer</p>
                 </div>
 
                 <div class="flex items-center gap-3">
@@ -35,23 +35,66 @@
                 </div>
             </div>
 
+            {{-- Source Selection Tabs (Form Section) --}}
+            <div id="sourceTabSelector" class="mb-6 flex gap-2 border-b border-gray-200">
+                <button type="button" onclick="switchFormTab('grading')" id="formTabBtnGrading"
+                    class="py-2.5 px-4 font-semibold text-sm border-b-2 border-blue-600 text-blue-600 transition-all focus:outline-none">
+                    Stok Hasil Grading
+                </button>
+                <button type="button" onclick="switchFormTab('sortir')" id="formTabBtnSortir"
+                    class="py-2.5 px-4 font-semibold text-sm text-gray-500 hover:text-gray-700 transition-all border-b-2 border-transparent focus:outline-none">
+                    Stok Hasil Sortir Bahan
+                </button>
+            </div>
+
+            {{-- Alert Messages --}}
+            @if (session('success'))
+                <div class="mb-6 bg-green-50 border-l-4 border-green-500 p-4 rounded-md shadow-sm">
+                    <div class="flex">
+                        <div class="flex-shrink-0">
+                            <svg class="h-5 w-5 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+                            </svg>
+                        </div>
+                        <div class="ml-3">
+                            <p class="text-sm font-medium text-green-800">{{ session('success') }}</p>
+                        </div>
+                    </div>
+                </div>
+            @endif
+
+            @if (session('error'))
+                <div class="mb-6 bg-red-50 border-l-4 border-red-500 p-4 rounded-md shadow-sm">
+                    <div class="flex">
+                        <div class="flex-shrink-0">
+                            <svg class="h-5 w-5 text-red-500" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+                            </svg>
+                        </div>
+                        <div class="ml-3">
+                            <p class="text-sm font-medium text-red-800">{{ session('error') }}</p>
+                        </div>
+                    </div>
+                </div>
+            @endif
 
             {{-- Tab Content Container --}}
             <div class="space-y-8">
 
                 {{-- Form Tab (Default Active) --}}
                 <div id="formTab" class="tab-content">
-                    <div class="bg-white rounded-xl shadow-md border border-gray-200">
+                    
+                    {{-- 1. FORM PENJUALAN GRADING --}}
+                    <div id="formGrading" class="bg-white rounded-xl shadow-md border border-gray-200">
                         <div class="px-6 py-4 border-b border-gray-200">
-                            <h2 class="text-lg font-semibold text-gray-900">Form Penjualan</h2>
-                            <p class="text-sm text-gray-500 mt-1">Lengkapi data penjualan barang</p>
+                            <h2 class="text-lg font-semibold text-gray-900">Form Penjualan (Stok Grading)</h2>
+                            <p class="text-sm text-gray-500 mt-1">Lengkapi data penjualan barang dari batch hasil grading</p>
                         </div>
 
                         <form action="{{ route('barang.keluar.sell.store') }}" method="POST" class="p-6">
                             @csrf
 
                             <div class="space-y-6">
-
                                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     {{-- Supplier Filter for Grade --}}
                                     <div>
@@ -98,7 +141,7 @@
                                 </div>
 
                                 {{-- Hidden Location (default Gudang Utama) --}}
-                                <input type="hidden" name="location_id" id="location_id" value="{{ $defaultLocation->id ?? 1 }}">
+                                <input type="hidden" name="location_id" value="{{ $defaultLocation->id ?? 1 }}">
 
                                 {{-- Weight & Date --}}
                                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -113,7 +156,7 @@
                                                 class="flex-1 border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                                 placeholder="Masukkan berat dalam gram">
                                             <button type="button" onclick="checkStock()" id="btnCheckStock"
-                                                class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                                                class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors whitespace-nowrap">
                                                 Cek Stok
                                             </button>
                                         </div>
@@ -137,10 +180,8 @@
                                 {{-- Notes --}}
                                 <div>
                                     <label class="block font-semibold text-gray-700 mb-2 flex items-center gap-2">
-                                        <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor"
-                                            viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                        <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                                         </svg>
                                         Catatan
                                         <span class="text-gray-400 font-normal text-xs">(Opsional)</span>
@@ -158,19 +199,136 @@
                             <div class="flex items-center gap-3 pt-6 border-t border-gray-200 mt-6">
                                 <button type="reset"
                                     class="flex-1 inline-flex items-center justify-center px-4 py-3 border-2 border-gray-300 text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 hover:border-gray-400 transition-all">
-                                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                            d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                                    </svg>
                                     Reset
                                 </button>
                                 <button type="submit"
-                                    class="flex-1 inline-flex items-center justify-center px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white font-semibold rounded-lg hover:from-blue-700 hover:to-blue-800 focus:ring-4 focus:ring-blue-300 transition-all duration-200 shadow-lg hover:shadow-xl">
-                                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                            d="M5 13l4 4L19 7" />
-                                    </svg>
-                                    Simpan Penjualan
+                                    class="flex-1 inline-flex items-center justify-center px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white font-semibold rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all duration-200 shadow-lg">
+                                    Simpan Penjualan Grading
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+
+                    {{-- 2. FORM PENJUALAN SORTIR --}}
+                    <div id="formSortir" class="bg-white rounded-xl shadow-md border border-gray-200 hidden">
+                        <div class="px-6 py-4 border-b border-gray-200">
+                            <h2 class="text-lg font-semibold text-gray-900">Form Penjualan (Stok Sortir Bahan)</h2>
+                            <p class="text-sm text-gray-500 mt-1">Lengkapi data penjualan barang langsung dari hasil sortir bahan</p>
+                        </div>
+
+                        <form action="{{ route('barang.keluar.sell.sortir.store') }}" method="POST" class="p-6">
+                            @csrf
+
+                            <div class="space-y-6">
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    {{-- Parent Grade Select --}}
+                                    <div>
+                                        <label class="block font-semibold text-gray-700 mb-2">
+                                            Parent Grade Perusahaan <span class="text-red-500">*</span>
+                                        </label>
+
+                                        <select name="parent_grade_company_id" id="sort_parent_grade_company_id" required
+                                            class="w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                                            <option value="">-- Pilih Parent Grade --</option>
+                                            @foreach($sortStocks as $pg)
+                                                <option value="{{ $pg['id'] }}" 
+                                                    data-stock="{{ $pg['stock'] }}"
+                                                    {{ old('parent_grade_company_id') == $pg['id'] ? 'selected' : '' }}>
+                                                    {{ $pg['name'] }} (Stok Sortir: {{ number_format($pg['stock'], 2, ',', '.') }} gr)
+                                                </option>
+                                            @endforeach
+                                        </select>
+
+                                        @error('parent_grade_company_id')
+                                            <p class="mt-1.5 text-sm text-red-600">{{ $message }}</p>
+                                        @enderror
+                                    </div>
+
+                                    {{-- Required Child Grade --}}
+                                    <div>
+                                        <label class="block font-semibold text-gray-700 mb-2">
+                                            Detail Grade Company <span class="text-red-500">*</span>
+                                        </label>
+                                        <select name="grade_company_id" id="sort_grade_company_id" required
+                                            class="w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+                                            <option value="">-- Pilih Detail Grade (Pilih Parent Dahulu) --</option>
+                                            @foreach($sortGradesWithStock as $child)
+                                                <option value="{{ $child['id'] }}" 
+                                                    data-parent-id="{{ $child['parent_grade_company_id'] }}"
+                                                    data-stock="{{ $child['stock'] }}">
+                                                    {{ $child['name'] }} (Stok Sortir: {{ number_format($child['stock'], 2, ',', '.') }} gr)
+                                                </option>
+                                            @endforeach
+                                        </select>
+
+                                        {{-- Stock hint --}}
+                                        <p id="sort-stock-hint" class="mt-2 text-sm text-gray-500">
+                                            Stok sortir grade: <span id="sort-stock-value" class="font-semibold text-green-600">-</span>
+                                        </p>
+                                    </div>
+                                </div>
+
+                                {{-- Weight & Date --}}
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div>
+                                        <label class="block font-semibold text-gray-700 mb-2">
+                                            Berat Penjualan (gram) <span class="text-red-500">*</span>
+                                        </label>
+                                        <div class="flex gap-2">
+                                            <input type="number" name="weight" id="sort_weight"
+                                                step="0.01" min="0.01" required
+                                                value="{{ old('weight') }}"
+                                                class="flex-1 border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                                placeholder="Masukkan berat dalam gram">
+                                            <button type="button" onclick="checkSortStock()" id="btnCheckSortStock"
+                                                class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors whitespace-nowrap">
+                                                Cek Stok
+                                            </button>
+                                        </div>
+                                        <p id="sort-check-result" class="mt-2 text-sm hidden"></p>
+                                        @error('weight')
+                                            <p class="mt-1.5 text-sm text-red-600">{{ $message }}</p>
+                                        @enderror
+                                    </div>
+
+                                    <div>
+                                        <label class="block font-semibold text-gray-700 mb-2">Tanggal Penjualan</label>
+                                        <input type="date" name="sale_date"
+                                            value="{{ old('sale_date', date('Y-m-d')) }}"
+                                            class="w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                                        @error('sale_date')
+                                            <p class="mt-1.5 text-sm text-red-600">{{ $message }}</p>
+                                        @enderror
+                                    </div>
+                                </div>
+
+                                {{-- Notes --}}
+                                <div>
+                                    <label class="block font-semibold text-gray-700 mb-2 flex items-center gap-2">
+                                        <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                        </svg>
+                                        Catatan Penjualan Sortir
+                                        <span class="text-gray-400 font-normal text-xs">(Opsional)</span>
+                                    </label>
+                                    <textarea name="notes" rows="3"
+                                        placeholder="Keterangan penjualan sortir bahan..."
+                                        class="w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition resize-none">{{ old('notes') }}</textarea>
+                                    @error('notes')
+                                        <p class="mt-1.5 text-sm text-red-600">{{ $message }}</p>
+                                    @enderror
+                                </div>
+                            </div>
+
+                            {{-- Form Actions --}}
+                            <div class="flex items-center gap-3 pt-6 border-t border-gray-200 mt-6">
+                                <button type="reset"
+                                    class="flex-1 inline-flex items-center justify-center px-4 py-3 border-2 border-gray-300 text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 hover:border-gray-400 transition-all">
+                                    Reset
+                                </button>
+                                <button type="submit"
+                                    class="flex-1 inline-flex items-center justify-center px-6 py-3 bg-gradient-to-r from-purple-600 to-purple-700 text-white font-semibold rounded-lg hover:from-purple-700 hover:to-purple-800 transition-all duration-200 shadow-lg">
+                                    Simpan Penjualan Sortir
                                 </button>
                             </div>
                         </form>
@@ -179,27 +337,39 @@
 
                 {{-- History Tab (Hidden by default) --}}
                 <div id="historyTab" class="tab-content hidden">
-                    <div class="bg-white rounded-xl shadow-md border border-gray-200">
+
+                    {{-- History Tab Headers --}}
+                    <div class="mb-4 flex gap-2 border-b border-gray-200 bg-white p-2 rounded-t-xl">
+                        <button type="button" onclick="switchHistoryTab('grading')" id="historyTabBtnGrading"
+                            class="py-2 px-4 font-semibold text-sm border-b-2 border-blue-600 text-blue-600 transition-all focus:outline-none">
+                            Riwayat Penjualan Grading
+                        </button>
+                        <button type="button" onclick="switchHistoryTab('sortir')" id="historyTabBtnSortir"
+                            class="py-2 px-4 font-semibold text-sm text-gray-500 hover:text-gray-700 transition-all border-b-2 border-transparent focus:outline-none">
+                            Riwayat Penjualan Sortir Bahan
+                        </button>
+                    </div>
+
+                    {{-- 1. HISTORY PENJUALAN GRADING --}}
+                    <div id="historyGrading" class="bg-white rounded-xl shadow-md border border-gray-200">
                         <div class="px-6 py-4 border-b border-gray-200 bg-gray-50">
                             <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
                                 <form action="{{ route('barang.keluar.sell.form') }}" method="GET"
                                     class="flex flex-wrap items-end gap-4">
-                                    {{-- Keep existing filters if any --}}
+                                    <input type="hidden" name="active_tab" value="grading">
                                     @if (request('page'))
                                         <input type="hidden" name="page" value="{{ request('page') }}">
                                     @endif
 
                                     <div>
-                                        <label for="start_date" class="block text-sm font-medium text-gray-700 mb-1">Dari
-                                            Tanggal</label>
+                                        <label for="start_date" class="block text-sm font-medium text-gray-700 mb-1">Dari Tanggal</label>
                                         <input type="date" name="start_date" id="start_date"
                                             value="{{ request('start_date') }}"
                                             class="w-full md:w-auto text-sm border-gray-300 rounded-md px-3 py-2 focus:ring-blue-500 focus:border-blue-500">
                                     </div>
 
                                     <div>
-                                        <label for="end_date" class="block text-sm font-medium text-gray-700 mb-1">Sampai
-                                            Tanggal</label>
+                                        <label for="end_date" class="block text-sm font-medium text-gray-700 mb-1">Sampai Tanggal</label>
                                         <input type="date" name="end_date" id="end_date"
                                             value="{{ request('end_date') }}"
                                             class="w-full md:w-auto text-sm border-gray-300 rounded-md px-3 py-2 focus:ring-blue-500 focus:border-blue-500">
@@ -219,7 +389,7 @@
 
                                     <div>
                                         <label for="grade_company_id" class="block text-sm font-medium text-gray-700 mb-1">Grade</label>
-                                        <select name="grade_company_id" id="grade_company_id" class="w-full md:w-auto text-sm border-gray-300 rounded-md px-3 py-2 focus:ring-blue-500 focus:border-blue-500">
+                                        <select name="grade_company_id" class="w-full md:w-auto text-sm border-gray-300 rounded-md px-3 py-2 focus:ring-blue-500 focus:border-blue-500">
                                             <option value="">Semua Grade</option>
                                             @foreach($grades as $grade)
                                                 <option value="{{ $grade->id }}" {{ request('grade_company_id') == $grade->id ? 'selected' : '' }}>
@@ -237,13 +407,12 @@
 
                                         <a href="{{ route('barang.keluar.sell.export', request()->query()) }}"
                                             class="flex items-center gap-1 px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-md hover:bg-green-700 transition-colors">
-                                            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z"/></svg>
                                             Export Excel
                                         </a>
 
-                                        @if (request('start_date') || request('end_date'))
-                                            <a href="{{ route('barang.keluar.sell.form') }}"
-                                                class="px-4 py-2 bg-white border border-gray-300 text-gray-700 text-sm font-medium rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition-colors">
+                                        @if (request('start_date') || request('end_date') || request('supplier_id') || request('grade_company_id'))
+                                            <a href="{{ route('barang.keluar.sell.form', ['active_tab' => 'grading']) }}"
+                                                class="px-4 py-2 bg-white border border-gray-300 text-gray-700 text-sm font-medium rounded-md hover:bg-gray-50 transition-colors">
                                                 Reset
                                             </a>
                                         @endif
@@ -252,10 +421,6 @@
 
                                 <button onclick="toggleHistoryTab()"
                                     class="text-sm text-gray-600 hover:text-gray-800 flex items-center gap-1 px-3 py-1.5 hover:bg-gray-100 rounded transition md:ml-auto">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                            d="M6 18L18 6M6 6l12 12" />
-                                    </svg>
                                     Tutup
                                 </button>
                             </div>
@@ -271,9 +436,6 @@
                                                 <div class="text-lg font-bold text-blue-600">
                                                     {{ number_format($totalWeight, 0, ',', '.') }} <span class="text-xs font-normal text-gray-500">gr</span>
                                                 </div>
-                                                <div class="text-xs text-gray-400">
-                                                    {{ number_format($totalWeight / 1000, 2, ',', '.') }} kg
-                                                </div>
                                             </div>
                                         @endforeach
                                     </div>
@@ -285,33 +447,13 @@
                             <table class="min-w-full divide-y divide-gray-200">
                                 <thead class="bg-gray-50">
                                     <tr>
-                                        <th scope="col"
-                                            class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                                            Tanggal
-                                        </th>
-                                        <th scope="col"
-                                            class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                                            Grade
-                                        </th>
-                                        <th scope="col"
-                                            class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                                            Supplier
-                                        </th>
-                                        <th scope="col"
-                                            class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                                            Lokasi
-                                        </th>
-                                        <th scope="col"
-                                            class="px-6 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                                            Stok Berkurang
-                                        </th>
-                                        <th scope="col" class="px-6 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                                            Referensi
-                                        </th>
-                                        <th scope="col"
-                                            class="px-6 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                                            Aksi
-                                        </th>
+                                        <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Tanggal</th>
+                                        <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Grade</th>
+                                        <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Supplier</th>
+                                        <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Lokasi</th>
+                                        <th class="px-6 py-3 text-right text-xs font-semibold text-gray-600 uppercase">Stok Berkurang</th>
+                                        <th class="px-6 py-3 text-center text-xs font-semibold text-gray-600 uppercase">Referensi</th>
+                                        <th class="px-6 py-3 text-center text-xs font-semibold text-gray-600 uppercase">Aksi</th>
                                     </tr>
                                 </thead>
                                 <tbody class="bg-white divide-y divide-gray-200">
@@ -332,36 +474,25 @@
                                             <td class="px-6 py-4 whitespace-nowrap text-sm font-semibold text-blue-600 text-right">
                                                 {{ number_format(abs($tx->quantity_change_grams), 2) }} gr
                                             </td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-center text-sm">
-                                                <span class="inline-flex items-center px-2 py-1 rounded text-xs font-mono bg-gray-100 text-gray-700">
-                                                    #{{ $tx->id }}
-                                                </span>
+                                            <td class="px-6 py-4 whitespace-nowrap text-center text-sm font-mono text-gray-600 bg-gray-50">
+                                                #{{ $tx->id }}
                                             </td>
                                             <td class="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
-                                                <div class="flex justify-center items-center space-x-2">
-                                                    <form action="{{ route('barang.keluar.sell.destroy', $tx->id) }}" method="POST" onsubmit="return confirm('Apakah Anda yakin ingin menghapus transaksi penjualan ini?');">
-                                                        @csrf
-                                                        @method('DELETE')
-                                                        <button type="submit" class="text-red-600 hover:text-red-900" title="Hapus">
-                                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                                            </svg>
-                                                        </button>
-                                                    </form>
-                                                </div>
+                                                <form action="{{ route('barang.keluar.sell.destroy', $tx->id) }}" method="POST" onsubmit="return confirm('Apakah Anda yakin ingin menghapus transaksi penjualan ini?');">
+                                                    @csrf
+                                                    @method('DELETE')
+                                                    <button type="submit" class="text-red-600 hover:text-red-900" title="Hapus">
+                                                        <svg class="w-5 h-5 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                        </svg>
+                                                    </button>
+                                                </form>
                                             </td>
                                         </tr>
                                     @empty
                                         <tr>
                                             <td colspan="7" class="px-6 py-12 text-center text-gray-500">
-                                                <div class="flex flex-col items-center">
-                                                    <svg class="w-12 h-12 text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                            d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                                    </svg>
-                                                    <p class="text-lg font-medium text-gray-900 mb-1">Belum ada data penjualan</p>
-                                                    <p class="text-sm text-gray-500">Transaksi penjualan yang sudah dicatat akan muncul di sini</p>
-                                                </div>
+                                                <p class="text-base text-gray-600">Belum ada riwayat penjualan grading.</p>
                                             </td>
                                         </tr>
                                     @endforelse
@@ -371,16 +502,132 @@
 
                         @if ($penjualanTransactions->hasPages())
                             <div class="px-6 py-4 border-t border-gray-200 bg-gray-50">
-                                <div class="flex items-center justify-between">
-                                    <div class="text-sm text-gray-600">
-                                        Menampilkan {{ $penjualanTransactions->firstItem() }} -
-                                        {{ $penjualanTransactions->lastItem() }} dari
-                                        {{ $penjualanTransactions->total() }} transaksi
-                                    </div>
+                                {{ $penjualanTransactions->links() }}
+                            </div>
+                        @endif
+                    </div>
+
+                    {{-- 2. HISTORY PENJUALAN SORTIR --}}
+                    <div id="historySortir" class="bg-white rounded-xl shadow-md border border-gray-200 hidden">
+                        <div class="px-6 py-4 border-b border-gray-200 bg-gray-50">
+                            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                <form action="{{ route('barang.keluar.sell.form') }}" method="GET"
+                                    class="flex flex-wrap items-end gap-4">
+                                    <input type="hidden" name="active_tab" value="sortir">
+
                                     <div>
-                                        {{ $penjualanTransactions->links() }}
+                                        <label for="sort_start_date" class="block text-sm font-medium text-gray-700 mb-1">Dari Tanggal</label>
+                                        <input type="date" name="sort_start_date" id="sort_start_date"
+                                            value="{{ request('sort_start_date') }}"
+                                            class="w-full md:w-auto text-sm border-gray-300 rounded-md px-3 py-2 focus:ring-blue-500 focus:border-blue-500">
                                     </div>
-                                </div>
+
+                                    <div>
+                                        <label for="sort_end_date" class="block text-sm font-medium text-gray-700 mb-1">Sampai Tanggal</label>
+                                        <input type="date" name="sort_end_date" id="sort_end_date"
+                                            value="{{ request('sort_end_date') }}"
+                                            class="w-full md:w-auto text-sm border-gray-300 rounded-md px-3 py-2 focus:ring-blue-500 focus:border-blue-500">
+                                    </div>
+
+                                    <div>
+                                        <label for="sort_parent_grade_id" class="block text-sm font-medium text-gray-700 mb-1">Parent Grade</label>
+                                        <select name="sort_parent_grade_id" id="sort_parent_grade_id" class="w-full md:w-auto text-sm border-gray-300 rounded-md px-3 py-2 focus:ring-blue-500 focus:border-blue-500">
+                                            <option value="">Semua Parent Grade</option>
+                                            @foreach($parentGrades as $pg)
+                                                <option value="{{ $pg->id }}" {{ request('sort_parent_grade_id') == $pg->id ? 'selected' : '' }}>
+                                                    {{ $pg->name }}
+                                                </option>
+                                            @endforeach
+                                        </select>
+                                    </div>
+
+                                    <div class="flex gap-2">
+                                        <button type="submit"
+                                            class="px-4 py-2 bg-purple-600 text-white text-sm font-medium rounded-md hover:bg-purple-700 focus:outline-none transition-colors">
+                                            Filter
+                                        </button>
+
+                                        <a href="{{ route('barang.keluar.sell.sortir.export', request()->query()) }}"
+                                            class="flex items-center gap-1 px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-md hover:bg-green-700 transition-colors">
+                                            Export Excel
+                                        </a>
+
+                                        @if (request('sort_start_date') || request('sort_end_date') || request('sort_parent_grade_id'))
+                                            <a href="{{ route('barang.keluar.sell.form', ['active_tab' => 'sortir']) }}"
+                                                class="px-4 py-2 bg-white border border-gray-300 text-gray-700 text-sm font-medium rounded-md hover:bg-gray-50 transition-colors">
+                                                Reset
+                                            </a>
+                                        @endif
+                                    </div>
+                                </form>
+
+                                <button onclick="toggleHistoryTab()"
+                                    class="text-sm text-gray-600 hover:text-gray-800 flex items-center gap-1 px-3 py-1.5 hover:bg-gray-100 rounded transition md:ml-auto">
+                                    Tutup
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full divide-y divide-gray-200">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Tanggal</th>
+                                        <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Parent Grade</th>
+                                        <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Grade Company</th>
+                                        <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Catatan / Deskripsi</th>
+                                        <th class="px-6 py-3 text-right text-xs font-semibold text-gray-600 uppercase">Berat Keluar</th>
+                                        <th class="px-6 py-3 text-center text-xs font-semibold text-gray-600 uppercase">Referensi ID</th>
+                                        <th class="px-6 py-3 text-center text-xs font-semibold text-gray-600 uppercase">Aksi</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="bg-white divide-y divide-gray-200">
+                                    @forelse($sortSaleTransactions as $tx)
+                                        <tr class="hover:bg-gray-50">
+                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                                {{ $tx->sale_date ? $tx->sale_date->format('d/m/Y') : $tx->created_at->format('d/m/Y') }}
+                                            </td>
+                                            <td class="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">
+                                                {{ $tx->parentGradeCompany->name ?? '-' }}
+                                            </td>
+                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                                                {{ $tx->gradeCompany->name ?? '-' }}
+                                            </td>
+                                            <td class="px-6 py-4 text-sm text-gray-500 max-w-xs truncate" title="{{ $tx->notes }}">
+                                                {{ $tx->notes ?? 'Tidak ada catatan' }}
+                                            </td>
+                                            <td class="px-6 py-4 whitespace-nowrap text-sm font-semibold text-purple-600 text-right">
+                                                {{ number_format($tx->weight, 2) }} gr
+                                            </td>
+                                            <td class="px-6 py-4 whitespace-nowrap text-center text-sm font-mono text-gray-500 bg-gray-50">
+                                                #{{ $tx->id }}
+                                            </td>
+                                            <td class="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
+                                                <form action="{{ route('barang.keluar.sell.sortir.destroy', $tx->id) }}" method="POST" onsubmit="return confirm('Apakah Anda yakin ingin menghapus penjualan sortir bahan ini? Stok sortir akan dikembalikan.');">
+                                                    @csrf
+                                                    @method('DELETE')
+                                                    <button type="submit" class="text-red-600 hover:text-red-900" title="Hapus Penjualan Sortir">
+                                                        <svg class="w-5 h-5 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                        </svg>
+                                                    </button>
+                                                </form>
+                                            </td>
+                                        </tr>
+                                    @empty
+                                        <tr>
+                                            <td colspan="7" class="px-6 py-12 text-center text-gray-500">
+                                                <p class="text-base text-gray-600">Belum ada riwayat penjualan dari sortir bahan.</p>
+                                            </td>
+                                        </tr>
+                                    @endforelse
+                                </tbody>
+                            </table>
+                        </div>
+
+                        @if ($sortSaleTransactions->hasPages())
+                            <div class="px-6 py-4 border-t border-gray-200 bg-gray-50">
+                                {{ $sortSaleTransactions->links() }}
                             </div>
                         @endif
                     </div>
@@ -392,16 +639,68 @@
 
     @push('scripts')
         <script>
-            // Toggle History Tab Function
+            // Active Form Tab State: 'grading' or 'sortir'
+            let currentFormTab = 'grading';
+            let currentHistoryTab = 'grading';
+
+            // Toggle Form Tab (Stok Grading vs Stok Sortir)
+            function switchFormTab(tab) {
+                currentFormTab = tab;
+                const formGrading = document.getElementById('formGrading');
+                const formSortir = document.getElementById('formSortir');
+                const btnGrading = document.getElementById('formTabBtnGrading');
+                const btnSortir = document.getElementById('formTabBtnSortir');
+
+                if (tab === 'grading') {
+                    formGrading.classList.remove('hidden');
+                    formSortir.classList.add('hidden');
+                    
+                    btnGrading.className = "py-2.5 px-4 font-semibold text-sm border-b-2 border-blue-600 text-blue-600 transition-all focus:outline-none";
+                    btnSortir.className = "py-2.5 px-4 font-semibold text-sm text-gray-500 hover:text-gray-700 transition-all border-b-2 border-transparent focus:outline-none";
+                } else {
+                    formGrading.classList.add('hidden');
+                    formSortir.classList.remove('hidden');
+
+                    btnGrading.className = "py-2.5 px-4 font-semibold text-sm text-gray-500 hover:text-gray-700 transition-all border-b-2 border-transparent focus:outline-none";
+                    btnSortir.className = "py-2.5 px-4 font-semibold text-sm border-b-2 border-purple-600 text-purple-600 transition-all focus:outline-none";
+                }
+            }
+
+            // Toggle History Tab (Penjualan Grading vs Penjualan Sortir)
+            function switchHistoryTab(tab) {
+                currentHistoryTab = tab;
+                const histGrading = document.getElementById('historyGrading');
+                const histSortir = document.getElementById('historySortir');
+                const btnGrading = document.getElementById('historyTabBtnGrading');
+                const btnSortir = document.getElementById('historyTabBtnSortir');
+
+                if (tab === 'grading') {
+                    histGrading.classList.remove('hidden');
+                    histSortir.classList.add('hidden');
+
+                    btnGrading.className = "py-2 px-4 font-semibold text-sm border-b-2 border-blue-600 text-blue-600 transition-all focus:outline-none";
+                    btnSortir.className = "py-2 px-4 font-semibold text-sm text-gray-500 hover:text-gray-700 transition-all border-b-2 border-transparent focus:outline-none";
+                } else {
+                    histGrading.classList.add('hidden');
+                    histSortir.classList.remove('hidden');
+
+                    btnGrading.className = "py-2 px-4 font-semibold text-sm text-gray-500 hover:text-gray-700 transition-all border-b-2 border-transparent focus:outline-none";
+                    btnSortir.className = "py-2 px-4 font-semibold text-sm border-b-2 border-purple-600 text-purple-600 transition-all focus:outline-none";
+                }
+            }
+
+            // Toggle History Tab Function (Full Section Toggle)
             function toggleHistoryTab() {
                 const formTab = document.getElementById('formTab');
                 const historyTab = document.getElementById('historyTab');
                 const toggleBtn = document.getElementById('historyToggleBtn');
                 const toggleText = document.getElementById('historyToggleText');
+                const sourceSelector = document.getElementById('sourceTabSelector');
 
                 if (historyTab.classList.contains('hidden')) {
                     // Show history, hide form
                     formTab.classList.add('hidden');
+                    sourceSelector.classList.add('hidden');
                     historyTab.classList.remove('hidden');
                     toggleText.textContent = 'Kembali ke Form';
                     toggleBtn.classList.remove('bg-blue-50', 'text-blue-700', 'border-blue-300');
@@ -410,33 +709,32 @@
                     // Show form, hide history
                     historyTab.classList.add('hidden');
                     formTab.classList.remove('hidden');
+                    sourceSelector.classList.remove('hidden');
                     toggleText.textContent = 'Daftar Penjualan Langsung';
                     toggleBtn.classList.remove('bg-gray-100', 'text-gray-700', 'border-gray-300');
                     toggleBtn.classList.add('bg-blue-50', 'text-blue-700', 'border-blue-300');
                 }
             }
 
-            // Grade Selection and Stock Check (simplified for select)
+            // ────────────────────────────────────────────────────────
+            // JS LOGIC FOR GRADING
+            // ────────────────────────────────────────────────────────
             const gradeSelect = document.getElementById('grade_company_id');
             const gradeStockValue = document.getElementById('grade-stock-value');
             const supplierFilter = document.getElementById('filter_supplier_id');
 
-            // Filter Grades by Supplier
             supplierFilter.addEventListener('change', function() {
                 const selectedSupplierId = this.value;
                 const options = gradeSelect.querySelectorAll('option');
                 
-                // Reset selection
                 gradeSelect.value = "";
                 gradeStockValue.textContent = '-';
                 gradeStockValue.classList.remove('text-green-600', 'text-red-600');
                 document.getElementById('stock-check-result').classList.add('hidden');
 
                 options.forEach(option => {
-                    if (option.value === "") return; // Skip placeholder
-
+                    if (option.value === "") return;
                     const gradeSupplierId = option.dataset.supplierId;
-                    
                     if (!selectedSupplierId || gradeSupplierId == selectedSupplierId) {
                         option.style.display = '';
                         option.disabled = false;
@@ -461,7 +759,7 @@
             });
 
             function fetchStockInfo(gradeId) {
-                fetch(`{{ route('barang.keluar.sell.stock_check') }}?grade_company_id=${gradeId}&location_id={{ $defaultLocation->id }}`)
+                fetch(`{{ route('barang.keluar.sell.stock_check') }}?grade_company_id=${gradeId}`)
                     .then(response => response.json())
                     .then(data => {
                         if (data.ok) {
@@ -470,14 +768,10 @@
                             gradeStockValue.classList.add('text-green-600');
                         } else {
                             gradeStockValue.textContent = 'Error';
-                            gradeStockValue.classList.remove('text-green-600');
-                            gradeStockValue.classList.add('text-red-600');
                         }
                     })
                     .catch(() => {
                         gradeStockValue.textContent = 'Error cek stok';
-                        gradeStockValue.classList.remove('text-green-600');
-                        gradeStockValue.classList.add('text-red-600');
                     });
             }
 
@@ -490,16 +784,14 @@
                     showStockResult('Pilih grade terlebih dahulu.', 'error');
                     return;
                 }
-
                 if (weight <= 0) {
                     showStockResult('Masukkan berat yang valid.', 'error');
                     return;
                 }
 
-                // Show loading
                 showStockResult('Mengecek stok...', 'info');
 
-                fetch(`{{ route('barang.keluar.sell.stock_check') }}?grade_company_id=${gradeId}&location_id={{ $defaultLocation->id }}`)
+                fetch(`{{ route('barang.keluar.sell.stock_check') }}?grade_company_id=${gradeId}`)
                     .then(response => response.json())
                     .then(data => {
                         if (!data.ok) {
@@ -509,62 +801,138 @@
 
                         const available = parseFloat(data.available_grams);
                         if (available >= weight) {
-                            showStockResult(
-                                `✓ Stok mencukupi! Tersedia ${new Intl.NumberFormat('id-ID').format(available)} gram.`,
-                                'success'
-                            );
+                            showStockResult(`✓ Stok mencukupi! Tersedia ${new Intl.NumberFormat('id-ID').format(available)} gram.`, 'success');
                         } else {
-                            showStockResult(
-                                `⚠ Stok tidak mencukupi! Hanya tersedia ${new Intl.NumberFormat('id-ID').format(available)} gram.`,
-                                'error'
-                            );
+                            showStockResult(`⚠ Stok tidak mencukupi! Hanya tersedia ${new Intl.NumberFormat('id-ID').format(available)} gram.`, 'error');
                         }
                     })
                     .catch(() => {
-                        showStockResult('Gagal mengecek stok. Silakan coba lagi.', 'error');
+                        showStockResult('Gagal mengecek stok.', 'error');
                     });
             }
 
             function showStockResult(message, type) {
                 const resultEl = document.getElementById('stock-check-result');
                 resultEl.classList.remove('hidden', 'text-red-600', 'text-green-600', 'text-blue-600');
-
-                switch(type) {
-                    case 'success':
-                        resultEl.classList.add('text-green-600');
-                        break;
-                    case 'error':
-                        resultEl.classList.add('text-red-600');
-                        break;
-                    case 'info':
-                        resultEl.classList.add('text-blue-600');
-                        break;
-                }
-
+                if (type === 'success') resultEl.classList.add('text-green-600');
+                else if (type === 'error') resultEl.classList.add('text-red-600');
+                else resultEl.classList.add('text-blue-600');
                 resultEl.textContent = message;
             }
 
-            // Check if there's a page parameter (from pagination), if yes, show history tab
+            // ────────────────────────────────────────────────────────
+            // JS LOGIC FOR SORTIR BAHAN
+            // ────────────────────────────────────────────────────────
+            const sortParentSelect = document.getElementById('sort_parent_grade_company_id');
+            const sortStockValue = document.getElementById('sort-stock-value');
+            const sortGradeSelect = document.getElementById('sort_grade_company_id');
+
+            // Dynamic filter for child grade selection based on selected parent
+            sortParentSelect.addEventListener('change', function() {
+                const selectedParentId = this.value;
+                const options = sortGradeSelect.querySelectorAll('option');
+
+                // Reset child grade
+                sortGradeSelect.value = "";
+                sortStockValue.textContent = '-';
+                sortStockValue.className = "font-semibold text-gray-500";
+
+                options.forEach(option => {
+                    if (option.value === "") return;
+                    const optionParentId = option.dataset.parentId;
+                    if (!selectedParentId || optionParentId == selectedParentId) {
+                        option.style.display = '';
+                        option.disabled = false;
+                    } else {
+                        option.style.display = 'none';
+                        option.disabled = true;
+                    }
+                });
+
+                document.getElementById('sort-check-result').classList.add('hidden');
+            });
+
+            // Display stock when specific child grade is selected
+            sortGradeSelect.addEventListener('change', function() {
+                const selectedOption = this.options[this.selectedIndex];
+                if (selectedOption.value) {
+                    const stock = parseFloat(selectedOption.dataset.stock || 0);
+                    sortStockValue.textContent = new Intl.NumberFormat('id-ID').format(stock) + ' gr';
+                    sortStockValue.className = "font-semibold text-green-600";
+                } else {
+                    sortStockValue.textContent = '-';
+                    sortStockValue.className = "font-semibold text-gray-500";
+                }
+                document.getElementById('sort-check-result').classList.add('hidden');
+            });
+
+            function checkSortStock() {
+                const gradeId = sortGradeSelect.value;
+                const weight = parseFloat(document.getElementById('sort_weight').value || 0);
+                const resultEl = document.getElementById('sort-check-result');
+
+                resultEl.classList.remove('hidden', 'text-red-600', 'text-green-600');
+
+                if (!sortParentSelect.value) {
+                    resultEl.textContent = 'Pilih parent grade terlebih dahulu.';
+                    resultEl.classList.add('text-red-600');
+                    return;
+                }
+                if (!gradeId) {
+                    resultEl.textContent = 'Pilih detail grade company terlebih dahulu.';
+                    resultEl.classList.add('text-red-600');
+                    return;
+                }
+                if (weight <= 0) {
+                    resultEl.textContent = 'Masukkan berat yang valid.';
+                    resultEl.classList.add('text-red-600');
+                    return;
+                }
+
+                const selectedOption = sortGradeSelect.options[sortGradeSelect.selectedIndex];
+                const available = parseFloat(selectedOption.dataset.stock || 0);
+
+                if (available >= weight) {
+                    resultEl.textContent = `✓ Stok mencukupi! Tersedia ${new Intl.NumberFormat('id-ID').format(available)} gram untuk grade ini.`;
+                    resultEl.classList.add('text-green-600');
+                } else {
+                    resultEl.textContent = `⚠ Stok tidak mencukupi! Hanya tersedia ${new Intl.NumberFormat('id-ID').format(available)} gram untuk grade ini.`;
+                    resultEl.classList.add('text-red-600');
+                }
+            }
+
+            // Initialization on DOM Loaded
             document.addEventListener('DOMContentLoaded', function() {
                 const urlParams = new URLSearchParams(window.location.search);
-                if (urlParams.has('page') || urlParams.has('start_date') || urlParams.has('end_date')) {
+                
+                // Read active tab
+                const activeTab = urlParams.get('active_tab') || 'grading';
+                
+                if (activeTab === 'sortir') {
+                    switchFormTab('sortir');
+                    switchHistoryTab('sortir');
+                }
+
+                if (urlParams.has('page') || urlParams.has('start_date') || urlParams.has('end_date') || urlParams.has('sort_start_date') || urlParams.has('sort_end_date')) {
                     toggleHistoryTab();
                 }
 
-                // Set initial stock if grade is pre-selected
                 const selectedGrade = gradeSelect.value;
                 if (selectedGrade) {
                     fetchStockInfo(selectedGrade);
                 }
             });
 
-            // Reset form handler
-            document.querySelector('button[type="reset"]').addEventListener('click', function() {
-                setTimeout(() => {
-                    gradeStockValue.textContent = '-';
-                    gradeStockValue.classList.remove('text-green-600', 'text-red-600');
-                    document.getElementById('stock-check-result').classList.add('hidden');
-                }, 10);
+            // Resets
+            document.querySelectorAll('button[type="reset"]').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    setTimeout(() => {
+                        gradeStockValue.textContent = '-';
+                        sortStockValue.textContent = '-';
+                        document.getElementById('stock-check-result').classList.add('hidden');
+                        document.getElementById('sort-check-result').classList.add('hidden');
+                    }, 10);
+                });
             });
         </script>
     @endpush
