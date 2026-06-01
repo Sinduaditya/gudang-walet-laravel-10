@@ -114,7 +114,8 @@ class SortMaterialService
         $query = SortMaterial::with(['parentGradeCompany', 'gradeCompany'])
             ->where('type', SortMaterial::TYPE_KELUAR)
             ->whereNotNull('sale_date') // Hanya ambil record penjualan nyata, bukan grading internal!
-            ->orderBy('sale_date', 'desc');
+            ->orderBy('sale_date', 'desc')
+            ->orderBy('id', 'desc');
 
         if (!empty($filters['start_date'])) {
             $query->whereDate('sale_date', '>=', $filters['start_date']);

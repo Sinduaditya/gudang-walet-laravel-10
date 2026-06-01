@@ -61,7 +61,8 @@ class PenjualanController extends Controller
             // Riwayat penjualan grading
             $query = InventoryTransaction::where('transaction_type', 'SALE_OUT')
                 ->with(['gradeCompany', 'location', 'sortingResult.receiptItem.purchaseReceipt.supplier'])
-                ->orderBy('transaction_date', 'desc');
+                ->orderBy('transaction_date', 'desc')
+                ->orderBy('id', 'desc');
 
             if ($request->filled('start_date')) {
                 $query->whereDate('transaction_date', '>=', $request->start_date);
