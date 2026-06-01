@@ -38,20 +38,24 @@ class SortMaterialService
     }
 
     /**
-     * List parent grade companies dengan stok sortir > 0 (untuk dropdown penjualan)
+     * List parent grade companies dengan stok sortir > 0 (baik di parent mentah ATAU di child-nya)
      */
     public function getAvailableSortStock(): Collection
     {
-        return ParentGradeCompany::where('stock', '>', 0)
-            ->orderBy('name')
+        return ParentGradeCompany::orderBy('name')
             ->get()
             ->map(function ($pg) {
+                $rawStock = $this->getNetSortStock($pg->id);
+                $totalStock = $this->getStockByParent($pg->id);
                 return [
-                    'id'    => $pg->id,
-                    'name'  => $pg->name,
-                    'stock' => (float) $pg->stock,
+                    'id'          => $pg->id,
+                    'name'        => $pg->name,
+                    'stock'       => (float) $rawStock,     // Stok mentah parent (untuk validasi penjualan parent)
+                    'total_stock' => (float) $totalStock,   // Kunci filter: Gabungan Mentah + Child
                 ];
-            });
+            })
+            ->filter(fn($pg) => $pg['total_stock'] > 0) // Munculkan parent jika ada stok mentah ATAU child!
+            ->values();
     }
 
     /**

@@ -234,7 +234,7 @@
                                                 <option value="{{ $pg['id'] }}" 
                                                     data-stock="{{ $pg['stock'] }}"
                                                     {{ old('parent_grade_company_id') == $pg['id'] ? 'selected' : '' }}>
-                                                    {{ $pg['name'] }} (Stok Sortir: {{ number_format($pg['stock'], 2, ',', '.') }} gr)
+                                                    {{ $pg['name'] }} (Stok Mentah: {{ number_format($pg['stock'], 2, ',', '.') }} gr)
                                                 </option>
                                             @endforeach
                                         </select>
