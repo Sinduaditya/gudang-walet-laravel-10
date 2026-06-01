@@ -113,6 +113,7 @@ class SortMaterialService
     {
         $query = SortMaterial::with(['parentGradeCompany', 'gradeCompany'])
             ->where('type', SortMaterial::TYPE_KELUAR)
+            ->whereNotNull('sale_date') // Hanya ambil record penjualan nyata, bukan grading internal!
             ->orderBy('sale_date', 'desc');
 
         if (!empty($filters['start_date'])) {
@@ -123,6 +124,10 @@ class SortMaterialService
         }
         if (!empty($filters['parent_grade_company_id'])) {
             $query->where('parent_grade_company_id', $filters['parent_grade_company_id']);
+        }
+
+        if (!empty($filters['no_paginate'])) {
+            return $query->get();
         }
 
         return $query->paginate(10)->withQueryString();
@@ -139,25 +144,22 @@ class SortMaterialService
     public function create(array $data): SortMaterial
     {
         return DB::transaction(function () use ($data) {
-            $destination = $data['destination'] ?? null;
-            
-            // Jika ada tujuan sortir (destination), arahkan parent_grade_company_id ke target parent grade ID!
-            $targetParentId = $destination ?: $data['parent_grade_company_id'];
-
-            // Tambahkan keterangan deskripsi jika ada tujuan
-            if ($destination && empty($data['description'])) {
-                $targetParent = ParentGradeCompany::find($targetParentId);
-                $data['description'] = 'Sortir Global - Masuk Stok (' . ($targetParent->name ?? '') . ')';
-            }
+            $parentId       = $data['parent_grade_company_id'];
+            $gradeCompanyId = $data['grade_company_id'] ?? null;
+            $weight         = (float) $data['weight'];
 
             $sortMaterial = SortMaterial::create(array_merge($data, [
                 'type'                    => SortMaterial::TYPE_MASUK,
-                'parent_grade_company_id' => $targetParentId,
+                'weight'                  => $weight,
+                'parent_grade_company_id' => $parentId,
+                'grade_company_id'        => $gradeCompanyId ?: null,
             ]));
 
-            // Update parent grade stock dari target
-            ParentGradeCompany::find($targetParentId)
-                ?->increment('stock', $data['weight']);
+            // Hanya increment stock cache parent jika masuknya adalah raw parent (grade_company_id = null)
+            if (is_null($gradeCompanyId)) {
+                ParentGradeCompany::find($parentId)
+                    ?->increment('stock', $weight);
+            }
 
             return $sortMaterial;
         });
@@ -222,7 +224,11 @@ class SortMaterialService
                     'sort_date'               => $processDate,
                     'description'             => 'Hasil Grading Internal dari Parent ' . ParentGradeCompany::find($sourceParentId)->name,
                 ]);
-                ParentGradeCompany::find($targetParentId)->increment('stock', $weight);
+                
+                // Hanya increment stock cache parent jika targetnya adalah raw parent (grade_company_id = null)
+                if (is_null($targetGradeId)) {
+                    ParentGradeCompany::find($targetParentId)->increment('stock', $weight);
+                }
             }
 
             return true;
@@ -281,25 +287,27 @@ class SortMaterialService
                 'description'             => 'Penjualan dari Sortir Bahan',
             ]);
 
-            // Selalu kurangi total stok parent cache juga
-            $parentGrade->decrement('stock', $weight);
+            // Selalu kurangi total stok parent cache jika penjualan dilakukan dari raw parent (grade_company_id = null)
+            if (is_null($gradeCompanyId)) {
+                $parentGrade->decrement('stock', $weight);
+            }
 
             return $sortMaterial;
         });
     }
 
-    /**
-     * Hapus penjualan dari sortir dan kembalikan stok
-     */
     public function deleteSale(int $id): bool
     {
         return DB::transaction(function () use ($id) {
             $sortMaterial = SortMaterial::where('type', SortMaterial::TYPE_KELUAR)
+                ->whereNotNull('sale_date') // Mencegah bypass penghapusan record non-penjualan!
                 ->findOrFail($id);
 
-            // Kembalikan stok ke parent grade
-            ParentGradeCompany::find($sortMaterial->parent_grade_company_id)
-                ?->increment('stock', $sortMaterial->weight);
+            // Kembalikan stok ke parent grade jika penjualan dilakukan dari raw parent
+            if (is_null($sortMaterial->grade_company_id)) {
+                ParentGradeCompany::find($sortMaterial->parent_grade_company_id)
+                    ?->increment('stock', $sortMaterial->weight);
+            }
 
             $sortMaterial->deleted_by = auth()->id();
             $sortMaterial->save();
@@ -342,9 +350,11 @@ class SortMaterialService
                     );
                 }
 
-                // Kembalikan stok ke parent grade (dikurangi karena dibatalkan masuknya)
-                ParentGradeCompany::find($sortMaterial->parent_grade_company_id)
-                    ?->decrement('stock', $sortMaterial->weight);
+                // Kembalikan stok ke parent grade jika yang dibatalkan adalah raw parent
+                if (is_null($sortMaterial->grade_company_id)) {
+                    ParentGradeCompany::find($sortMaterial->parent_grade_company_id)
+                        ?->decrement('stock', $sortMaterial->weight);
+                }
             }
 
             $sortMaterial->deleted_by = auth()->id();
@@ -390,5 +400,31 @@ class SortMaterialService
     public function getNetSortStock(int $parentId): float
     {
         return (float) (ParentGradeCompany::find($parentId)?->stock ?? 0);
+    }
+
+    /**
+     * Memperbaiki dan menyinkronkan ulang seluruh data stok cache parent_grade_companies
+     * agar 100% akurat mewakili stok mentah (raw parent) yang belum di-grading/di-pecah.
+     */
+    public function recalculateAllParentStocks(): void
+    {
+        DB::transaction(function () {
+            $parents = ParentGradeCompany::all();
+            foreach ($parents as $parent) {
+                $masuk = SortMaterial::where('parent_grade_company_id', $parent->id)
+                    ->whereNull('grade_company_id')
+                    ->where('type', SortMaterial::TYPE_MASUK)
+                    ->whereNull('deleted_at')
+                    ->sum('weight');
+
+                $keluar = SortMaterial::where('parent_grade_company_id', $parent->id)
+                    ->whereNull('grade_company_id')
+                    ->where('type', SortMaterial::TYPE_KELUAR)
+                    ->whereNull('deleted_at')
+                    ->sum('weight');
+
+                $parent->update(['stock' => max(0.00, (float) ($masuk - $keluar))]);
+            }
+        });
     }
 }

@@ -98,7 +98,16 @@ class TrackingStockController extends Controller
             $search = $request->input('search');
             $sortMaterials = $this->trackingStockService->getSortMaterials($id, $search);
             $globalStock = $this->trackingStockService->calculateParentGlobalStock($id);
-            $sortStock = $this->trackingStockService->calculateParentSortStock($id);
+            
+            // Ambil layanan sortir bahan
+            $sortService = app(\App\Services\SortMaterial\SortMaterialService::class);
+            
+            // 1. Total Stok Sortir (Gabungan Parent + Child)
+            $sortStock = $sortService->getStockByParent($id);
+            
+            // 2. Breakdown untuk catatan Parent (Mentah) vs Child (Pecahan)
+            $sortParentStock = $sortService->getNetSortStock($id);
+            $sortChildStock = max(0.00, $sortStock - $sortParentStock);
 
             Log::channel('audit')->info('TrackingStock parentSorts accessed', [
                 'user_id' => auth()->id(),
@@ -108,7 +117,15 @@ class TrackingStockController extends Controller
                 'ip' => $request->ip(),
             ]);
 
-            return view('admin.stock.parent-sorts', compact('parentGrade', 'sortMaterials', 'search', 'globalStock', 'sortStock'));
+            return view('admin.stock.parent-sorts', compact(
+                'parentGrade', 
+                'sortMaterials', 
+                'search', 
+                'globalStock', 
+                'sortStock',
+                'sortParentStock',
+                'sortChildStock'
+            ));
         } catch (\Exception $e) {
             Log::error('TrackingStock parentSorts error: ' . $e->getMessage(), [
                 'user_id' => auth()->id(),

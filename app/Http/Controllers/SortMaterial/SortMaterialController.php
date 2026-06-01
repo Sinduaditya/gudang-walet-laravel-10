@@ -19,7 +19,11 @@ class SortMaterialController extends Controller
 
     public function index(Request $request)
     {
-        $search       = $request->input('search');
+        $search = $request->input('search');
+        
+        // Singkronkan ulang stok cache parent secara otomatis agar selalu 100% akurat
+        $this->sortMaterialService->recalculateAllParentStocks();
+        
         $sortMaterials = $this->sortMaterialService->getAll($search);
 
         return view('admin.sort-materials.index', compact('sortMaterials', 'search'));

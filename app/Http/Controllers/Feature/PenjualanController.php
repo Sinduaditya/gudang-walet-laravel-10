@@ -88,6 +88,7 @@ class PenjualanController extends Controller
             $penjualanTransactions = $query->paginate(10)->withQueryString();
 
             // ── STOK SORTIR ───────────────────────────────────────
+            $this->sortService->recalculateAllParentStocks();
             $sortStocks           = $this->sortService->getAvailableSortStock();
             $sortGradesWithStock  = $this->sortService->getAvailableSortGradesWithStock();
             $parentGrades         = \App\Models\ParentGradeCompany::orderBy('name')->get();
