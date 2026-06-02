@@ -24,6 +24,7 @@ class SortMaterial extends Model
         'notes',
         'destination',
         'sorting_result_id',
+        'grading_source_parent_id',
     ];
 
     protected $casts = [

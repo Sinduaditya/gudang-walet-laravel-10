@@ -216,20 +216,22 @@ class SortMaterialService
             ParentGradeCompany::find($sourceParentId)->decrement('stock', $totalWeight);
 
             // 3. Buat Record "MASUK" untuk Setiap Target Hasil Pecahan
+            $sourceParentName = ParentGradeCompany::find($sourceParentId)->name;
             foreach ($data['targets'] as $target) {
                 $targetParentId = $target['parent_grade_company_id'];
-                $targetGradeId = $target['grade_company_id'] ?: null;
-                $weight = (float) $target['weight'];
+                $targetGradeId  = $target['grade_company_id'] ?: null;
+                $weight         = (float) $target['weight'];
 
                 SortMaterial::create([
-                    'type'                    => SortMaterial::TYPE_MASUK,
-                    'parent_grade_company_id' => $targetParentId,
-                    'grade_company_id'        => $targetGradeId,
-                    'weight'                  => $weight,
-                    'sort_date'               => $processDate,
-                    'description'             => 'Hasil Grading Internal dari Parent ' . ParentGradeCompany::find($sourceParentId)->name,
+                    'type'                      => SortMaterial::TYPE_MASUK,
+                    'parent_grade_company_id'   => $targetParentId,
+                    'grade_company_id'          => $targetGradeId,
+                    'weight'                    => $weight,
+                    'sort_date'                 => $processDate,
+                    'description'               => 'Hasil Grading Internal dari Parent ' . $sourceParentName,
+                    'grading_source_parent_id'  => $sourceParentId, // ← link ke source
                 ]);
-                
+
                 // Hanya increment stock cache parent jika targetnya adalah raw parent (grade_company_id = null)
                 if (is_null($targetGradeId)) {
                     ParentGradeCompany::find($targetParentId)->increment('stock', $weight);
@@ -330,35 +332,82 @@ class SortMaterialService
     {
         return DB::transaction(function () use ($id) {
             $sortMaterial = $this->getById($id);
+            $weight       = (float) $sortMaterial->weight;
 
             if ($sortMaterial->type === SortMaterial::TYPE_MASUK) {
-                // 1. VALIDASI DETAIL GRADE: Apakah jika dihapus, stok detail grade company ini menjadi negatif?
+
+                // ── VALIDASI CHILD GRADE ──────────────────────────────────────────────
+                // Cek apakah stok child grade sudah habis terpakai penjualan
                 if ($sortMaterial->grade_company_id) {
                     $availableGradeStock = $this->getSortStockByGrade($sortMaterial->grade_company_id);
-                    if ($availableGradeStock < $sortMaterial->weight) {
+                    if ($availableGradeStock < $weight) {
                         throw new \Exception(
                             "Data sortir masuk tidak dapat dihapus karena barang dari detail grade '" .
-                            ($sortMaterial->gradeCompany->name ?? 'Unknown') . "' ini " .
-                            "telah diproses/dijual di Penjualan Langsung. Silakan hapus transaksi penjualan sortir terlebih dahulu."
+                            ($sortMaterial->gradeCompany->name ?? 'Unknown') .
+                            "' ini telah diproses/dijual. Silakan hapus transaksi penjualan sortir terlebih dahulu."
                         );
                     }
                 }
 
-                // 2. VALIDASI PARENT GRADE (Dua Lapis): Apakah jika dihapus, total sisa stok parent menjadi negatif?
-                $availableParentStock = $this->getNetSortStock($sortMaterial->parent_grade_company_id);
-                if ($availableParentStock < $sortMaterial->weight) {
-                    throw new \Exception(
-                        "Data sortir masuk tidak dapat dihapus karena sisa stok yang tersedia di parent '" .
-                        ($sortMaterial->parentGradeCompany->name ?? 'Unknown') . "' hanya tinggal " .
-                        number_format($availableParentStock, 2) . " gr (tidak mencukupi untuk membatalkan masuk sebesar " .
-                        number_format($sortMaterial->weight, 2) . " gr). Barang ini kemungkinan sudah dipecah stok atau dijual."
-                    );
+                // ── VALIDASI PARENT (hanya untuk record raw parent, bukan child grade) ──
+                // Bug 1 fix: record child grade (grade_company_id != null) tidak pernah
+                // menyentuh parent.stock cache, jadi tidak perlu divalidasi dari cache.
+                if (is_null($sortMaterial->grade_company_id)) {
+                    $availableParentStock = $this->getNetSortStock($sortMaterial->parent_grade_company_id);
+                    if ($availableParentStock < $weight) {
+                        throw new \Exception(
+                            "Data sortir masuk tidak dapat dihapus karena sisa stok parent '" .
+                            ($sortMaterial->parentGradeCompany->name ?? 'Unknown') . "' hanya " .
+                            number_format($availableParentStock, 2) . " gr (dibutuhkan " .
+                            number_format($weight, 2) . " gr). Barang kemungkinan sudah dipecah stok atau dijual."
+                        );
+                    }
                 }
 
-                // Kembalikan stok ke parent grade jika yang dibatalkan adalah raw parent
-                if (is_null($sortMaterial->grade_company_id)) {
-                    ParentGradeCompany::find($sortMaterial->parent_grade_company_id)
-                        ?->decrement('stock', $sortMaterial->weight);
+                // ── KEMBALIKAN STOK ──────────────────────────────────────────────────
+                if ($sortMaterial->grading_source_parent_id) {
+                    // Bug 2 fix: ini adalah TARGET hasil grading internal.
+                    // Kembalikan stok ke SOURCE parent (misal: Mangkok)
+                    // dan sesuaikan record KELUAR source-nya.
+                    $sourceParentId = $sortMaterial->grading_source_parent_id;
+
+                    // Cari record KELUAR dari sesi grading yang sama
+                    $keluarRecord = SortMaterial::where('parent_grade_company_id', $sourceParentId)
+                        ->where('type', SortMaterial::TYPE_KELUAR)
+                        ->where('sort_date', $sortMaterial->sort_date)
+                        ->where('description', 'Aktivitas Grading Internal (Pengurangan Sumber)')
+                        ->whereNull('deleted_at')
+                        ->lockForUpdate()
+                        ->first();
+
+                    if ($keluarRecord) {
+                        $newKeluarWeight = (float) $keluarRecord->weight - $weight;
+                        if ($newKeluarWeight <= 0.001) {
+                            // Semua target sudah dihapus → hapus juga record KELUAR
+                            $keluarRecord->deleted_by = auth()->id();
+                            $keluarRecord->save();
+                            $keluarRecord->delete();
+                        } else {
+                            // Kurangi berat KELUAR sebesar target yang dihapus
+                            $keluarRecord->update(['weight' => round($newKeluarWeight, 2)]);
+                        }
+                    }
+
+                    // Kembalikan ke source parent cache (Mangkok += weight)
+                    ParentGradeCompany::find($sourceParentId)?->increment('stock', $weight);
+
+                    // Kurangi target parent cache jika target adalah raw parent level
+                    if (is_null($sortMaterial->grade_company_id)) {
+                        ParentGradeCompany::find($sortMaterial->parent_grade_company_id)
+                            ?->decrement('stock', $weight);
+                    }
+
+                } else {
+                    // Input biasa (bukan grading): kurangi parent cache
+                    if (is_null($sortMaterial->grade_company_id)) {
+                        ParentGradeCompany::find($sortMaterial->parent_grade_company_id)
+                            ?->decrement('stock', $weight);
+                    }
                 }
             }
 
