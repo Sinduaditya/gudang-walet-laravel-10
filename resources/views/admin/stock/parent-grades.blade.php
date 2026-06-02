@@ -104,10 +104,22 @@
                         </div>
 
                         {{-- Nama Grade --}}
-                        <div class="text-center px-4 py-3">
+                        <div class="text-center px-4 py-2">
                             <h6 class="font-bold uppercase text-sm tracking-wide text-gray-800">
                                 {{ $item->name }}
                             </h6>
+                        </div>
+
+                        {{-- Stock Breakdown Stats --}}
+                        <div class="px-4 pb-3 space-y-1.5 text-xs">
+                            <div class="flex justify-between items-center text-gray-600 bg-gray-50 p-2 rounded border border-gray-100">
+                                <span class="font-medium text-gray-500">Stok Grading:</span>
+                                <span class="font-bold text-gray-800">{{ number_format($item->total_stock, 0, ',', '.') }} gr</span>
+                            </div>
+                            <div class="flex justify-between items-center text-orange-700 bg-orange-50/50 p-2 rounded border border-orange-100">
+                                <span class="font-medium text-orange-600">Stok Sortir:</span>
+                                <span class="font-bold text-orange-800">{{ number_format($item->sort_stock, 0, ',', '.') }} gr</span>
+                            </div>
                         </div>
 
                         <div class="border-t border-gray-200 mx-4"></div>

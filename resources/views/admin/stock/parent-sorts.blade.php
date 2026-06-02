@@ -42,16 +42,21 @@
                     </div>
 
                     {{-- Breakdown --}}
-                    <div class="flex gap-8 border-t md:border-t-0 md:border-l border-gray-100 pt-4 md:pt-0 md:pl-8">
+                    <div class="flex flex-wrap gap-6 border-t md:border-t-0 md:border-l border-gray-100 pt-4 md:pt-0 md:pl-8">
                         <div>
                             <p class="text-xs text-gray-400 uppercase tracking-wide font-semibold">Grades</p>
                             <p class="text-lg font-bold text-gray-700">{{ number_format($globalStock ?? 0, 0, ',', '.') }}
                                 <span class="text-sm font-normal text-gray-500">gr</span></p>
                         </div>
-                        <div>
-                            <p class="text-xs text-gray-400 uppercase tracking-wide font-semibold">Sortir</p>
+                        <div class="border-l border-gray-200 pl-6">
+                            <p class="text-xs text-gray-400 uppercase tracking-wide font-semibold">Total Sortir</p>
                             <p class="text-lg font-bold text-orange-600">{{ number_format($sortStock ?? 0, 0, ',', '.') }}
                                 <span class="text-sm font-normal text-orange-400">gr</span></p>
+                            <p class="text-xs text-gray-500 mt-1">
+                                <span class="px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 font-semibold">{{ number_format($sortParentStock ?? 0, 0, ',', '.') }} gr Mentah</span>
+                                <span class="mx-1 text-gray-300">|</span>
+                                <span class="px-1.5 py-0.5 rounded bg-purple-50 text-purple-600 font-semibold">{{ number_format($sortChildStock ?? 0, 0, ',', '.') }} gr Child</span>
+                            </p>
                         </div>
                     </div>
                 </div>
@@ -92,10 +97,20 @@
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                                         {{ $item->sort_date ? $item->sort_date->format('d M Y') : '-' }}
                                     </td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">
-                                        {{ $item->gradeCompany->name ?? '-' }}
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                        @if($item->gradeCompany)
+                                            <span class="inline-flex items-center px-2 py-1 rounded-md text-xs font-semibold bg-purple-50 text-purple-700 border border-purple-100">
+                                                <span class="w-1.5 h-1.5 rounded-full bg-purple-500 mr-1.5"></span>
+                                                Child: {{ $item->gradeCompany->name }}
+                                            </span>
+                                        @else
+                                            <span class="inline-flex items-center px-2 py-1 rounded-md text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-100">
+                                                <span class="w-1.5 h-1.5 rounded-full bg-blue-500 mr-1.5"></span>
+                                                Parent (Mentah)
+                                            </span>
+                                        @endif
                                     </td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-semibold">
                                         {{ number_format($item->weight, 0, ',', '.') }} gr
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">

@@ -137,7 +137,8 @@ class TrackingStockService
 
     public function calculateParentSortStock(int $parentId): int
     {
-        return (int) round(SortMaterial::where('parent_grade_company_id', $parentId)->sum('weight'));
+        // Baca dari parent_grade_companies.stock yang selalu up-to-date oleh SortMaterialService
+        return (int) round(\App\Models\ParentGradeCompany::find($parentId)?->stock ?? 0);
     }
 
     // public function getStockPerLocation(int $gradeId, ?string $search = null): Collection

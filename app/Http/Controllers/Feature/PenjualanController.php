@@ -7,8 +7,10 @@ use App\Models\InventoryTransaction;
 use App\Models\GradeCompany;
 use App\Models\Location;
 use App\Services\BarangKeluar\BarangKeluarService;
+use App\Services\SortMaterial\SortMaterialService;
 use App\Http\Requests\BarangKeluar\SellRequest;
 use App\Exports\PenjualanExport;
+use App\Exports\PenjualanSortirExport;
 use Maatwebsite\Excel\Facades\Excel;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -16,14 +18,16 @@ use Illuminate\Support\Facades\DB;
 class PenjualanController extends Controller
 {
     protected BarangKeluarService $service;
+    protected SortMaterialService $sortService;
 
-    public function __construct(BarangKeluarService $service)
+    public function __construct(BarangKeluarService $service, SortMaterialService $sortService)
     {
-        $this->service = $service;
+        $this->service     = $service;
+        $this->sortService = $sortService;
     }
 
     /**
-     * Tampilkan form penjualan + riwayat penjualan
+     * Tampilkan form penjualan + riwayat (grading & sortir)
      */
     public function sellForm(Request $request)
     {
@@ -33,30 +37,33 @@ class PenjualanController extends Controller
                 return redirect()->back()->with('error', 'Lokasi "Gudang Utama" tidak ditemukan.');
             }
 
-            // Ambil sumber grading dengan logika "Global Budgeting"
-            $gradingSources = $this->service->getGradingSourcesWithStock(\App\Models\SortingResult::OUTGOING_TYPE_PENJUALAN_LANGSUNG, $defaultLocation->id);
+            // ── STOK GRADING ──────────────────────────────────────
+            $gradingSources = $this->service->getGradingSourcesWithStock(
+                \App\Models\SortingResult::OUTGOING_TYPE_PENJUALAN_LANGSUNG,
+                $defaultLocation->id
+            );
 
             $gradesWithStock = $gradingSources->map(function ($source) {
                 return [
-                    'id' => $source->id,
-                    'name' => $source->gradeCompany->name ?? 'Unknown',
-                    'supplier_name' => $source->receiptItem->purchaseReceipt->supplier->name ?? 'Unknown',
-                    'supplier_id' => $source->receiptItem->purchaseReceipt->supplier_id ?? null,
-                    'grading_date' => $source->grading_date ? $source->grading_date->format('d M Y') : '-',
+                    'id'               => $source->id,
+                    'name'             => $source->gradeCompany->name ?? 'Unknown',
+                    'supplier_name'    => $source->receiptItem->purchaseReceipt->supplier->name ?? 'Unknown',
+                    'supplier_id'      => $source->receiptItem->purchaseReceipt->supplier_id ?? null,
+                    'grading_date'     => $source->grading_date ? $source->grading_date->format('d M Y') : '-',
                     'batch_stock_grams' => $source->adjusted_weight,
                     'total_stock_grams' => $source->real_global_stock,
                 ];
             });
 
-            // Fetch Suppliers and Grades for filters
             $suppliers = \App\Models\Supplier::all();
-            $grades = \App\Models\GradeCompany::all();
+            $grades    = \App\Models\GradeCompany::all();
 
+            // Riwayat penjualan grading
             $query = InventoryTransaction::where('transaction_type', 'SALE_OUT')
                 ->with(['gradeCompany', 'location', 'sortingResult.receiptItem.purchaseReceipt.supplier'])
-                ->orderBy('transaction_date', 'desc');
+                ->orderBy('transaction_date', 'desc')
+                ->orderBy('id', 'desc');
 
-            // Apply Filters
             if ($request->filled('start_date')) {
                 $query->whereDate('transaction_date', '>=', $request->start_date);
             }
@@ -72,18 +79,30 @@ class PenjualanController extends Controller
                 $query->where('grade_company_id', $request->grade_company_id);
             }
 
-            // Calculate Summary (Total Weight per Grade)
-            // Clone query to avoid modifying the pagination query
-            $summaryQuery = clone $query;
-            $summary = $summaryQuery->get()
+            $summaryQuery        = clone $query;
+            $summary             = $summaryQuery->get()
                 ->groupBy('gradeCompany.name')
                 ->map(function ($group) {
-                    return $group->sum(function ($tx) {
-                        return abs($tx->quantity_change_grams);
-                    });
+                    return $group->sum(fn($tx) => abs($tx->quantity_change_grams));
                 });
 
             $penjualanTransactions = $query->paginate(10)->withQueryString();
+
+            // ── STOK SORTIR ───────────────────────────────────────
+            $this->sortService->recalculateAllParentStocks();
+            $sortStocks           = $this->sortService->getAvailableSortStock();
+            $sortGradesWithStock  = $this->sortService->getAvailableSortGradesWithStock();
+            $parentGrades         = \App\Models\ParentGradeCompany::orderBy('name')->get();
+
+            $sortFilters = [
+                'start_date'              => $request->get('sort_start_date'),
+                'end_date'                => $request->get('sort_end_date'),
+                'parent_grade_company_id' => $request->get('sort_parent_grade_id'),
+            ];
+            $sortSaleTransactions = $this->sortService->getSortSales($sortFilters);
+
+            // Summary sortir sales
+            $sortSummary = $this->sortService->getSortSales($sortFilters + ['no_paginate' => true]);
 
             return view('admin.barang-keluar.sell', compact(
                 'gradesWithStock',
@@ -91,12 +110,16 @@ class PenjualanController extends Controller
                 'defaultLocation',
                 'suppliers',
                 'grades',
-                'summary'
+                'summary',
+                'sortStocks',
+                'sortGradesWithStock',
+                'parentGrades',
+                'sortSaleTransactions',
             ));
         } catch (\Exception $e) {
             \Illuminate\Support\Facades\Log::error('PenjualanController sellForm error: ' . $e->getMessage(), [
                 'user_id' => auth()->id(),
-                'trace' => $e->getTraceAsString(),
+                'trace'   => $e->getTraceAsString(),
             ]);
             return redirect()->back()->with('error', 'Terjadi kesalahan saat memuat data. Silakan coba lagi.');
         }
@@ -105,7 +128,6 @@ class PenjualanController extends Controller
     public function checkStock(Request $request)
     {
         try {
-            // This is now checking BATCH stock because grade_company_id param is actually sorting_result_id
             $sortingResultId = (int) $request->query('grade_company_id');
 
             if (!$sortingResultId) {
@@ -113,7 +135,7 @@ class PenjualanController extends Controller
             }
 
             $defaultLocation = Location::where('name', 'Gudang Utama')->first();
-            $locationId = $defaultLocation ? $defaultLocation->id : 1;
+            $locationId      = $defaultLocation ? $defaultLocation->id : 1;
 
             $available = $this->service->getBatchRemainingStock($sortingResultId, $locationId);
             return response()->json(['ok' => true, 'available_grams' => (float) $available]);
@@ -124,35 +146,31 @@ class PenjualanController extends Controller
     }
 
     /**
-     * Store sale
+     * Store penjualan dari stok grading
      */
     public function sell(SellRequest $request)
     {
         try {
             $defaultLocation = Location::where('name', 'Gudang Utama')->first();
+            $data            = $request->validated();
 
-            $data = $request->validated();
-
-            // Resolve SortingResult and GradeCompany
-            $sortingResult = \App\Models\SortingResult::findOrFail($data['grade_company_id']);
+            $sortingResult           = \App\Models\SortingResult::findOrFail($data['grade_company_id']);
             $data['sorting_result_id'] = $sortingResult->id;
-            $data['grade_company_id'] = $sortingResult->grade_company_id;
-            $data['location_id'] = $defaultLocation->id;
+            $data['grade_company_id']  = $sortingResult->grade_company_id;
+            $data['location_id']       = $defaultLocation->id;
 
-            // 1. Cek stok BATCH (Link ke sorting_result)
             $batchRemaining = $this->service->getBatchRemainingStock($data['sorting_result_id'], $data['location_id']);
             if ($batchRemaining < $data['weight_grams']) {
                 return redirect()->back()
                     ->withInput()
-                    ->with('error', 'Stok batch (' . $sortingResult->gradeCompany->name . ') tidak mencukupi atau sudah habis terpakai transaksi lain. Tersedia: ' . number_format($batchRemaining, 2) . ' gr.');
+                    ->with('error', 'Stok batch (' . $sortingResult->gradeCompany->name . ') tidak mencukupi. Tersedia: ' . number_format($batchRemaining, 2) . ' gr.');
             }
 
-            // 2. Cek stok NYATA di Gudang (Total Grade di lokasi tersebut)
             if (!$this->service->hasEnoughStock($data['grade_company_id'], $data['location_id'], $data['weight_grams'])) {
                 $realStock = $this->service->getAvailableStock($data['grade_company_id'], $data['location_id']);
                 return redirect()->back()
                     ->withInput()
-                    ->with('error', 'Stok fisik di gudang tidak mencukupi untuk Grade ini! Stok Nyata: ' . number_format($realStock, 2) . ' gr. Anda mencoba menjual: ' . number_format($data['weight_grams'], 2) . ' gr.');
+                    ->with('error', 'Stok fisik di gudang tidak mencukupi! Stok Nyata: ' . number_format($realStock, 2) . ' gr.');
             }
 
             $this->service->sell($data);
@@ -162,12 +180,47 @@ class PenjualanController extends Controller
         } catch (\Exception $e) {
             \Illuminate\Support\Facades\Log::error('PenjualanController sell error: ' . $e->getMessage(), [
                 'user_id' => auth()->id(),
-                'trace' => $e->getTraceAsString(),
+                'trace'   => $e->getTraceAsString(),
             ]);
             return redirect()->back()->with('error', 'Terjadi kesalahan saat memproses penjualan. Silakan coba lagi.');
         }
     }
 
+    /**
+     * Store penjualan dari stok sortir bahan
+     */
+    public function sellFromSort(Request $request)
+    {
+        $request->validate([
+            'parent_grade_company_id' => 'required|exists:parent_grade_companies,id',
+            'grade_company_id'        => 'nullable|exists:grades_company,id',
+            'weight'                  => 'required|numeric|min:0.01',
+            'sale_date'               => 'nullable|date',
+            'notes'                   => 'nullable|string|max:500',
+        ], [
+            'parent_grade_company_id.required' => 'Parent Grade harus dipilih.',
+            'parent_grade_company_id.exists'   => 'Parent Grade tidak valid.',
+            'grade_company_id.exists'          => 'Detail Grade Company tidak valid.',
+            'weight.required'                  => 'Berat harus diisi.',
+            'weight.min'                       => 'Berat minimal 0.01 gram.',
+        ]);
+
+        try {
+            $this->sortService->sellFromSort($request->only([
+                'parent_grade_company_id', 'grade_company_id', 'weight', 'sale_date', 'notes',
+            ]));
+
+            return redirect()->route('barang.keluar.sell.form', ['active_tab' => 'sortir'])
+                ->with('success', 'Penjualan dari Sortir Bahan berhasil dicatat dan stok dikurangi.');
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('PenjualanController sellFromSort error: ' . $e->getMessage());
+            return redirect()->back()->withInput()->with('error', $e->getMessage());
+        }
+    }
+
+    /**
+     * Hapus penjualan grading + revert stok
+     */
     public function destroy($id)
     {
         \Log::info("========== PENJUALAN DELETE START ==========");
@@ -176,71 +229,45 @@ class PenjualanController extends Controller
         try {
             return DB::transaction(function () use ($id) {
                 $tx = InventoryTransaction::lockForUpdate()->findOrFail($id);
-                \Log::info("Transaction found: id=$tx->id, grade_company_id=$tx->grade_company_id, sorting_result_id=$tx->sorting_result_id, quantity_change_grams=$tx->quantity_change_grams, deleted_at=" . ($tx->deleted_at ?? 'null'));
 
-                // If transaction is already soft-deleted, don't process again
                 if ($tx->deleted_at) {
-                    \Log::info("Transaction already soft-deleted, skipping");
                     return redirect()->route('barang.keluar.sell.form')
                         ->with('error', 'Transaksi sudah dihapus sebelumnya.');
                 }
 
-                // Check if SALE_REVERT already exists for this specific transaction
                 $existingRevert = \App\Models\InventoryTransaction::where('reference_id', $tx->id)
                     ->where('transaction_type', 'SALE_REVERT')
                     ->first();
-                \Log::info("Existing revert check: " . ($existingRevert ? "YES, revert_id=" . $existingRevert->id : "NO"));
 
-                // Only create SALE_REVERT if:
-                // 1. No existing revert for this transaction
-                // 2. This is a SALE_OUT transaction (not already reverted)
                 if (!$existingRevert && $tx->transaction_type === 'SALE_OUT') {
                     $revertAmount = abs($tx->quantity_change_grams);
-                    \Log::info("Creating SALE_REVERT with amount: $revertAmount");
 
                     InventoryTransaction::create([
-                        'transaction_date' => now(),
-                        'grade_company_id' => $tx->grade_company_id,
-                        'location_id' => $tx->location_id,
+                        'transaction_date'     => now(),
+                        'grade_company_id'     => $tx->grade_company_id,
+                        'location_id'          => $tx->location_id,
                         'quantity_change_grams' => $revertAmount,
-                        'supplier_id' => $tx->supplier_id,
-                        'transaction_type' => 'SALE_REVERT',
-                        'reference_id' => $tx->id,
-                        'sorting_result_id' => null, // NULL agar tidak double-count di batch stock
-                        'notes' => 'Revert dari delete penjualan ID: ' . $id,
-                        'created_by' => auth()->id(),
+                        'supplier_id'          => $tx->supplier_id,
+                        'transaction_type'     => 'SALE_REVERT',
+                        'reference_id'         => $tx->id,
+                        'sorting_result_id'    => null,
+                        'notes'                => 'Revert dari delete penjualan ID: ' . $id,
+                        'created_by'           => auth()->id(),
                     ]);
-                    \Log::info("SALE_REVERT created successfully");
-                } else {
-                    \Log::info("Skipping SALE_REVERT - either already exists or not a SALE_OUT");
                 }
 
-                // Also delete linked SortMaterial if exists (to avoid double revert)
                 if ($tx->sorting_result_id) {
-                    \Log::info("Checking SortMaterial for sorting_result_id: $tx->sorting_result_id");
                     $sortMaterial = \App\Models\SortMaterial::where('sorting_result_id', $tx->sorting_result_id)->first();
                     if ($sortMaterial) {
-                        \Log::info("Found SortMaterial ID: $sortMaterial->id, deleting...");
                         $sortMaterial->deleted_by = auth()->id();
                         $sortMaterial->save();
                         $sortMaterial->delete();
-                        \Log::info("SortMaterial deleted");
-                    } else {
-                        \Log::info("No SortMaterial found for this sorting_result_id");
                     }
                 }
 
-                \Log::info("Now soft-deleting transaction ID: $tx->id");
                 $tx->deleted_by = auth()->id();
                 $tx->save();
                 $tx->delete();
-                \Log::info("Transaction soft-deleted");
-
-                // Debug: check stock after delete
-                $stockAfter = \App\Models\InventoryTransaction::where('grade_company_id', $tx->grade_company_id)
-                    ->whereNull('deleted_at')
-                    ->sum('quantity_change_grams');
-                \Log::info("Stock for grade_company_id {$tx->grade_company_id} after delete: $stockAfter");
 
                 \Log::info("========== PENJUALAN DELETE END ==========");
                 return redirect()->route('barang.keluar.sell.form')
@@ -248,9 +275,22 @@ class PenjualanController extends Controller
             });
         } catch (\Exception $e) {
             \Log::error("ERROR in PenjualanController destroy: " . $e->getMessage());
-            \Log::error("Trace: " . $e->getTraceAsString());
-            \Log::info("========== PENJUALAN DELETE FAILED ==========");
             return redirect()->back()->with('error', 'Gagal menghapus transaksi: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Hapus penjualan dari sortir bahan + revert stok
+     */
+    public function destroySortSale(int $id)
+    {
+        try {
+            $this->sortService->deleteSale($id);
+            return redirect()->route('barang.keluar.sell.form', ['active_tab' => 'sortir'])
+                ->with('success', 'Penjualan sortir bahan dihapus dan stok dikembalikan.');
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('PenjualanController destroySortSale error: ' . $e->getMessage());
+            return redirect()->back()->with('error', 'Gagal menghapus: ' . $e->getMessage());
         }
     }
 
@@ -258,16 +298,34 @@ class PenjualanController extends Controller
     {
         try {
             $filters = [
-                'start_date'      => $request->get('start_date'),
-                'end_date'        => $request->get('end_date'),
-                'supplier_id'     => $request->get('supplier_id'),
-                'grade_company_id'=> $request->get('grade_company_id'),
+                'start_date'       => $request->get('start_date'),
+                'end_date'         => $request->get('end_date'),
+                'supplier_id'      => $request->get('supplier_id'),
+                'grade_company_id' => $request->get('grade_company_id'),
             ];
 
             $fileName = 'penjualan_langsung_' . date('Y-m-d') . '.xlsx';
             return Excel::download(new PenjualanExport($filters), $fileName);
         } catch (\Exception $e) {
             \Illuminate\Support\Facades\Log::error('PenjualanController export error: ' . $e->getMessage());
+            return redirect()->back()->with('error', 'Terjadi kesalahan saat export data.');
+        }
+    }
+
+    public function exportSortSale(Request $request)
+    {
+        try {
+            $filters = [
+                'start_date'              => $request->get('start_date'),
+                'end_date'                => $request->get('end_date'),
+                'parent_grade_company_id' => $request->get('parent_grade_company_id'),
+                'grade_company_id'        => $request->get('grade_company_id'),
+            ];
+
+            $fileName = 'penjualan_sortir_bahan_' . date('Y-m-d') . '.xlsx';
+            return Excel::download(new PenjualanSortirExport($filters), $fileName);
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('PenjualanController exportSortSale error: ' . $e->getMessage());
             return redirect()->back()->with('error', 'Terjadi kesalahan saat export data.');
         }
     }
