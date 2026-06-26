@@ -17,10 +17,6 @@ class IdmTransfer extends Model
         'transfer_date',
         'transfer_code',
         'sum_goods',
-        'price_transfer',
-        'average_idm_price',
-        'total_non_idm_price',
-        'total_idm_price',
         'notes',
     ];
 

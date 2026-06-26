@@ -170,8 +170,28 @@
         </div>
     </div>
 
+@push('styles')
+    <link href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.min.css" rel="stylesheet">
+    <style>
+        .ts-wrapper.single .ts-control { padding: 7px 12px; border-radius: 6px; font-size: 0.875rem; }
+        .ts-wrapper.single.input-active .ts-control { border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59,130,246,.25); }
+    </style>
+@endpush
+
 @push('scripts')
+    <script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
     <script>
+        const gradeCompaniesData = @json($allGradeCompanies->map(fn($g) => $g->name));
+
+        function initGradeCompanySelect(el) {
+            if (el.tomselect) return;
+            new TomSelect(el, {
+                placeholder: 'Cari atau pilih grade...',
+                allowEmptyOption: true,
+                maxOptions: null,
+            });
+        }
+
         let gradeIndex = {{ old('grades') ? count(old('grades')) : 1 }};
         const originalWeight = {{ $sortingResult->receiptItem->warehouse_weight_grams ?? 0 }};
 
@@ -231,9 +251,12 @@
             if (gradesContainer) {
                 handleMutualExclusivity(gradesContainer);
             }
-            
+
             updateGradeNumbers();
             calculateTotalWeight();
+
+            // Init Tom Select pada semua grade company select yang ada
+            document.querySelectorAll('.grade-company-select').forEach(initGradeCompanySelect);
 
             // Add event listeners to existing weight inputs
             document.querySelectorAll('.grade-weight').forEach(input => {
@@ -243,11 +266,14 @@
 
         function addNewGrade() {
             const container = document.getElementById('gradesContainer');
+            const gradeOptions = gradeCompaniesData.map(name =>
+                `<option value="${name}">${name}</option>`
+            ).join('');
             const newGradeHtml = `
         <div class="grade-row border border-gray-200 rounded-lg p-4 mb-4" data-index="${gradeIndex}">
             <div class="flex justify-between items-center mb-3">
                 <h4 class="font-medium text-sm text-gray-700">Grade ${gradeIndex + 1}</h4>
-                <button type="button" onclick="removeGrade(this)" 
+                <button type="button" onclick="removeGrade(this)"
                     class="text-red-600 hover:text-red-800 text-sm">
                     Hapus
                 </button>
@@ -257,10 +283,11 @@
                 <!-- Grade Company Name -->
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Grade Perusahaan</label>
-                    <input type="text" name="grades[${gradeIndex}][grade_company_name]" required
-                        placeholder="Contoh: A, B, C, Super"
-                        class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        list="grade-company-options">
+                    <select name="grades[${gradeIndex}][grade_company_name]" required
+                        class="grade-company-select w-full border border-gray-300 rounded-md px-3 py-2 text-sm">
+                        <option value="">Cari atau pilih grade...</option>
+                        ${gradeOptions}
+                    </select>
                 </div>
 
                 <!-- Weight -->
@@ -309,12 +336,12 @@
     `;
 
             container.insertAdjacentHTML('beforeend', newGradeHtml);
-            
-             // Re-run initial check for the newly added row to ensure correct state (though they start enabled)
-             // But since we use delegation on the container, we don't strictly need to re-attach listeners.
-             // However, triggering the 'initial sync' logic for the new row is good practice if we had default values.
-             // For blank new rows, disable logic isn't triggered yet, which is correct.
-            
+
+            // Init Tom Select pada select yang baru ditambahkan
+            const newRow = container.lastElementChild;
+            const newSelect = newRow.querySelector('.grade-company-select');
+            if (newSelect) initGradeCompanySelect(newSelect);
+
             gradeIndex++;
             updateGradeNumbers();
             calculateTotalWeight();

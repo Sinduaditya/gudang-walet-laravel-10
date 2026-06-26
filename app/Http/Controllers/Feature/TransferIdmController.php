@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Feature;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use App\Services\Idm\TransferIdmService;
 use App\Exports\TransferIdmExport;
 use Maatwebsite\Excel\Facades\Excel;
@@ -72,127 +73,75 @@ class TransferIdmController extends Controller
 
     public function step2(Request $request)
     {
+        if ($request->isMethod('GET')) {
+            return redirect()->route('barang.keluar.transfer-idm.create');
+        }
+
         $request->validate([
-            'selected_items' => 'required|array',
+            'selected_items'   => 'required|array',
             'selected_items.*' => 'exists:idm_details,id',
         ]);
 
-        $selectedItemIds = $request->selected_items;
-        $items = \App\Models\IdmDetail::with(['idmManagement.supplier'])->whereIn('id', $selectedItemIds)->get();
+        $sub   = '(SELECT COALESCE(SUM(itd.weight), 0) FROM idm_transfer_details itd
+                   INNER JOIN idm_transfers it ON it.id = itd.idm_transfer_id AND it.deleted_at IS NULL
+                   WHERE itd.idm_detail_id = idm_details.id AND itd.deleted_at IS NULL)';
+        $items = \App\Models\IdmDetail::with(['idmManagement.supplier'])
+            ->selectRaw("idm_details.*, (idm_details.weight - {$sub}) AS remaining_weight")
+            ->whereIn('idm_details.id', $request->selected_items)
+            ->get();
+        $locations = \App\Models\Location::all();
 
-        // Calculations
-        $idmItems = $items; // Assuming all are IDM for now, need logic to distinguish "Non IDM"?
-        // User said: "Total harga selain idm diambil dari perhitungan harga barang selain idm (perutan dan kakian)"
-        // How to distinguish? Maybe grade_idm_name contains 'Perutan' or 'Kakian'?
-        
-        $nonIdmKeywords = ['perutan', 'kakian'];
-        $nonIdmItems = $items->filter(function ($item) use ($nonIdmKeywords) {
-            foreach ($nonIdmKeywords as $keyword) {
-                if (stripos($item->grade_idm_name, $keyword) !== false) {
-                    return true;
-                }
-            }
-            return false;
-        });
-        
-        $idmOnlyItems = $items->diff($nonIdmItems);
-
-        $totalIdmPrice = $idmOnlyItems->sum('price'); // or total_price?
-        // Wait, price usually is per unit or total? IdmDetail has 'price' and 'total_price'.
-        // Assuming 'total_price' is the value to sum.
-        // Let's check IdmDetail schema again. It has 'price' and 'total_price'.
-        // The wireframe says "Harga".
-        // The calculation "Rata Rata Harga IDM" = (sum price) / count? Or (sum total_price / sum weight)?
-        // "Rata rata harga idm yg diambil dari perhitungan harga idm yg dipilih kemudian dijumlahkan dan dibagi jumlah barang idm yg dipilih"
-        // "harga idm yg dipilih" -> sum(price) / count items?
-        
-        $sumIdmPrice = $idmOnlyItems->sum('total_price') ?? 0;
-        $countIdm = $idmOnlyItems->count();
-        $averageIdmPrice = $countIdm > 0 ? $sumIdmPrice / $countIdm : 0;
-        
-        // Ensure consistency
-        // If Price column in view is displaying 'price' (unit price), change it to total_price or allow user to see both?
-        // Detailed view usually shows Value.
-
-        $totalNonIdmPrice = $nonIdmItems->sum('total_price') ?? 0; // Using total_price for sum
-        // Or should I use 'price' column if it represents the value?
-        // Usually, price = unit price, total_price = weight * price.
-        // "Total harga selain IDM" -> Sum of total values.
-        // "Rata Rata Harga IDM" -> Average of unit prices? Or Average of Total values?
-        // "Harga transfer" usually means Total Value.
-        
-        // Let's assume 'price' in IdmDetail is the value the user looks at in card (e.g. 100.000).
-        // If "Harga" in card is total_price, then use total_price.
-        
-        // I will fallback to using 'price' as the value for average calculation as requested literally.
-        
-        $totalTransferPrice = $items->sum('total_price'); // Total of everything?
-        // Requirement: "kemudian total harga diambil dari rata rata harga idm ditambahkan total harga selain idm"
-        // This is weird. Average + Total?
-        // "average_idm_price + total_non_idm_price" = Total Price?
-        // Example: 10 items IDM @ 1000 each. Avg = 1000. 1 item Non-IDM = 5000.
-        // Total = 1000 + 5000 = 6000?
-        // That implies the "Transfer Price" is a constructed value, not the sum of goods values.
-        // Okay, I will follow the formula strictly:
-        // FinalTotal = AverageIdmPrice + TotalNonIdmPrice.
-        
-        return view('admin.transfer-idm.create-step-2', compact(
-            'items', 
-            'averageIdmPrice', 
-            'totalNonIdmPrice',
-            'idmOnlyItems',
-            'nonIdmItems'
-        ) + ['source_location_id' => $request->input('source_location_id')]);
+        return view('admin.transfer-idm.create-step-2', [
+            'items'         => $items,
+            'transfer_date' => $request->input('transfer_date'),
+            'locations'     => $locations,
+        ]);
     }
 
     public function store(Request $request)
     {
-        // Validate and Store
-        $data = $request->validate([
-            'items' => 'required|array',
-            'transfer_date' => 'required|date',
-            'average_idm_price' => 'required|numeric',
-            'total_non_idm_price' => 'required|numeric',
-            'total_idm_price' => 'required|numeric',
-            'total_price' => 'required|numeric',
-            'source_location_id' => 'sometimes|exists:locations,id', // Make it optional for backward compatibility or strict? Better strict if user wants control.
+        $request->validate([
+            'items'              => 'required|array',
+            'items.*.id'         => 'required|exists:idm_details,id',
+            'items.*.weight'     => 'required|numeric|min:0.01',
+            'transfer_date'      => 'required|date',
+            'source_location_id' => 'required|exists:locations,id',
         ]);
 
-        // Re-construct items array from request or re-fetch?
-        // The service expects array of items with details.
-        // The form in step 2 should submit these values.
-        
-        // Better: Fetch items again by IDs passed in hidden fields to ensure integrity?
-        // Or trust the POST data if it contains the snapshot values.
-        // I'll fetch items by ID for security but use calculated values from request for the header totals if user verified them.
-        
-        $itemIds = array_column($request->items, 'id');
-        $items = \App\Models\IdmDetail::whereIn('id', $itemIds)->get();
-        // Map items to array format for service
-        $itemsData = $items->map(function($item) {
-            return [
-                'id' => $item->id,
-                'weight' => $item->weight,
-                'price' => $item->price, // Snapshot Unit Price
-                'total_price' => $item->total_price, // Snapshot Total Value
-                'grade_idm_name' => $item->grade_idm_name,
-            ];
-        });
+        $sub     = '(SELECT COALESCE(SUM(itd.weight), 0) FROM idm_transfer_details itd
+                    INNER JOIN idm_transfers it ON it.id = itd.idm_transfer_id AND it.deleted_at IS NULL
+                    WHERE itd.idm_detail_id = idm_details.id AND itd.deleted_at IS NULL)';
+        $dbItems = \App\Models\IdmDetail::whereIn('idm_details.id', array_column($request->items, 'id'))
+            ->selectRaw("idm_details.*, (idm_details.weight - {$sub}) AS remaining_weight")
+            ->get()->keyBy('id');
 
-        $storeData = [
-            'transfer_date' => $request->transfer_date,
-            'source_location_id' => $request->source_location_id,
-            'items' => $itemsData,
-            'total_price' => $request->total_price,
-            'average_idm_price' => $request->average_idm_price,
-            'total_non_idm_price' => $request->total_non_idm_price,
-            'total_idm_price' => $request->total_idm_price,
-            'notes' => $request->notes
-        ];
+        foreach ($request->items as $submitted) {
+            $dbItem = $dbItems->get($submitted['id']);
+            $remaining = $dbItem ? (float) $dbItem->remaining_weight : 0;
+            if (!$dbItem || (float) $submitted['weight'] > $remaining + 0.001) {
+                return redirect()->back()
+                    ->with('error', 'Berat yang dimasukkan melebihi sisa berat tersedia untuk item ' . ($dbItem->grade_idm_name ?? '') . ' (sisa: ' . number_format($remaining, 2) . ' g).');
+            }
+        }
 
-        $this->transferIdmService->storeTransfer($storeData);
+        $itemsData = collect($request->items)->map(fn ($submitted) => [
+            'id'             => $submitted['id'],
+            'weight'         => (float) $submitted['weight'],
+            'grade_idm_name' => $dbItems->get($submitted['id'])->grade_idm_name,
+        ]);
 
-        return redirect()->route('barang.keluar.transfer-idm.index')->with('success', 'Transfer Created Successfully');
+        try {
+            $this->transferIdmService->storeTransfer([
+                'transfer_date'      => $request->transfer_date,
+                'source_location_id' => $request->source_location_id,
+                'items'              => $itemsData,
+                'notes'              => $request->notes,
+            ]);
+
+            return redirect()->route('barang.keluar.transfer-idm.index')->with('success', 'Transfer IDM berhasil dibuat.');
+        } catch (\Exception $e) {
+            return redirect()->route('barang.keluar.transfer-idm.create')->with('error', $e->getMessage());
+        }
     }
 
     public function destroy($id)

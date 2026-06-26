@@ -13,11 +13,17 @@
     <!-- Grade Company Name -->
     <div>
         <label class="block text-sm font-medium text-gray-700 mb-1">Grade Perusahaan</label>
-        <input type="text" name="grades[{{ $index }}][grade_company_name]" required
-            value="{{ old('grades.' . $index . '.grade_company_name', $grade['grade_company_name'] ?? '') }}"
-            placeholder="Contoh: A, B, C, Super"
-            class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            list="grade-company-options">
+        <select name="grades[{{ $index }}][grade_company_name]" required
+            class="grade-company-select w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+            data-selected="{{ old('grades.' . $index . '.grade_company_name', $grade['grade_company_name'] ?? '') }}">
+            <option value="">Cari atau pilih grade...</option>
+            @foreach($allGradeCompanies ?? [] as $gc)
+                <option value="{{ $gc->name }}"
+                    {{ old('grades.' . $index . '.grade_company_name', $grade['grade_company_name'] ?? '') === $gc->name ? 'selected' : '' }}>
+                    {{ $gc->name }}
+                </option>
+            @endforeach
+        </select>
     </div>
 
     <!-- Weight -->
@@ -71,11 +77,3 @@
         class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
 </div>
 
-<!-- Datalist hanya sekali -->
-@if($index === 0)
-<datalist id="grade-company-options">
-    @foreach($allGradeCompanies as $gradeCompany)
-        <option value="{{ $gradeCompany->name }}">
-    @endforeach
-</datalist>
-@endif

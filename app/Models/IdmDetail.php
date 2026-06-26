@@ -15,8 +15,6 @@ class IdmDetail extends Model
         'idm_management_id',
         'grade_idm_name',
         'weight',
-        'price',
-        'total_price',
     ];
 
     public function idmManagement()

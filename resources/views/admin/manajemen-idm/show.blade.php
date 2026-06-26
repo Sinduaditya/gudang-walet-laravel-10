@@ -23,7 +23,7 @@
                 </div>
             </div>
 
-            <!-- ✅ Informasi Barang Asal -->
+            <!-- Informasi Barang Asal -->
             <div class="bg-white shadow rounded-lg border mb-6 p-6">
                 <h2 class="text-lg font-semibold text-gray-900 mb-4">Informasi Barang Asal</h2>
                 <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
@@ -35,9 +35,9 @@
                     </div>
                     <div>
                         <p class="text-sm text-gray-500 font-medium">Kategori IDM</p>
-                        <span
-                            class="inline-flex items-center px-2.5 py-0.5 rounded-full text-sm font-medium {{ ($idmManagement->sourceItems->first()->category_grade ?? '') == 'IDM A' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800' }}">
-                            {{ $idmManagement->sourceItems->first()->category_grade ?? '-' }}
+                        @php $catFirst = $idmManagement->sourceItems->first()->category_grade ?? '-'; @endphp
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-sm font-medium {{ $catFirst == 'IDM A' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800' }}">
+                            {{ $catFirst }}
                         </span>
                     </div>
                     <div>
@@ -67,7 +67,7 @@
                 </div>
             </div>
 
-            <!-- ✅ Detail Hasil IDM -->
+            <!-- Detail Hasil IDM -->
             <div class="bg-white shadow rounded-lg border overflow-hidden mb-6">
                 <div class="px-6 py-4 border-b bg-gray-50">
                     <h2 class="text-lg font-semibold text-gray-900">Detail Hasil IDM</h2>
@@ -80,9 +80,7 @@
                                 <tr>
                                     <th class="px-4 py-3 rounded-tl-md">No</th>
                                     <th class="px-4 py-3">Jenis</th>
-                                    <th class="px-4 py-3">Berat (gr)</th>
-                                    <th class="px-4 py-3">Harga Satuan</th>
-                                    <th class="px-4 py-3 rounded-tr-md">Total Harga</th>
+                                    <th class="px-4 py-3 rounded-tr-md">Berat (gr)</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-gray-200">
@@ -95,62 +93,10 @@
                                         <td class="px-4 py-3 font-mono text-gray-700">
                                             {{ number_format($detail->weight, 2) }}
                                         </td>
-                                        <td class="px-4 py-3 font-mono text-gray-700">
-                                            Rp {{ number_format($detail->price, 2, ',', '.') }}
-                                        </td>
-                                        <td class="px-4 py-3 font-mono font-semibold text-gray-900">
-                                            Rp {{ number_format($detail->total_price, 2, ',', '.') }}
-                                        </td>
                                     </tr>
                                 @endforeach
                             </tbody>
                         </table>
-                    </div>
-                </div>
-            </div>
-
-            <!-- ✅ Ringkasan Keuangan -->
-            <div class="bg-white shadow rounded-lg border p-6">
-                <h3 class="text-lg font-semibold text-gray-900 mb-4">Ringkasan Keuangan</h3>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <!-- Total Estimasi Harga Jual -->
-                    <div class="bg-gradient-to-r from-green-50 to-green-100 p-4 rounded-lg border border-green-200">
-                        <div class="flex items-center">
-                            <svg class="w-8 h-8 text-green-600 mr-3" fill="none" stroke="currentColor"
-                                viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                    d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                            <div>
-                                <div class="text-sm text-green-600 font-medium">Total Estimasi Harga Jual per Gram</div>
-                                <div class="text-2xl font-bold text-green-900">
-                                    Rp {{ number_format($idmManagement->estimated_selling_price, 2, ',', '.') }}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Keuntungan -->
-                    <div class="bg-gradient-to-r from-blue-50 to-blue-100 p-4 rounded-lg border border-blue-200">
-                        <div class="flex items-center">
-                            <svg class="w-8 h-8 text-blue-600 mr-3" fill="none" stroke="currentColor"
-                                viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                    d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-                            </svg>
-                            <div>
-                                <div class="text-sm text-blue-600 font-medium">Keuntungan</div>
-                                <div class="text-2xl font-bold text-blue-900">
-                                    @php
-                                        $totalInitialCost =
-                                            $idmManagement->initial_weight * $idmManagement->initial_price;
-                                        $totalSales = $idmManagement->details->sum('total_price');
-                                        $profit = $totalSales - $totalInitialCost;
-                                    @endphp
-                                    Rp {{ number_format($profit, 2, ',', '.') }}
-                                </div>
-                            </div>
-                        </div>
                     </div>
                 </div>
             </div>

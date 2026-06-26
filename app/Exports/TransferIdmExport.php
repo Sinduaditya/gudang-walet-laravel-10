@@ -39,7 +39,7 @@ class TransferIdmExport implements FromQuery, WithHeadings, WithMapping, ShouldA
 
     public function headings(): array
     {
-        return ['No', 'Kode Transfer', 'Tgl Transfer', 'Total Barang', 'Harga Transfer'];
+        return ['No', 'Kode Transfer', 'Tgl Transfer', 'Total Barang'];
     }
 
     public function map($transfer): array
@@ -51,13 +51,12 @@ class TransferIdmExport implements FromQuery, WithHeadings, WithMapping, ShouldA
             $transfer->transfer_code,
             \Carbon\Carbon::parse($transfer->transfer_date)->format('d/m/Y'),
             $transfer->details_count,
-            'Rp ' . number_format($transfer->price_transfer ?? 0, 0, ',', '.'),
         ];
     }
 
     public function styles(Worksheet $sheet)
     {
-        $sheet->getStyle('A1:E1')->applyFromArray([
+        $sheet->getStyle('A1:D1')->applyFromArray([
             'font' => ['bold' => true, 'size' => 11],
             'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => 'E5E7EB']],
             'borders' => ['allBorders' => ['borderStyle' => Border::BORDER_THIN]],
