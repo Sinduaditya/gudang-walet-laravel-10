@@ -49,8 +49,7 @@ class TransferExternalController extends Controller
                 ];
             });
 
-            $jasaCuciLocations = Location::where('name', 'NOT LIKE', '%IDM%')
-                ->where('name', 'NOT LIKE', '%DMK%')
+            $jasaCuciLocations = Location::where('is_jasa_cuci', true)
                 ->where('name', '!=', 'Gudang Utama')
                 ->orderBy('name')
                 ->get();

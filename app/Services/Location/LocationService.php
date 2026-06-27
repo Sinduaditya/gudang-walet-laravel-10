@@ -10,16 +10,24 @@ class LocationService
 {
     /**
      * Get all locations.
+     * Menggunakan withExists untuk menghindari N+1 query saat
+     * menampilkan icon warning di view untuk lokasi yang punya history transaksi.
      */
     public function getAll(?string $search = null)
     {
-        $query = Location::query();
+        $query = Location::query()
+            ->withExists([
+                'stockTransfersFrom',
+                'stockTransfersTo',
+                'inventoryTransactions',
+                'saleItems',
+            ]);
 
         if ($search) {
             $query->where('name', 'like', '%' . $search . '%');
         }
 
-        return $query->latest()->paginate(10)->withQueryString(); 
+        return $query->latest()->paginate(10)->withQueryString();
     }
 
     /**

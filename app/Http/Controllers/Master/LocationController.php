@@ -64,7 +64,8 @@ class LocationController extends Controller
     public function edit(int $id)
     {
         $location = $this->locationService->getById($id);
-        return view('admin.locations.edit', compact('location'));
+        $hasHistory = $location->hasTransactions();
+        return view('admin.locations.edit', compact('location', 'hasHistory'));
     }
 
     /**

@@ -54,6 +54,13 @@ class TransferInternalController extends Controller
 
             $dmkLocation = Location::where('name', 'DMK')->first();
 
+            // Ambil semua lokasi non-jasa-cuci (exit-point) sebagai tujuan transfer internal,
+            // kecuali Gudang Utama karena dia adalah lokasi asal tetap.
+            $internalDestinations = Location::where('is_jasa_cuci', false)
+                ->where('name', '!=', 'Gudang Utama')
+                ->orderBy('name')
+                ->get();
+
             // Fetch Suppliers and Grades for filters
             $suppliers = \App\Models\Supplier::all();
             $grades = \App\Models\GradeCompany::all();
@@ -95,6 +102,7 @@ class TransferInternalController extends Controller
             return view('admin.barang-keluar.transfer-step1', compact(
                 'gradesWithStock',
                 'dmkLocation',
+                'internalDestinations',
                 'transferInternalTransactions',
                 'gudangUtama',
                 'suppliers',
@@ -295,7 +303,9 @@ class TransferInternalController extends Controller
 
                 $inTx = $transfer->transactions()->where("transaction_type", "TRANSFER_IN")->first();
                 $toLocation = Location::find($transfer->to_location_id);
-                if ($inTx && $toLocation && stripos($toLocation->name, "DMK") === false) {
+                // Untuk lokasi non-jasa-cuci (exit-point seperti DMK), TRANSFER_IN tidak pernah
+                // dibuat saat transfer, jadi saat reverts juga tidak perlu dibuat.
+                if ($inTx && $toLocation && !$toLocation->is_jasa_cuci) {
                     InventoryTransaction::create([
                         "transaction_date" => now(),
                         "grade_company_id" => $transfer->grade_company_id,

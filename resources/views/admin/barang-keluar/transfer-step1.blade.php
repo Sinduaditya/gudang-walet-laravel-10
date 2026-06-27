@@ -186,12 +186,25 @@
                                                 </svg>
                                                 Lokasi Tujuan <span class="text-red-500">*</span>
                                             </label>
-                                            
-                                            <div class="w-full border border-gray-200 bg-gray-50 rounded-lg p-3 text-gray-800 font-medium">
-                                                {{ $dmkLocation->name ?? 'DMK' }}
-                                            </div>
-                                            <input type="hidden" name="to_location_id" value="{{ $dmkLocation->id ?? '' }}">
-                                            
+
+                                            <select name="to_location_id" id="to_location_id" required
+                                                class="w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition">
+                                                <option value="">-- Pilih Lokasi Tujuan --</option>
+                                                @foreach ($internalDestinations as $loc)
+                                                    <option value="{{ $loc->id }}" {{ old('to_location_id') == $loc->id ? 'selected' : '' }}>
+                                                        {{ $loc->name }}
+                                                    </option>
+                                                @endforeach
+                                            </select>
+                                            <p class="mt-1.5 text-xs text-gray-500">
+                                                <svg class="w-3 h-3 inline mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                                    <path fill-rule="evenodd"
+                                                        d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
+                                                        clip-rule="evenodd" />
+                                                </svg>
+                                                Pilih lokasi tujuan transfer internal
+                                            </p>
+
                                             @error('to_location_id')
                                                 <p class="mt-1.5 text-sm text-red-600">{{ $message }}</p>
                                             @enderror
@@ -836,7 +849,17 @@
 
                 const gradeName = selectedOption.text;
                 const fromLocation = "Gudang Utama"; // Fixed as per controller
-                const toLocation = "DMK"; // Static as per requirement
+
+                // Ambil lokasi tujuan dari dropdown (bukan hardcode lagi)
+                const toLocationSelect = document.getElementById('to_location_id');
+                if (!toLocationSelect.value) {
+                    alert('Silakan pilih lokasi tujuan terlebih dahulu');
+                    toLocationSelect.focus();
+                    toLocationSelect.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    return;
+                }
+                const toLocation = toLocationSelect.options[toLocationSelect.selectedIndex].text;
+
                 const notes = document.querySelector('textarea[name="notes"]').value;
 
                 // Populate modal

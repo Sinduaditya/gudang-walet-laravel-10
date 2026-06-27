@@ -238,10 +238,11 @@ class BarangKeluarService
         ]);
 
         // TRANSFER_IN ke lokasi tujuan (quantity positif = berat bersih)
-        // KECUALI jika tujuan adalah DMK, maka barang dianggap hilang/keluar dari tracking (seperti penjualan)
+        // KECUALI jika tujuan adalah lokasi non-jasa-cuci (exit-point seperti DMK),
+        // maka barang dianggap keluar permanen dari tracking (seperti penjualan).
         $toLocation = Location::find($data['to_location_id']);
 
-        if ($toLocation && stripos($toLocation->name, 'DMK') === false) {
+        if ($toLocation && !$toLocation->is_jasa_cuci) {
             InventoryTransaction::create([
                 'transaction_date' => $data['transfer_date'] ?? now(),
                 'grade_company_id' => $data['grade_company_id'],

@@ -24,6 +24,7 @@ class LocationRequest extends FormRequest
         return [
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
+            'is_jasa_cuci' => 'required|boolean',
         ];
     }
 
@@ -37,6 +38,8 @@ class LocationRequest extends FormRequest
             'name.string' => 'Nama lokasi harus berupa teks.',
             'name.max' => 'Nama lokasi maksimal 255 karakter.',
             'description.string' => 'Deskripsi harus berupa teks.',
+            'is_jasa_cuci.required' => 'Tipe lokasi wajib dipilih.',
+            'is_jasa_cuci.boolean' => 'Tipe lokasi tidak valid.',
         ];
     }
 }
