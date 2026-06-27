@@ -4,7 +4,6 @@ namespace App\Http\Controllers\Feature;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use App\Services\Idm\TransferIdmService;
 use App\Exports\TransferIdmExport;
 use Maatwebsite\Excel\Facades\Excel;
@@ -26,9 +25,13 @@ class TransferIdmController extends Controller
 
     public function create(Request $request)
     {
+        $sub = '(SELECT COALESCE(SUM(itd.weight), 0) FROM idm_transfer_details itd
+                 INNER JOIN idm_transfers it ON it.id = itd.idm_transfer_id AND it.deleted_at IS NULL
+                 WHERE itd.idm_detail_id = idm_details.id AND itd.deleted_at IS NULL)';
+
         // 1. Get pairs of (supplier_id, grade_company_id) that have AVAILABLE IdmDetails
-        $availablePairs = \App\Models\IdmManagement::whereHas('details', function ($q) {
-                $q->whereDoesntHave('transferDetails');
+        $availablePairs = \App\Models\IdmManagement::whereHas('details', function ($q) use ($sub) {
+                $q->whereRaw("idm_details.weight > {$sub}");
             })
             ->select('supplier_id', 'grade_company_id')
             ->distinct()
@@ -41,7 +44,7 @@ class TransferIdmController extends Controller
         // 3. Fetch Grade Companies present in the pairs, and attach valid supplier IDs for JS filtering
         $gradeCompanyIds = $availablePairs->pluck('grade_company_id')->unique();
         $gradeCompanies = \App\Models\GradeCompany::whereIn('id', $gradeCompanyIds)->get();
-        
+
         $gradeCompanies->each(function ($gc) use ($availablePairs) {
             $gc->valid_supplier_ids = $availablePairs->where('grade_company_id', $gc->id)
                 ->pluck('supplier_id')
@@ -50,15 +53,14 @@ class TransferIdmController extends Controller
         });
 
         // 4. Get unique grade idm names for filter (Only from available items)
-        $gradeIdms = \App\Models\IdmDetail::whereDoesntHave('transferDetails')
+        $gradeIdms = \App\Models\IdmDetail::whereRaw("idm_details.weight > {$sub}")
             ->select('grade_idm_name')
             ->distinct()
             ->pluck('grade_idm_name');
 
         // 5. Get unique IDM Types (category_grade)
-        // We need to look at IdmManagement's sourceItems
-        $idmTypes = \App\Models\SortingResult::whereHas('idmManagement.details', function ($q) {
-                $q->whereDoesntHave('transferDetails');
+        $idmTypes = \App\Models\SortingResult::whereHas('idmManagement.details', function ($q) use ($sub) {
+                $q->whereRaw("idm_details.weight > {$sub}");
             })
             ->select('category_grade')
             ->distinct()
@@ -147,43 +149,12 @@ class TransferIdmController extends Controller
     public function destroy($id)
     {
         try {
-            return DB::transaction(function () use ($id) {
-                $transfer = \App\Models\IdmTransfer::lockForUpdate()->findOrFail($id);
-                $userId = auth()->id();
-                
-                // Revert IDM_TRANSFER_OUT transactions
-                $transactions = \App\Models\InventoryTransaction::where("transaction_type", "IDM_TRANSFER_OUT")
-                    ->where("reference_id", $transfer->id)
-                    ->get();
-                
-                foreach ($transactions as $tx) {
-                    // Create reversal transaction
-                    \App\Models\InventoryTransaction::create([
-                        "transaction_date" => now(),
-                        "grade_company_id" => $tx->grade_company_id,
-                        "location_id" => $tx->location_id,
-                        "quantity_change_grams" => abs($tx->quantity_change_grams),
-                        "transaction_type" => "IDM_TRANSFER_REVERT",
-                        "reference_id" => $transfer->id,
-                        "sorting_result_id" => $tx->sorting_result_id,
-                        "created_by" => $userId,
-                    ]);
-                    
-                    $tx->deleted_by = $userId;
-                    $tx->save();
-                    $tx->delete();
-                }
-                
-                $transfer->deleted_by = $userId;
-                $transfer->save();
-                $transfer->delete();
-                
-                return redirect()->route("barang.keluar.transfer-idm.index")
-                    ->with("success", "Transfer IDM berhasil dihapus dan stok dikembalikan.");
-            });
+            $this->transferIdmService->deleteTransfer($id);
+            return redirect()->route('barang.keluar.transfer-idm.index')
+                ->with('success', 'Transfer IDM berhasil dihapus dan stok dikembalikan.');
         } catch (\Exception $e) {
-            \Illuminate\Support\Facades\Log::error("TransferIdmController destroy error: " . $e->getMessage());
-            return redirect()->back()->with("error", "Terjadi kesalahan saat menghapus transfer.");
+            \Illuminate\Support\Facades\Log::error('TransferIdmController destroy error: ' . $e->getMessage());
+            return redirect()->back()->with('error', 'Terjadi kesalahan saat menghapus transfer.');
         }
     }
 
