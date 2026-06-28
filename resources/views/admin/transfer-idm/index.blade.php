@@ -108,7 +108,8 @@
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Kode Transfer</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tgl Transfer</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Barang</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Harga Transfer</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nama Barang</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Berat</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
                         </tr>
                     </thead>
@@ -119,13 +120,23 @@
                                 <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ $transfer->transfer_code }}</td>
                                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ \Carbon\Carbon::parse($transfer->transfer_date)->format('d/m/Y') }}</td>
                                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ $transfer->sum_goods }}</td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-900">Rp {{ number_format($transfer->price_transfer, 0, ',', '.') }}</td>
+                                <td class="px-6 py-4 text-sm text-gray-900">
+                                    <div class="flex flex-wrap gap-1">
+                                        @foreach($transfer->details as $detail)
+                                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800 capitalize">
+                                                {{ $detail->grade_idm_name }}
+                                            </span>
+                                        @endforeach
+                                    </div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-mono">
+                                    {{ number_format($transfer->details->sum('weight'), 2) }} g
+                                </td>
                                 <td class="px-6 py-4 whitespace-nowrap text-sm space-x-2">
                                     <div class="flex items-center gap-2">
                                         <a href="{{ route('barang.keluar.transfer-idm.show', $transfer->id) }}"
                                            class="text-blue-600 hover:text-blue-800 font-medium">Detail</a>
-                                        <a href="{{ route('barang.keluar.transfer-idm.edit', $transfer->id) }}"
-                                           class="text-yellow-600 hover:text-yellow-800 font-medium">Edit</a>
+
                                         <button onclick="confirmDelete('{{ route('barang.keluar.transfer-idm.destroy', $transfer->id) }}')"
                                             class="text-red-600 hover:text-red-800 font-medium">Hapus</button>
                                     </div>
@@ -133,7 +144,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="6" class="px-6 py-12 text-center text-gray-500">
+                                <td colspan="7" class="px-6 py-12 text-center text-gray-500">
                                     <div class="flex flex-col items-center justify-center">
                                         <svg class="w-12 h-12 text-gray-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>

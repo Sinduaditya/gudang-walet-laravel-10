@@ -19,8 +19,6 @@ class IdmTransferDetail extends Model
         'item_name',
         'grade_idm_name',
         'weight',
-        'price',
-        'total_price',
     ];
 
     public function transfer()

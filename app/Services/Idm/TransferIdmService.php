@@ -24,7 +24,7 @@ class TransferIdmService
 
     public function getTransfers($filters = [])
     {
-        $query = IdmTransfer::withCount('details');
+        $query = IdmTransfer::withCount('details')->with('details');
 
         if (!empty($filters['start_date']) && !empty($filters['end_date'])) {
             $query->whereBetween('transfer_date', [$filters['start_date'], $filters['end_date']]);
@@ -37,10 +37,21 @@ class TransferIdmService
         return $query->latest()->paginate(10);
     }
 
+    // SQL subquery untuk menghitung berat yang sudah ditransfer (exclude soft-deleted transfer)
+    private function transferredWeightSubquery(): string
+    {
+        return '(SELECT COALESCE(SUM(itd.weight), 0) FROM idm_transfer_details itd
+                 INNER JOIN idm_transfers it ON it.id = itd.idm_transfer_id AND it.deleted_at IS NULL
+                 WHERE itd.idm_detail_id = idm_details.id AND itd.deleted_at IS NULL)';
+    }
+
     public function getAvailableIdmDetails($filters = [])
     {
+        $sub = $this->transferredWeightSubquery();
+
         $query = IdmDetail::with(['idmManagement.supplier', 'idmManagement.gradeCompany'])
-            ->whereDoesntHave('transferDetails'); // Ensure not already transferred
+            ->selectRaw("idm_details.*, (idm_details.weight - {$sub}) AS remaining_weight")
+            ->whereRaw("idm_details.weight > {$sub}"); // hanya tampilkan yang masih ada sisa
 
         // Filter: Grading Date (from IdmManagement)
         if (!empty($filters['grading_date'])) {
@@ -89,8 +100,8 @@ class TransferIdmService
         $code = $baseCode;
         $counter = 1;
 
-        // Verify uniqueness
-        while (IdmTransfer::where('transfer_code', $code)->exists()) {
+        // Verify uniqueness (withTrashed agar soft-deleted record tetap dihitung)
+        while (IdmTransfer::withTrashed()->where('transfer_code', $code)->exists()) {
             $code = "{$baseCode}-{$counter}";
             $counter++;
         }
@@ -104,12 +115,8 @@ class TransferIdmService
             $transfer = IdmTransfer::create([
                 'transfer_date' => $data['transfer_date'],
                 'transfer_code' => $this->generateTransferCode($data['transfer_date']),
-                'sum_goods' => count($data['items']),
-                'price_transfer' => $data['total_price'],
-                'average_idm_price' => $data['average_idm_price'],
-                'total_non_idm_price' => $data['total_non_idm_price'],
-                'total_idm_price' => $data['total_idm_price'],
-                'notes' => $data['notes'] ?? null,
+                'sum_goods'     => count($data['items']),
+                'notes'         => $data['notes'] ?? null,
             ]);
 
             // Determine Source Location
@@ -125,12 +132,10 @@ class TransferIdmService
             foreach ($data['items'] as $item) {
                 IdmTransferDetail::create([
                     'idm_transfer_id' => $transfer->id,
-                    'idm_detail_id' => $item['id'],
-                    'item_name' => $item['grade_idm_name'] ?? 'Unknown',
-                    'grade_idm_name' => $item['grade_idm_name'],
-                    'weight' => $item['weight'],
-                    'price' => $item['price'],
-                    'total_price' => $item['total_price'],
+                    'idm_detail_id'   => $item['id'],
+                    'item_name'       => $item['grade_idm_name'] ?? 'Unknown',
+                    'grade_idm_name'  => $item['grade_idm_name'],
+                    'weight'          => $item['weight'],
                 ]);
 
                 // Record Inventory Transaction (Deduct from Source Location)
@@ -154,14 +159,6 @@ class TransferIdmService
 
                         $gradeCompanyId = $detailModel->idmManagement->grade_company_id;
 
-                        // STOK CHECK: Pastikan stok Global & Lokal mencukupi
-                        if (!$this->barangKeluarService->hasEnoughStock($gradeCompanyId, $sourceLocationId, $deductionWeight)) {
-                            $available = $this->barangKeluarService->getAvailableStock($gradeCompanyId, $sourceLocationId);
-                            $gradeName = $detailModel->idmManagement->gradeCompany->name ?? 'Grade';
-                            throw new \Exception("Stok tidak mencukupi untuk item {$item['grade_idm_name']} (Grade: {$gradeName}). Dibutuhkan: {$deductionWeight}g, Tersedia: {$available}g");
-                        }
-
-                        // Ensure precise rounding not needed if DB handles float, but logically consistent
                         InventoryTransaction::create([
                             'transaction_date' => $transfer->transfer_date,
                             'grade_company_id' => $detailModel->idmManagement->grade_company_id,
@@ -193,12 +190,8 @@ class TransferIdmService
             }
 
             $transfer->transfer_date = $data['transfer_date'];
-            $transfer->sum_goods = count($data['items']);
-            $transfer->price_transfer = $data['total_price'];
-            $transfer->average_idm_price = $data['average_idm_price'];
-            $transfer->total_non_idm_price = $data['total_non_idm_price'];
-            $transfer->total_idm_price = $data['total_idm_price'];
-            $transfer->notes = $data['notes'] ?? null;
+            $transfer->sum_goods     = count($data['items']);
+            $transfer->notes         = $data['notes'] ?? null;
             $transfer->save();
 
             // Sync items: Delete all existing details and recreate
@@ -234,12 +227,10 @@ class TransferIdmService
             foreach ($data['items'] as $item) {
                 IdmTransferDetail::create([
                     'idm_transfer_id' => $transfer->id,
-                    'idm_detail_id' => $item['id'], // Ensure this maps to idm_detail_id
-                    'item_name' => $item['grade_idm_name'] ?? 'Unknown',
-                    'grade_idm_name' => $item['grade_idm_name'],
-                    'weight' => $item['weight'],
-                    'price' => $item['price'],
-                    'total_price' => $item['total_price'],
+                    'idm_detail_id'   => $item['id'],
+                    'item_name'       => $item['grade_idm_name'] ?? 'Unknown',
+                    'grade_idm_name'  => $item['grade_idm_name'],
+                    'weight'          => $item['weight'],
                 ]);
 
                 // Record Inventory Transaction
@@ -281,22 +272,35 @@ class TransferIdmService
     public function deleteTransfer($id)
     {
         return DB::transaction(function () use ($id) {
-            $transfer = IdmTransfer::findOrFail($id);
+            $transfer = IdmTransfer::lockForUpdate()->findOrFail($id);
+            $userId = Auth::id();
 
-            // Revert Inventory Transactions
             $transactions = InventoryTransaction::where('transaction_type', 'IDM_TRANSFER_OUT')
                 ->where('reference_id', $transfer->id)
                 ->get();
 
-            foreach ($transactions as $transaction) {
-                $transaction->deleted_by = Auth::id();
-                $transaction->save();
-                $transaction->delete();
+            foreach ($transactions as $tx) {
+                InventoryTransaction::create([
+                    'transaction_date'      => now(),
+                    'grade_company_id'      => $tx->grade_company_id,
+                    'location_id'           => $tx->location_id,
+                    'supplier_id'           => $tx->supplier_id,
+                    'quantity_change_grams' => abs($tx->quantity_change_grams),
+                    'transaction_type'      => 'IDM_TRANSFER_REVERT',
+                    'reference_id'          => $transfer->id,
+                    'sorting_result_id'     => $tx->sorting_result_id,
+                    'created_by'            => $userId,
+                ]);
+
+                $tx->deleted_by = $userId;
+                $tx->save();
+                $tx->delete();
             }
 
-            $transfer->deleted_by = Auth::id();
+            $transfer->deleted_by = $userId;
             $transfer->save();
             $transfer->delete();
+
             return true;
         });
     }

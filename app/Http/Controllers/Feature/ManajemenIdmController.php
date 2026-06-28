@@ -3,83 +3,29 @@
 namespace App\Http\Controllers\Feature;
 
 use App\Http\Controllers\Controller;
+use App\Models\Supplier;
+use App\Models\GradeCompany;
+use App\Services\Idm\ManajemenIdmService;
 use Illuminate\Http\Request;
 
 class ManajemenIdmController extends Controller
 {
+    public function __construct(private ManajemenIdmService $service) {}
+
     public function index(Request $request)
     {
-        $suppliers = \App\Models\Supplier::all();
-        $gradeCompanies = \App\Models\GradeCompany::all();
-
-        $query = \App\Models\IdmManagement::with(['supplier', 'gradeCompany']);
-
-        if ($request->has('supplier_id') && $request->supplier_id != '') {
-            $query->where('supplier_id', $request->supplier_id);
-        }
-
-        if ($request->has('grade_company_id') && $request->grade_company_id != '') {
-            $query->where('grade_company_id', $request->grade_company_id);
-        }
-
-        if ($request->has('category_grade') && $request->category_grade != '') {
-            $query->whereHas('sourceItems', function ($q) use ($request) {
-                $q->where('category_grade', $request->category_grade);
-            });
-        }
-
-        $idmManagements = $query->latest()->paginate(10);
+        $suppliers      = Supplier::all();
+        $gradeCompanies = GradeCompany::all();
+        $idmManagements = $this->service->getAll($request->all());
 
         return view('admin.manajemen-idm.index', compact('idmManagements', 'suppliers', 'gradeCompanies'));
     }
 
     public function create(Request $request)
     {
-        $suppliers = \App\Models\Supplier::all();
-        
-        // Default category to IDM A if not specified
-        $category = $request->input('category', 'IDM A');
-
-        $query = \App\Models\SortingResult::with([
-            'receiptItem' => function ($q) {
-                $q->withTrashed();
-            },
-            'receiptItem.purchaseReceipt' => function ($q) {
-                $q->withTrashed();
-            },
-            'receiptItem.purchaseReceipt.supplier' => function ($q) {
-                $q->withTrashed();
-            },
-            'gradeCompany'
-        ])
-            ->where('category_grade', $category)
-            ->whereNull('idm_management_id');
-
-        // Filter Date
-        if ($request->has('from_date') && $request->from_date != '') {
-            $query->whereDate('created_at', '>=', $request->from_date);
-        }
-        if ($request->has('to_date') && $request->to_date != '') {
-            $query->whereDate('created_at', '<=', $request->to_date);
-        }
-
-        // Filter Supplier
-        if ($request->has('supplier_id') && $request->supplier_id != '') {
-            $query->whereHas('receiptItem', function ($q) use ($request) {
-                $q->withTrashed()->whereHas('purchaseReceipt', function ($q2) use ($request) {
-                    $q2->withTrashed()->where('supplier_id', $request->supplier_id);
-                });
-            });
-        }
-
-        // Filter Barang (Search)
-        if ($request->has('search') && $request->search != '') {
-            $query->whereHas('gradeCompany', function($q) use ($request) {
-                $q->where('name', 'like', '%' . $request->search . '%');
-            });
-        }
-
-        $items = $query->latest()->paginate(12);
+        $suppliers = Supplier::all();
+        $category  = $request->input('category', 'IDM A');
+        $items     = $this->service->getAvailableItems($category, $request->all());
 
         return view('admin.manajemen-idm.create', compact('items', 'suppliers', 'category'));
     }
@@ -87,236 +33,114 @@ class ManajemenIdmController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'selected_items' => 'required|array',
+            'selected_items'   => 'required|array',
             'selected_items.*' => 'exists:sorting_results,id',
         ]);
 
-        // Redirect to Step 2 with selected items
         return redirect()->route('manajemen-idm.step2', ['items' => $request->selected_items]);
     }
 
     public function createStep2(Request $request)
     {
         $itemIds = $request->query('items');
-        
+
         if (!$itemIds || !is_array($itemIds)) {
             return redirect()->route('manajemen-idm.create')->with('error', 'Silakan pilih item terlebih dahulu.');
         }
 
-        // Fetch selected items (SortingResult)
-        $items = \App\Models\SortingResult::with([
-            'receiptItem' => function ($q) {
-                $q->withTrashed();
-            },
-            'receiptItem.purchaseReceipt' => function ($q) {
-                $q->withTrashed();
-            },
-            'receiptItem.purchaseReceipt.supplier' => function ($q) {
-                $q->withTrashed();
-            },
-            'gradeCompany'
-        ])
-            ->whereIn('id', $itemIds)
-            ->get();
+        $items = $this->service->getItemsByIds($itemIds);
 
         if ($items->isEmpty()) {
             return redirect()->route('manajemen-idm.create')->with('error', 'Item tidak ditemukan.');
         }
 
-        $firstItem = $items->first();
+        $firstItem   = $items->first();
         $totalWeight = $items->sum('weight_grams');
-        
-        // Prepare data for view
-        $data = [
-            'items' => $items,
-            'firstItem' => $firstItem,
-            'totalWeight' => $totalWeight,
-            'itemIds' => $itemIds,
-        ];
 
-        return view('admin.manajemen-idm.step2', $data);
+        return view('admin.manajemen-idm.step2', compact('items', 'firstItem', 'totalWeight', 'itemIds'));
     }
 
     public function storeStep2(Request $request)
     {
         $request->validate([
-            'item_ids' => 'required|array',
-            'total_weight' => 'required|numeric',
-            'initial_price' => 'required|numeric',
-            'shrinkage' => 'required|numeric',
-            'details' => 'required|array',
-            'details.perutan.weight' => 'required|numeric',
-            'details.perutan.price' => 'required|numeric',
-            'details.kakian.weight' => 'required|numeric',
-            'details.kakian.price' => 'required|numeric',
-            'details.idm.weight' => 'required|numeric',
-            'details.idm.price' => 'required|numeric',
-            'estimated_selling_price' => 'required|numeric',
+            'item_ids'                    => 'required|array',
+            'details'                     => 'required|array',
+            'details.perutan.weight'      => 'required|numeric|min:0',
+            'details.kakian.weight'       => 'required|numeric|min:0',
+            'details.idm.weight'          => 'required|numeric|min:0',
+            'grade_company_id'            => 'required|exists:grades_company,id',
         ]);
 
         try {
-            \Illuminate\Support\Facades\DB::beginTransaction();
+            $idmManagement = $this->service->create($request->item_ids, $request->only(['details', 'grade_company_id']));
 
-            // Fetch items to get supplier and grade info
-            $items = \App\Models\SortingResult::with([
-                'receiptItem' => function ($q) {
-                    $q->withTrashed();
-                },
-                'receiptItem.purchaseReceipt' => function ($q) {
-                    $q->withTrashed();
-                }
-            ])->whereIn('id', $request->item_ids)->get();
-            $firstItem = $items->first();
-
-            if (!$firstItem->receiptItem) {
-                 throw new \Exception('Data Receipt Item tidak ditemukan (mungkin terhapus permanen).');
-            }
-
-            // Create IdmManagement record
-            $idmManagement = \App\Models\IdmManagement::create([
-                'supplier_id' => optional($firstItem->receiptItem->purchaseReceipt)->supplier_id,
-                'grade_company_id' => $firstItem->grade_company_id,
-                'initial_weight' => $request->total_weight,
-                'shrinkage' => $request->shrinkage,
-                'initial_price' => $request->initial_price,
-                'estimated_selling_price' => $request->estimated_selling_price,
-                'grading_date' => now(),
-            ]);
-
-            // Create Details
-            foreach ($request->details as $type => $detail) {
-                \App\Models\IdmDetail::create([
-                    'idm_management_id' => $idmManagement->id,
-                    'grade_idm_name' => $type,
-                    'weight' => $detail['weight'],
-                    'price' => $detail['price'],
-                    'total_price' => $detail['weight'] * $detail['price'],
-                ]);
-            }
-
-            // Update SortingResult items to link them to this IdmManagement
-            \App\Models\SortingResult::whereIn('id', $request->item_ids)
-                ->update(['idm_management_id' => $idmManagement->id]);
-
-            \Illuminate\Support\Facades\DB::commit();
-
-            return redirect()->route('manajemen-idm.index')->with('success', 'Data estimasi IDM berhasil disimpan.');
-
+            return redirect()->route('manajemen-idm.index')->with('success', 'Data IDM berhasil disimpan.');
         } catch (\Exception $e) {
-            \Illuminate\Support\Facades\DB::rollBack();
             return back()->with('error', 'Terjadi kesalahan: ' . $e->getMessage());
         }
     }
 
     public function edit(Request $request, $id)
     {
-        $idmManagement = \App\Models\IdmManagement::with(['supplier', 'gradeCompany', 'details', 'sourceItems'])->findOrFail($id);
-        
-        $page = $request->get('page');
-        $supplier_id = $request->get('supplier_id');
-        $grade_company_id = $request->get('grade_company_id');
-        $category_grade = $request->get('category_grade');
+        $idmManagement = $this->service->find($id);
 
-        return view('admin.manajemen-idm.edit', compact('idmManagement', 'page', 'supplier_id', 'grade_company_id', 'category_grade'));
+        $page             = $request->get('page');
+        $supplier_id      = $request->get('supplier_id');
+        $grade_company_id = $request->get('grade_company_id');
+        $category_grade   = $request->get('category_grade');
+
+        return view('admin.manajemen-idm.edit', compact(
+            'idmManagement', 'page', 'supplier_id', 'grade_company_id', 'category_grade'
+        ));
     }
 
     public function update(Request $request, $id)
     {
         $request->validate([
-            'total_weight' => 'required|numeric',
-            'initial_price' => 'required|numeric',
-            'shrinkage' => 'required|numeric',
-            'details' => 'required|array',
-            'details.perutan.weight' => 'required|numeric',
-            'details.perutan.price' => 'required|numeric',
-            'details.kakian.weight' => 'required|numeric',
-            'details.kakian.price' => 'required|numeric',
-            'details.idm.weight' => 'required|numeric',
-            'details.idm.price' => 'required|numeric',
-            'estimated_selling_price' => 'required|numeric',
+            'details'                => 'required|array',
+            'details.perutan.weight' => 'required|numeric|min:0',
+            'details.kakian.weight'  => 'required|numeric|min:0',
+            'details.idm.weight'     => 'required|numeric|min:0',
         ]);
 
         try {
-            \Illuminate\Support\Facades\DB::beginTransaction();
+            $this->service->update($id, $request->only('details'));
 
-            $idmManagement = \App\Models\IdmManagement::findOrFail($id);
-
-            // Update IdmManagement record
-            $idmManagement->update([
-                'initial_weight' => $request->total_weight,
-                'shrinkage' => $request->shrinkage,
-                'initial_price' => $request->initial_price,
-                'estimated_selling_price' => $request->estimated_selling_price,
+            $redirectParams = array_filter([
+                'page'             => $request->get('page'),
+                'supplier_id'      => $request->get('supplier_id'),
+                'grade_company_id' => $request->get('grade_company_id'),
+                'category_grade'   => $request->get('category_grade'),
             ]);
 
-            // Update Details (Delete and Recreate)
-            $idmManagement->details()->get()->each(function ($detail) {
-                $detail->delete();
-            });
-
-            foreach ($request->details as $type => $detail) {
-                \App\Models\IdmDetail::create([
-                    'idm_management_id' => $idmManagement->id,
-                    'grade_idm_name' => $type,
-                    'weight' => $detail['weight'],
-                    'price' => $detail['price'],
-                    'total_price' => $detail['weight'] * $detail['price'],
-                ]);
-            }
-
-            \Illuminate\Support\Facades\DB::commit();
-
-            $redirectParams = [];
-            if ($request->has('page')) $redirectParams['page'] = $request->page;
-            if ($request->has('supplier_id')) $redirectParams['supplier_id'] = $request->supplier_id;
-            if ($request->has('grade_company_id')) $redirectParams['grade_company_id'] = $request->grade_company_id;
-            if ($request->has('category_grade')) $redirectParams['category_grade'] = $request->category_grade;
-
-            return redirect()->route('manajemen-idm.show', array_merge(['id' => $id], $redirectParams))->with('success', 'Data estimasi IDM berhasil diperbarui.');
-
+            return redirect()->route('manajemen-idm.show', array_merge(['id' => $id], $redirectParams))
+                ->with('success', 'Data IDM berhasil diperbarui.');
         } catch (\Exception $e) {
-            \Illuminate\Support\Facades\DB::rollBack();
-            return back()->with('error', 'Terjadi kesalahan: ' . $e->getMessage());
+            return back()->with('error', $e->getMessage());
         }
     }
 
     public function show(Request $request, $id)
     {
-        $idmManagement = \App\Models\IdmManagement::with(['supplier', 'gradeCompany', 'details'])->findOrFail($id);
-
-        $page = $request->get('page');
-        $supplier_id = $request->get('supplier_id');
+        $idmManagement    = $this->service->find($id);
+        $page             = $request->get('page');
+        $supplier_id      = $request->get('supplier_id');
         $grade_company_id = $request->get('grade_company_id');
-        $category_grade = $request->get('category_grade');
+        $category_grade   = $request->get('category_grade');
 
-        return view('admin.manajemen-idm.show', compact('idmManagement', 'page', 'supplier_id', 'grade_company_id', 'category_grade'));
+        return view('admin.manajemen-idm.show', compact(
+            'idmManagement', 'page', 'supplier_id', 'grade_company_id', 'category_grade'
+        ));
     }
+
     public function destroy($id)
     {
         try {
-            \Illuminate\Support\Facades\DB::beginTransaction();
+            $this->service->delete($id);
 
-            $idmManagement = \App\Models\IdmManagement::findOrFail($id);
-
-            // Revert SortingResult items (set idm_management_id to null)
-            \App\Models\SortingResult::where('idm_management_id', $idmManagement->id)
-                ->update(['idm_management_id' => null]);
-
-            // Delete details
-            $idmManagement->details()->get()->each(function ($detail) {
-                $detail->delete();
-            });
-
-            // Delete the record
-            $idmManagement->delete();
-
-            \Illuminate\Support\Facades\DB::commit();
-
-            return redirect()->route('manajemen-idm.index')->with('success', 'Data estimasi IDM berhasil dihapus.');
-
+            return redirect()->route('manajemen-idm.index')->with('success', 'Data IDM berhasil dihapus.');
         } catch (\Exception $e) {
-            \Illuminate\Support\Facades\DB::rollBack();
-            return back()->with('error', 'Terjadi kesalahan: ' . $e->getMessage());
+            return back()->with('error', $e->getMessage());
         }
     }
 }

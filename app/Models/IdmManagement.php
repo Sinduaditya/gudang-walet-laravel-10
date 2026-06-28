@@ -16,8 +16,6 @@ class IdmManagement extends Model
         'grade_company_id',
         'initial_weight',
         'shrinkage',
-        'initial_price',
-        'estimated_selling_price',
         'grading_date',
     ];
 

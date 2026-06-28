@@ -12,7 +12,7 @@
                 </div>
 
                 <div class="flex items-center gap-3">
-                    <a href="{{ Route::has('manajemen-idm.create') ? route('manajemen-idm.create') : '#' }}"
+                    <a href="{{ route('manajemen-idm.create') }}"
                         class="inline-flex items-center px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-700">
                         <svg class="w-4 h-4 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
                             stroke="currentColor" aria-hidden="true">
@@ -25,7 +25,7 @@
 
             <!-- Filter Section -->
             <div class="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-6">
-                <form method="GET" action="{{ Route::has('manajemen-idm.index') ? route('manajemen-idm.index') : '#' }}"
+                <form method="GET" action="{{ route('manajemen-idm.index') }}"
                     class="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
                     <div class="flex flex-col sm:flex-row gap-4">
                         <!-- Filter Supplier -->
@@ -73,7 +73,7 @@
                             class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm">
                             Filter
                         </button>
-                        <a href="{{ Route::has('manajemen-idm.index') ? route('manajemen-idm.index') : '#' }}"
+                        <a href="{{ route('manajemen-idm.index') }}"
                             class="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 text-sm">
                             Reset
                         </a>
@@ -93,12 +93,11 @@
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500">Nama Grade</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500">Berat Awal</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500">Susut</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500">Estimasi Harga Jual per Gram</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500">Action</th>
                             </tr>
                         </thead>
                         <tbody class="bg-white divide-y divide-gray-200">
-                            @forelse($idmManagements ?? [] as $index => $item)
+                            @forelse($idmManagements as $index => $item)
                                 <tr class="hover:bg-gray-50">
                                     <td class="px-6 py-4 text-sm text-gray-900">
                                         {{ $idmManagements->firstItem() + $loop->index }}
@@ -123,14 +122,11 @@
                                     <td class="px-6 py-4 text-sm text-gray-900 font-mono">
                                         {{ number_format($item->shrinkage ?? 0, 2) }} gr
                                     </td>
-                                    <td class="px-6 py-4 text-sm text-gray-900 font-mono">
-                                        Rp {{ number_format($item->estimated_selling_price ?? 0, 2, ',', '.') }}
-                                    </td>
                                     <td class="px-6 py-4 text-sm text-gray-900">
                                         <div class="flex items-center gap-2">
-                                            <a href="{{ Route::has('manajemen-idm.show') ? route('manajemen-idm.show', array_merge(['id' => $item->id], request()->query())) : '#' }}"
+                                            <a href="{{ route('manajemen-idm.show', array_merge(['id' => $item->id], request()->query())) }}"
                                                 class="text-blue-600 hover:text-blue-800 font-medium">Detail</a>
-                                            <a href="{{ Route::has('manajemen-idm.edit') ? route('manajemen-idm.edit', array_merge(['id' => $item->id], request()->query())) : '#' }}"
+                                            <a href="{{ route('manajemen-idm.edit', array_merge(['id' => $item->id], request()->query())) }}"
                                                 class="text-yellow-600 hover:text-yellow-800 font-medium">Edit</a>
                                             <button onclick="confirmDelete({{ $item->id }})"
                                                 class="text-red-600 hover:text-red-800 font-medium">Hapus</button>
@@ -140,11 +136,7 @@
                             @empty
                                 <tr>
                                     <td colspan="7" class="px-6 py-12 text-center text-gray-500">
-                                        @if(request('month') || request('year'))
-                                            Tidak ada data estimasi IDM untuk filter yang dipilih.
-                                        @else
-                                            Belum ada data estimasi IDM.
-                                        @endif
+                                        Belum ada data estimasi IDM.
                                     </td>
                                 </tr>
                             @endforelse
@@ -152,7 +144,7 @@
                     </table>
                 </div>
 
-                @if(isset($idmManagements) && method_exists($idmManagements, 'links') && $idmManagements->isNotEmpty())
+                @if($idmManagements->isNotEmpty())
                     <div class="px-6 py-4 border-t border-gray-200">
                         {{ $idmManagements->appends(request()->query())->links() }}
                     </div>
@@ -183,7 +175,6 @@
             function confirmDelete(id) {
                 const modal = document.getElementById('deleteModal');
                 const form = document.getElementById('deleteForm');
-                // Use route helper with placeholder
                 const url = "{{ route('manajemen-idm.destroy', ':id') }}";
                 form.action = url.replace(':id', id);
                 modal.classList.remove('hidden');

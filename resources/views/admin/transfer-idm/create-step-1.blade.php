@@ -242,15 +242,17 @@
                                             {{ $item->idmManagement->sourceItems->first()->category_grade ?? '-' }}
                                         </span>
                                         <p class="text-xs text-gray-500 mb-2">{{ $item->idmManagement->supplier->name ?? 'No Supplier' }}</p>
-                                        <div class="mt-auto w-full pt-2 border-t border-gray-100 space-y-1">
+                                        <div class="mt-auto w-full pt-2 border-t border-gray-100">
                                             <div class="flex justify-between text-xs">
-                                                <span class="text-gray-500">Berat:</span>
-                                                <span class="font-medium text-gray-900">{{ $item->weight }} g</span>
+                                                <span class="text-gray-500">Sisa:</span>
+                                                <span class="font-medium text-gray-900">{{ number_format($item->remaining_weight, 2) }} g</span>
                                             </div>
-                                            <div class="flex justify-between text-xs">
-                                                <span class="text-gray-500">Harga:</span>
-                                                <span class="font-medium text-gray-900">Rp {{ number_format($item->total_price, 0, ',', '.') }}</span>
-                                            </div>
+                                            @if($item->remaining_weight < $item->weight)
+                                                <div class="flex justify-between text-xs mt-0.5">
+                                                    <span class="text-gray-400">Total:</span>
+                                                    <span class="text-gray-400">{{ number_format($item->weight, 2) }} g</span>
+                                                </div>
+                                            @endif
                                         </div>
                                     </div>
                                 </label>
