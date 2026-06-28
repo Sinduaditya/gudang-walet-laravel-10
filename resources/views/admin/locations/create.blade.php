@@ -46,8 +46,8 @@
                     <label for="description" class="block text-sm font-medium text-gray-700 mb-2">
                         Deskripsi
                     </label>
-                    <textarea name="description" 
-                              id="description" 
+                    <textarea name="description"
+                              id="description"
                               rows="5"
                               class="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent @error('description') border-red-500 @enderror"
                               placeholder="Masukkan deskripsi lokasi (opsional)">{{ old('description') }}</textarea>
@@ -55,6 +55,44 @@
                         <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                     @enderror
                     <p class="mt-1 text-xs text-gray-500">Deskripsi dapat membantu mengidentifikasi lokasi dengan lebih detail</p>
+                </div>
+
+                <!-- Tipe Lokasi -->
+                <div class="mb-6">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                        Tipe Lokasi <span class="text-red-500">*</span>
+                    </label>
+                    <div class="space-y-2">
+                        <label class="flex items-start gap-3 p-3 border border-gray-200 rounded-md cursor-pointer hover:bg-blue-50 transition">
+                            <input type="radio" name="is_jasa_cuci" value="1"
+                                {{ old('is_jasa_cuci', '0') == '1' ? 'checked' : '' }}
+                                class="mt-1">
+                            <div>
+                                <div class="font-medium text-gray-800">Jasa Cuci (Mitra / Vendor Eksternal)</div>
+                                <div class="text-xs text-gray-500 mt-1">
+                                    Muncul di dropdown <strong>Transfer External</strong> &amp; <strong>Receive External</strong>.
+                                    Stok yang dikirim ke sini akan di-track normal (ada <code class="bg-gray-100 px-1 rounded">TRANSFER_IN</code> di lokasi tujuan).
+                                </div>
+                            </div>
+                        </label>
+                        <label class="flex items-start gap-3 p-3 border border-gray-200 rounded-md cursor-pointer hover:bg-gray-50 transition">
+                            <input type="radio" name="is_jasa_cuci" value="0"
+                                {{ old('is_jasa_cuci', '0') == '0' ? 'checked' : '' }}
+                                class="mt-1">
+                            <div>
+                                <div class="font-medium text-gray-800">Non-Jasa Cuci (Gudang / Exit-Point)</div>
+                                <div class="text-xs text-gray-500 mt-1">
+                                    Muncul di dropdown <strong>Transfer Internal</strong>.
+                                    Stok yang dikirim ke sini dianggap <strong>keluar permanen</strong>
+                                    (skip <code class="bg-gray-100 px-1 rounded">TRANSFER_IN</code>).
+                                    Cocok untuk gudang sendiri atau lokasi penjualan langsung.
+                                </div>
+                            </div>
+                        </label>
+                    </div>
+                    @error('is_jasa_cuci')
+                        <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                    @enderror
                 </div>
 
                 <!-- Buttons -->

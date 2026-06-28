@@ -87,64 +87,87 @@
             <!-- Table -->
             <div class="bg-white border border-gray-200 rounded-lg overflow-hidden">
                 <div class="overflow-x-auto">
-                    <table class="min-w-full divide-y divide-gray-200" id="locationsTable">
-                        <thead class="bg-gray-50">
-                            <tr>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    ID
-                                </th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Nama Lokasi
-                                </th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Deskripsi
-                                </th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Tanggal Dibuat
-                                </th>
-                                <th
-                                    class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Action
-                                </th>
+                <table class="min-w-full divide-y divide-gray-200" id="locationsTable">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                ID
+                            </th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Nama Lokasi
+                            </th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Tipe
+                            </th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Deskripsi
+                            </th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Tanggal Dibuat
+                            </th>
+                            <th
+                                class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Action
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        @forelse($locations as $index => $location)
+                            <tr class="hover:bg-gray-50">
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                    {{ $index + 1 }}
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                    {{ $location->name }}
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm">
+                                    @if($location->is_jasa_cuci)
+                                        <span class="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                                            Jasa Cuci
+                                        </span>
+                                    @else
+                                        <span class="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-gray-100 text-gray-700">
+                                            Non-Jasa Cuci
+                                        </span>
+                                    @endif
+                                </td>
+                                <td class="px-6 py-4 text-sm text-gray-600">
+                                    {{ $location->description ?: '-' }}
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                                    {{ $location->created_at ? $location->created_at->format('d M Y') : '-' }}
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-center text-sm">
+                                    <div class="flex items-center justify-center space-x-2">
+                                        @php
+                                            $locHasHistory = $location->stock_transfers_from_exists
+                                                || $location->stock_transfers_to_exists
+                                                || $location->inventory_transactions_exists
+                                                || $location->sale_items_exists;
+                                        @endphp
+                                        <a href="{{ route('locations.edit', $location->id) }}"
+                                            data-has-history="{{ $locHasHistory ? '1' : '0' }}"
+                                            data-location-name="{{ $location->name }}"
+                                            onclick="handleEditClick(event, this)"
+                                            class="inline-flex items-center px-3 py-1 bg-blue-100 text-blue-600 rounded hover:bg-blue-200 transition duration-200">
+                                            Edit
+                                        </a>
+                                        <button onclick="confirmDelete({{ $location->id }}, '{{ $location->name }}')"
+                                            class="inline-flex items-center px-3 py-1 bg-red-100 text-red-600 rounded hover:bg-red-200 transition duration-200">
+                                            Hapus
+                                        </button>
+                                    </div>
+                                </td>
                             </tr>
-                        </thead>
-                        <tbody class="bg-white divide-y divide-gray-200">
-                            @forelse($locations as $index => $location)
-                                <tr class="hover:bg-gray-50">
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                        {{ $index + 1 }}
-                                    </td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                        {{ $location->name }}
-                                    </td>
-                                    <td class="px-6 py-4 text-sm text-gray-600">
-                                        {{ $location->description ?: '-' }}
-                                    </td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                                        {{ $location->created_at ? $location->created_at->format('d M Y') : '-' }}
-                                    </td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-center text-sm">
-                                        <div class="flex items-center justify-center space-x-2">
-                                            <a href="{{ route('locations.edit', $location->id) }}"
-                                                class="inline-flex items-center px-3 py-1 bg-blue-100 text-blue-600 rounded hover:bg-blue-200 transition duration-200">
-                                                Edit
-                                            </a>
-                                            <button onclick="confirmDelete({{ $location->id }}, '{{ $location->name }}')"
-                                                class="inline-flex items-center px-3 py-1 bg-red-100 text-red-600 rounded hover:bg-red-200 transition duration-200">
-                                                Hapus
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
-                            @empty
-                                <tr>
-                                    <td colspan="5" class="px-6 py-12 text-center text-sm text-gray-500">
-                                        Tidak ada data lokasi
-                                    </td>
-                                </tr>
-                            @endforelse
-                        </tbody>
-                    </table>
+                        @empty
+                            <tr>
+                                <td colspan="6" class="px-6 py-12 text-center text-sm text-gray-500">
+                                    Tidak ada data lokasi
+                                </td>
+                            </tr>
+                        @endforelse
+                    </tbody>
+                </table>
                 </div>
 
                 <!-- Pagination -->
@@ -161,6 +184,44 @@
                         </div>
                     </div>
                 @endif
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Warning Modal (untuk lokasi yang sudah punya history transaksi) -->
+    <div id="editWarningModal" class="hidden fixed inset-0 bg-black bg-opacity-50 overflow-y-auto h-full w-full z-50">
+        <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+            <div class="mt-3 text-center">
+                <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-amber-100">
+                    <svg class="h-6 w-6 text-amber-600" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                    </svg>
+                </div>
+                <h3 class="text-lg font-medium text-gray-900 mt-4">Peringatan: Lokasi Sudah Punya History</h3>
+                <p class="text-sm text-gray-500 mt-3 text-left">
+                    Lokasi <span id="editWarningLocationName" class="font-semibold text-gray-900"></span>
+                    sudah pernah dipakai di transaksi
+                    (<span class="font-mono text-xs">stock_transfer</span>,
+                    <span class="font-mono text-xs">inventory_transaction</span>, atau
+                    <span class="font-mono text-xs">sale_item</span>).
+                </p>
+                <div class="mt-3 p-3 bg-amber-50 border border-amber-200 rounded text-left">
+                    <p class="text-xs text-amber-700">
+                        <strong>Perhatian:</strong> Mengubah tipe lokasi
+                        (Jasa Cuci ↔ Non-Jasa Cuci) akan mempengaruhi konsistensi
+                        data historis dan reporting. Pastikan perubahan memang diperlukan.
+                    </p>
+                </div>
+                <div class="flex gap-3 justify-center mt-6">
+                    <button type="button" onclick="closeEditWarningModal()"
+                        class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-md text-sm font-medium transition duration-200">
+                        Batal
+                    </button>
+                    <a id="editWarningConfirmBtn" href="#"
+                        class="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-md text-sm font-medium transition duration-200">
+                        Lanjutkan Edit
+                    </a>
+                </div>
             </div>
         </div>
     </div>
@@ -217,6 +278,39 @@
         function closeDeleteModal() {
             document.getElementById('deleteModal').classList.add('hidden');
         }
+
+        // Edit warning modal: tampilkan popup konfirmasi saat klik Edit
+        // jika lokasi punya history transaksi (supaya admin aware sebelum masuk halaman edit)
+        function handleEditClick(event, el) {
+            const hasHistory = el.dataset.hasHistory === '1';
+            if (hasHistory) {
+                event.preventDefault();
+                document.getElementById('editWarningLocationName').textContent = el.dataset.locationName;
+                document.getElementById('editWarningConfirmBtn').setAttribute('href', el.getAttribute('href'));
+                document.getElementById('editWarningModal').classList.remove('hidden');
+                document.body.classList.add('overflow-hidden');
+            }
+            // else: biarkan default behavior (langsung navigate ke halaman edit)
+        }
+
+        function closeEditWarningModal() {
+            document.getElementById('editWarningModal').classList.add('hidden');
+            document.body.classList.remove('overflow-hidden');
+        }
+
+        // Close edit warning modal when clicking outside
+        document.getElementById('editWarningModal')?.addEventListener('click', function(event) {
+            if (event.target === this) {
+                closeEditWarningModal();
+            }
+        });
+
+        // Close edit warning modal on escape key
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape' && !document.getElementById('editWarningModal').classList.contains('hidden')) {
+                closeEditWarningModal();
+            }
+        });
 
         // Close modal when clicking outside
         document.getElementById('deleteModal')?.addEventListener('click', function(event) {

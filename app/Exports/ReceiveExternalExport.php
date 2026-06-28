@@ -27,7 +27,7 @@ class ReceiveExternalExport implements FromQuery, WithHeadings, WithMapping, Sho
         $query = InventoryTransaction::where('transaction_type', 'RECEIVE_EXTERNAL_IN')
             ->with(['gradeCompany', 'location', 'stockTransfer.fromLocation', 'sortingResult.receiptItem.purchaseReceipt.supplier'])
             ->whereHas('stockTransfer.fromLocation', function ($q) {
-                $q->where('name', 'NOT LIKE', '%IDM%')->where('name', 'NOT LIKE', '%DMK%');
+                $q->where('is_jasa_cuci', true);
             })
             ->orderBy('transaction_date', 'desc');
 

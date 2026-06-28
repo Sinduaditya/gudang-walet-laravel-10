@@ -14,7 +14,22 @@ class LocationSeeder extends Seeder
      */
     public function run(): void
     {
-        $locations = [['name' => 'Gudang Utama', 'description' => null], ['name' => 'KRIS', 'description' => null], ['name' => 'WIKOM', 'description' => null], ['name' => 'ASIH', 'description' => null], ['name' => 'RONI', 'description' => null], ['name' => 'SUNI', 'description' => null], ['name' => 'RUWI', 'description' => null], ['name' => 'JR', 'description' => null], ['name' => 'ANI SURABAYA', 'description' => null], ['name' => 'CANIAGO', 'description' => null], ['name' => 'MBA SURABAYA', 'description' => null], ['name' => 'BOJONEGORO', 'description' => null], ['name' => 'BABAT', 'description' => null], ['name' => 'Gudang Utama', 'description' => null], ['name' => 'DMK', 'description' => null]];
+        $locations = [
+            ['name' => 'Gudang Utama', 'description' => null, 'is_jasa_cuci' => false],
+            ['name' => 'KRIS', 'description' => null, 'is_jasa_cuci' => true],
+            ['name' => 'WIKOM', 'description' => null, 'is_jasa_cuci' => true],
+            ['name' => 'ASIH', 'description' => null, 'is_jasa_cuci' => true],
+            ['name' => 'RONI', 'description' => null, 'is_jasa_cuci' => true],
+            ['name' => 'SUNI', 'description' => null, 'is_jasa_cuci' => true],
+            ['name' => 'RUWI', 'description' => null, 'is_jasa_cuci' => true],
+            ['name' => 'JR', 'description' => null, 'is_jasa_cuci' => true],
+            ['name' => 'ANI SURABAYA', 'description' => null, 'is_jasa_cuci' => true],
+            ['name' => 'CANIAGO', 'description' => null, 'is_jasa_cuci' => true],
+            ['name' => 'MBA SURABAYA', 'description' => null, 'is_jasa_cuci' => true],
+            ['name' => 'BOJONEGORO', 'description' => null, 'is_jasa_cuci' => true],
+            ['name' => 'BABAT', 'description' => null, 'is_jasa_cuci' => true],
+            ['name' => 'DMK', 'description' => null, 'is_jasa_cuci' => false],
+        ];
 
         foreach ($locations as $location) {
             Location::create($location);

@@ -14,7 +14,12 @@ class Location extends Model
 
     protected $fillable = [
         'name',
-        'description'
+        'description',
+        'is_jasa_cuci',
+    ];
+
+    protected $casts = [
+        'is_jasa_cuci' => 'boolean',
     ];
 
     public function inventoryTransactions()
@@ -40,5 +45,19 @@ class Location extends Model
     public function deletedBy()
     {
         return $this->belongsTo(User::class, 'deleted_by');
+    }
+
+    /**
+     * Cek apakah lokasi ini sudah pernah dipakai di transaksi
+     * (stock_transfer, inventory_transaction, atau sale_item).
+     *
+     * @return bool
+     */
+    public function hasTransactions(): bool
+    {
+        return $this->stockTransfersFrom()->exists()
+            || $this->stockTransfersTo()->exists()
+            || $this->inventoryTransactions()->exists()
+            || $this->saleItems()->exists();
     }
 }

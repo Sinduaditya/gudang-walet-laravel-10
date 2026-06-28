@@ -31,9 +31,8 @@ class ReceiveExternalController extends Controller
             $grades = GradeCompany::all();
             $suppliers = \App\Models\Supplier::all();
 
-            $locations = Location::where('name', 'NOT LIKE', '%IDM%')
-                ->where('name', 'NOT LIKE', '%DMK%')
-                ->where('name', 'NOT LIKE', '%Gudang Utama%')
+            $locations = Location::where('is_jasa_cuci', true)
+                ->where('name', '!=', 'Gudang Utama')
                 ->get();
 
             $query = InventoryTransaction::where('transaction_type', 'RECEIVE_EXTERNAL_IN')
@@ -44,8 +43,7 @@ class ReceiveExternalController extends Controller
                     'sortingResult.receiptItem.purchaseReceipt.supplier'
                 ])
                 ->whereHas('stockTransfer.fromLocation', function($q) {
-                    $q->where('name', 'NOT LIKE', '%IDM%')
-                      ->where('name', 'NOT LIKE', '%DMK%');
+                    $q->where('is_jasa_cuci', true);
                 });
 
             if ($request->filled('grade_id')) {
@@ -101,9 +99,8 @@ class ReceiveExternalController extends Controller
             }
 
             // Get all relevant external locations (Jasa Cuci)
-            $query = Location::where('name', 'NOT LIKE', '%IDM%')
-                ->where('name', 'NOT LIKE', '%DMK%')
-                ->where('name', 'NOT LIKE', '%Gudang Utama%');
+            $query = Location::where('is_jasa_cuci', true)
+                ->where('name', '!=', 'Gudang Utama');
 
             if ($request->filled('from_location_id')) {
                 $query->where('id', $request->from_location_id);

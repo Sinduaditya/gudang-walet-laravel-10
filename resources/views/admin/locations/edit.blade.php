@@ -47,8 +47,8 @@
                     <label for="description" class="block text-sm font-medium text-gray-700 mb-2">
                         Deskripsi
                     </label>
-                    <textarea name="description" 
-                              id="description" 
+                    <textarea name="description"
+                              id="description"
                               rows="5"
                               class="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent @error('description') border-red-500 @enderror"
                               placeholder="Masukkan deskripsi lokasi (opsional)">{{ old('description', $location->description) }}</textarea>
@@ -56,6 +56,60 @@
                         <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                     @enderror
                     <p class="mt-1 text-xs text-gray-500">Deskripsi dapat membantu mengidentifikasi lokasi dengan lebih detail</p>
+                </div>
+
+                <!-- Tipe Lokasi -->
+                @php $hasHistoryFlag = $hasHistory ?? false; @endphp
+                <div class="mb-6">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                        Tipe Lokasi <span class="text-red-500">*</span>
+                    </label>
+
+                    @if($hasHistoryFlag)
+                        <div class="mb-3 bg-amber-50 border border-amber-200 rounded-lg p-3">
+                            <div class="flex items-start gap-2">
+                                <svg class="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                                </svg>
+                                <p class="text-xs text-amber-700">
+                                    Lokasi ini sudah dipakai di transaksi (stock_transfer, inventory_transaction, atau sale).
+                                    Mengubah tipe akan mempengaruhi konsistensi data historis. Pastikan perubahan memang diperlukan.
+                                </p>
+                            </div>
+                        </div>
+                    @endif
+
+                    <div class="space-y-2">
+                        <label class="flex items-start gap-3 p-3 border border-gray-200 rounded-md cursor-pointer hover:bg-blue-50 transition">
+                            <input type="radio" name="is_jasa_cuci" value="1"
+                                {{ old('is_jasa_cuci', $location->is_jasa_cuci ? '1' : '0') == '1' ? 'checked' : '' }}
+                                class="mt-1">
+                            <div>
+                                <div class="font-medium text-gray-800">Jasa Cuci (Mitra / Vendor Eksternal)</div>
+                                <div class="text-xs text-gray-500 mt-1">
+                                    Muncul di dropdown <strong>Transfer External</strong> &amp; <strong>Receive External</strong>.
+                                    Stok yang dikirim ke sini akan di-track normal (ada <code class="bg-gray-100 px-1 rounded">TRANSFER_IN</code> di lokasi tujuan).
+                                </div>
+                            </div>
+                        </label>
+                        <label class="flex items-start gap-3 p-3 border border-gray-200 rounded-md cursor-pointer hover:bg-gray-50 transition">
+                            <input type="radio" name="is_jasa_cuci" value="0"
+                                {{ old('is_jasa_cuci', $location->is_jasa_cuci ? '1' : '0') == '0' ? 'checked' : '' }}
+                                class="mt-1">
+                            <div>
+                                <div class="font-medium text-gray-800">Non-Jasa Cuci (Gudang / Exit-Point)</div>
+                                <div class="text-xs text-gray-500 mt-1">
+                                    Muncul di dropdown <strong>Transfer Internal</strong>.
+                                    Stok yang dikirim ke sini dianggap <strong>keluar permanen</strong>
+                                    (skip <code class="bg-gray-100 px-1 rounded">TRANSFER_IN</code>).
+                                    Cocok untuk gudang sendiri atau lokasi penjualan langsung.
+                                </div>
+                            </div>
+                        </label>
+                    </div>
+                    @error('is_jasa_cuci')
+                        <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                    @enderror
                 </div>
 
                 <!-- Info Update -->
