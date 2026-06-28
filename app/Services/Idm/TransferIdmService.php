@@ -272,22 +272,35 @@ class TransferIdmService
     public function deleteTransfer($id)
     {
         return DB::transaction(function () use ($id) {
-            $transfer = IdmTransfer::findOrFail($id);
+            $transfer = IdmTransfer::lockForUpdate()->findOrFail($id);
+            $userId = Auth::id();
 
-            // Revert Inventory Transactions
             $transactions = InventoryTransaction::where('transaction_type', 'IDM_TRANSFER_OUT')
                 ->where('reference_id', $transfer->id)
                 ->get();
 
-            foreach ($transactions as $transaction) {
-                $transaction->deleted_by = Auth::id();
-                $transaction->save();
-                $transaction->delete();
+            foreach ($transactions as $tx) {
+                InventoryTransaction::create([
+                    'transaction_date'      => now(),
+                    'grade_company_id'      => $tx->grade_company_id,
+                    'location_id'           => $tx->location_id,
+                    'supplier_id'           => $tx->supplier_id,
+                    'quantity_change_grams' => abs($tx->quantity_change_grams),
+                    'transaction_type'      => 'IDM_TRANSFER_REVERT',
+                    'reference_id'          => $transfer->id,
+                    'sorting_result_id'     => $tx->sorting_result_id,
+                    'created_by'            => $userId,
+                ]);
+
+                $tx->deleted_by = $userId;
+                $tx->save();
+                $tx->delete();
             }
 
-            $transfer->deleted_by = Auth::id();
+            $transfer->deleted_by = $userId;
             $transfer->save();
             $transfer->delete();
+
             return true;
         });
     }
