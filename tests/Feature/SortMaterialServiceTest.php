@@ -7,12 +7,12 @@ use App\Models\ParentGradeCompany;
 use App\Models\SortMaterial;
 use App\Models\User;
 use App\Services\SortMaterial\SortMaterialService;
-use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Tests\TestCase;
 
 class SortMaterialServiceTest extends TestCase
 {
-    use RefreshDatabase;
+    use DatabaseTransactions;
 
     protected SortMaterialService $service;
     protected User $user;

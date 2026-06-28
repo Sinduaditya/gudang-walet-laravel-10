@@ -52,8 +52,6 @@ class TransferInternalController extends Controller
 
 
 
-            $dmkLocation = Location::where('name', 'DMK')->first();
-
             // Ambil semua lokasi non-jasa-cuci (exit-point) sebagai tujuan transfer internal,
             // kecuali Gudang Utama karena dia adalah lokasi asal tetap.
             $internalDestinations = Location::where('is_jasa_cuci', false)
@@ -101,7 +99,6 @@ class TransferInternalController extends Controller
             // dd($gradesWithStock);
             return view('admin.barang-keluar.transfer-step1', compact(
                 'gradesWithStock',
-                'dmkLocation',
                 'internalDestinations',
                 'transferInternalTransactions',
                 'gudangUtama',

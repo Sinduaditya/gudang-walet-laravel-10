@@ -121,10 +121,7 @@ class DashboardService
     public function getFlowBarangKeJasaCuci()
     {
     
-        $jasaCuciLocations = Location::where('name', 'NOT LIKE', '%Gudang Utama%')
-            ->where('name', 'NOT LIKE', '%DMK%')
-            ->where('name', 'NOT LIKE', '%Demak%')
-            ->pluck('id');
+        $jasaCuciLocations = Location::where('is_jasa_cuci', true)->pluck('id');
 
         if ($jasaCuciLocations->isEmpty()) {
             // Jika tidak ada lokasi jasa cuci, return data kosong
