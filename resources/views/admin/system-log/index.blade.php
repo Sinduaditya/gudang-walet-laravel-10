@@ -89,18 +89,6 @@
                         </a>
                     </li>
                     <li class="mr-2">
-                        <a href="{{ route('system-log.index', ['type' => 'idm_transfers']) }}"
-                            class="inline-block p-4 border-b-2 rounded-t-lg {{ $type == 'idm_transfers' ? 'text-blue-600 border-blue-600 active' : 'border-transparent hover:text-gray-600 hover:border-gray-300' }}">
-                            IDM Transfers
-                        </a>
-                    </li>
-                    <li class="mr-2">
-                        <a href="{{ route('system-log.index', ['type' => 'idm_transfer_details']) }}"
-                            class="inline-block p-4 border-b-2 rounded-t-lg {{ $type == 'idm_transfer_details' ? 'text-blue-600 border-blue-600 active' : 'border-transparent hover:text-gray-600 hover:border-gray-300' }}">
-                            IDM Transfer Details
-                        </a>
-                    </li>
-                    <li class="mr-2">
                         <a href="{{ route('system-log.index', ['type' => 'inventory_transactions']) }}"
                             class="inline-block p-4 border-b-2 rounded-t-lg {{ $type == 'inventory_transactions' ? 'text-blue-600 border-blue-600 active' : 'border-transparent hover:text-gray-600 hover:border-gray-300' }}">
                             Inventory Transactions
@@ -197,10 +185,6 @@
                                             @if($item->notes)
                                                 <span class="text-xs text-gray-400 block italic">"{{ Str::limit($item->notes, 30) }}"</span>
                                             @endif
-                                        @elseif($type == 'idm_transfers')
-                                            {{ $item->transfer_code }}
-                                        @elseif($type == 'idm_transfer_details')
-                                            {{ $item->item_name }} ({{ $item->quantity_kg }} kg)
                                         @elseif($type == 'inventory_transactions')
                                             <span class="font-semibold">{{ ucwords(str_replace('_', ' ', $item->transaction_type)) }}</span>
                                             <span class="text-xs text-gray-500 block">

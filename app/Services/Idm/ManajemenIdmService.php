@@ -2,15 +2,28 @@
 
 namespace App\Services\Idm;
 
+use App\Models\GradeCompany;
 use App\Models\IdmDetail;
 use App\Models\IdmManagement;
+use App\Models\InventoryTransaction;
+use App\Models\Location;
 use App\Models\SortingResult;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
 class ManajemenIdmService
 {
+    // Transaksi outflow yang menandakan output ManajemenIDM sudah keluar — pakai untuk block edit/delete
+    private const OUTFLOW_TYPES = [
+        'SALE_OUT',
+        'TRANSFER_OUT',
+        'EXTERNAL_TRANSFER_OUT',
+        'RECEIVE_EXTERNAL_OUT',
+        'IDM_TRANSFER_OUT',
+    ];
+
     public function getAll(array $filters): LengthAwarePaginator
     {
         $query = IdmManagement::with(['supplier', 'gradeCompany', 'sourceItems'])
@@ -81,102 +94,228 @@ class ManajemenIdmService
     public function create(array $itemIds, array $data): IdmManagement
     {
         return DB::transaction(function () use ($itemIds, $data) {
-            $items = SortingResult::whereIn('id', $itemIds)->get();
+            $items         = SortingResult::whereIn('id', $itemIds)->get();
             $initialWeight = $items->sum('weight_grams');
 
-            $perutanWeight = (float) ($data['details']['perutan']['weight'] ?? 0);
-            $kakianWeight  = (float) ($data['details']['kakian']['weight'] ?? 0);
-            $idmWeight     = (float) ($data['details']['idm']['weight'] ?? 0);
-            $shrinkage     = $initialWeight - ($perutanWeight + $kakianWeight + $idmWeight);
+            $firstItem            = $items->first();
+            $supplierId           = optional($firstItem->receiptItem?->purchaseReceipt)->supplier_id;
+            $sourceGradeCompanyId = $data['grade_company_id'];
 
-            if ($shrinkage < 0) {
-                throw new \Exception('Total berat (perutan + kakian + IDM) melebihi berat awal. Periksa kembali input berat.');
-            }
+            $outputs = $this->buildOutputs($data['details'] ?? [], $sourceGradeCompanyId);
 
-            $firstItem    = $items->first();
-            $supplierId   = optional($firstItem->receiptItem?->purchaseReceipt)->supplier_id;
+            $this->validateOutputs($outputs, $initialWeight);
 
-            $idmManagement = IdmManagement::create([
+            $totalOutput = array_sum(array_column($outputs, 'weight'));
+            $shrinkage   = $initialWeight - $totalOutput;
+
+            $mgmt = IdmManagement::create([
                 'supplier_id'      => $supplierId,
-                'grade_company_id' => $data['grade_company_id'],
+                'grade_company_id' => $sourceGradeCompanyId,
                 'initial_weight'   => $initialWeight,
                 'shrinkage'        => $shrinkage,
                 'grading_date'     => now(),
             ]);
 
-            foreach (['perutan' => $perutanWeight, 'kakian' => $kakianWeight, 'idm' => $idmWeight] as $name => $weight) {
-                IdmDetail::create([
-                    'idm_management_id' => $idmManagement->id,
-                    'grade_idm_name'    => $name,
-                    'weight'            => $weight,
-                ]);
-            }
+            $this->createDetailsAndTransactions($mgmt, $outputs, $sourceGradeCompanyId, $initialWeight, $supplierId);
 
-            SortingResult::whereIn('id', $itemIds)->update(['idm_management_id' => $idmManagement->id]);
+            SortingResult::whereIn('id', $itemIds)->update(['idm_management_id' => $mgmt->id]);
 
-            return $idmManagement;
+            return $mgmt;
         });
     }
 
     public function update(int $id, array $data): IdmManagement
     {
         return DB::transaction(function () use ($id, $data) {
-            $idmManagement = IdmManagement::with('details.transferDetails')->findOrFail($id);
+            $mgmt = IdmManagement::with('details')->findOrFail($id);
 
-            $hasTransferred = $idmManagement->details->some(fn ($d) => $d->transferDetails->isNotEmpty());
-            if ($hasTransferred) {
-                throw new \Exception('Data tidak dapat diubah karena sudah dikeluarkan melalui Transfer IDM.');
-            }
+            $this->assertNoOutflow($mgmt, 'Data tidak dapat diubah — output sudah keluar via transfer/sale.');
 
-            $perutanWeight = (float) ($data['details']['perutan']['weight'] ?? 0);
-            $kakianWeight  = (float) ($data['details']['kakian']['weight'] ?? 0);
-            $idmWeight     = (float) ($data['details']['idm']['weight'] ?? 0);
-            $shrinkage     = $idmManagement->initial_weight - ($perutanWeight + $kakianWeight + $idmWeight);
+            $outputs = $this->buildOutputs($data['details'] ?? [], $mgmt->grade_company_id);
 
-            if ($shrinkage < 0) {
-                throw new \Exception('Total berat (perutan + kakian + IDM) melebihi berat awal. Periksa kembali input berat.');
-            }
+            $this->validateOutputs($outputs, $mgmt->initial_weight);
 
-            $idmManagement->update(['shrinkage' => $shrinkage]);
+            $totalOutput = array_sum(array_column($outputs, 'weight'));
+            $shrinkage   = $mgmt->initial_weight - $totalOutput;
 
-            $idmManagement->details()->delete();
+            $this->revertRegradingTransactions($mgmt);
 
-            foreach (['perutan' => $perutanWeight, 'kakian' => $kakianWeight, 'idm' => $idmWeight] as $name => $weight) {
-                IdmDetail::create([
-                    'idm_management_id' => $idmManagement->id,
-                    'grade_idm_name'    => $name,
-                    'weight'            => $weight,
-                ]);
-            }
+            $mgmt->details()->delete();
 
-            return $idmManagement->fresh();
+            $mgmt->update(['shrinkage' => $shrinkage]);
+
+            $this->createDetailsAndTransactions(
+                $mgmt,
+                $outputs,
+                $mgmt->grade_company_id,
+                $mgmt->initial_weight,
+                $mgmt->supplier_id
+            );
+
+            return $mgmt->fresh();
         });
     }
 
     public function find(int $id): IdmManagement
     {
-        $idmManagement = IdmManagement::with(['supplier', 'gradeCompany', 'details.transferDetails', 'sourceItems'])
-            ->findOrFail($id);
+        $mgmt = IdmManagement::with([
+            'supplier',
+            'gradeCompany',
+            'details.gradeCompany',
+            'sourceItems',
+        ])->findOrFail($id);
 
-        $idmManagement->is_transferred = $idmManagement->details->some(fn ($d) => $d->transferDetails->isNotEmpty());
+        $mgmt->is_transferred = $this->hasOutflow($mgmt);
 
-        return $idmManagement;
+        return $mgmt;
     }
 
     public function delete(int $id): void
     {
         DB::transaction(function () use ($id) {
-            $idmManagement = IdmManagement::with('details.transferDetails')->findOrFail($id);
+            $mgmt = IdmManagement::with('details')->findOrFail($id);
 
-            $hasTransferred = $idmManagement->details->some(fn ($d) => $d->transferDetails->isNotEmpty());
-            if ($hasTransferred) {
-                throw new \Exception('Data tidak dapat dihapus karena sudah dikeluarkan melalui Transfer IDM. Hapus Transfer IDM terlebih dahulu.');
-            }
+            $this->assertNoOutflow($mgmt, 'Tidak bisa hapus — output sudah keluar via transfer/sale. Hapus transfer/sale terlebih dahulu.');
+
+            $this->revertRegradingTransactions($mgmt);
 
             SortingResult::where('idm_management_id', $id)->update(['idm_management_id' => null]);
 
-            $idmManagement->details()->delete();
-            $idmManagement->delete();
+            $mgmt->details()->delete();
+            $mgmt->delete();
         });
+    }
+
+    // ===== Internal helpers =====
+
+    private function buildOutputs(array $details, int $sourceGradeCompanyId): array
+    {
+        $idmGc     = GradeCompany::where('name', 'IDM')->first();
+        $perutanGc = GradeCompany::where('name', 'PERUTAN')->first();
+        $kakianGc  = GradeCompany::where('name', 'KAKIAN')->first();
+        $aluGc     = GradeCompany::where('name', 'ALU/AFKIR')->first();
+
+        return [
+            'IDM' => [
+                'weight'           => (float) ($details['IDM']['weight'] ?? 0),
+                'grade_company_id' => $idmGc?->id,
+            ],
+            'KAKIAN'  => ['weight' => (float) ($details['KAKIAN']['weight']  ?? 0), 'grade_company_id' => $kakianGc?->id],
+            'PERUTAN' => ['weight' => (float) ($details['PERUTAN']['weight'] ?? 0), 'grade_company_id' => $perutanGc?->id],
+            'ALU'     => ['weight' => (float) ($details['ALU']['weight']     ?? 0), 'grade_company_id' => $aluGc?->id],
+        ];
+    }
+
+    private function validateOutputs(array $outputs, float $initialWeight): void
+    {
+        if ($outputs['IDM']['weight'] <= 0 || !$outputs['IDM']['grade_company_id']) {
+            throw new \Exception('Berat IDM dan grade IDM wajib diisi.');
+        }
+
+        foreach (['KAKIAN', 'PERUTAN', 'ALU'] as $k) {
+            if ($outputs[$k]['weight'] > 0 && !$outputs[$k]['grade_company_id']) {
+                throw new \Exception("Grade untuk {$k} tidak ditemukan di database. Jalankan db:seed.");
+            }
+        }
+
+        $totalOutput = array_sum(array_column($outputs, 'weight'));
+        if ($totalOutput - $initialWeight > 0.001) {
+            throw new \Exception('Total berat output melebihi berat awal. Periksa input.');
+        }
+    }
+
+    private function createDetailsAndTransactions(
+        IdmManagement $mgmt,
+        array $outputs,
+        int $sourceGradeCompanyId,
+        float $initialWeight,
+        ?int $supplierId
+    ): void {
+        $gudangUtama = Location::where('name', 'Gudang Utama')->firstOrFail();
+        $userId      = Auth::id();
+
+        // 1. Deduct input grade (IDM A / IDM B)
+        InventoryTransaction::create([
+            'transaction_date'      => now(),
+            'grade_company_id'      => $sourceGradeCompanyId,
+            'location_id'           => $gudangUtama->id,
+            'supplier_id'           => $supplierId,
+            'quantity_change_grams' => -$initialWeight,
+            'transaction_type'      => 'IDM_REGRADING_OUT',
+            'reference_id'          => $mgmt->id,
+            'created_by'            => $userId,
+        ]);
+
+        // 2. Per-output: buat idm_detail + (kalau weight > 0) inventory_transaction IDM_REGRADING_IN
+        foreach ($outputs as $name => $out) {
+            IdmDetail::create([
+                'idm_management_id' => $mgmt->id,
+                'grade_idm_name'    => $name,
+                'grade_company_id'  => $out['grade_company_id'],
+                'weight'            => $out['weight'],
+            ]);
+
+            if ($out['weight'] > 0 && $out['grade_company_id']) {
+                InventoryTransaction::create([
+                    'transaction_date'      => now(),
+                    'grade_company_id'      => $out['grade_company_id'],
+                    'location_id'           => $gudangUtama->id,
+                    'supplier_id'           => $supplierId,
+                    'quantity_change_grams' => $out['weight'],
+                    'transaction_type'      => 'IDM_REGRADING_IN',
+                    'reference_id'          => $mgmt->id,
+                    'created_by'            => $userId,
+                ]);
+            }
+        }
+    }
+
+    private function revertRegradingTransactions(IdmManagement $mgmt): void
+    {
+        $userId = Auth::id();
+
+        $txs = InventoryTransaction::where('reference_id', $mgmt->id)
+            ->whereIn('transaction_type', ['IDM_REGRADING_OUT', 'IDM_REGRADING_IN'])
+            ->get();
+
+        foreach ($txs as $tx) {
+            InventoryTransaction::create([
+                'transaction_date'      => now(),
+                'grade_company_id'      => $tx->grade_company_id,
+                'location_id'           => $tx->location_id,
+                'supplier_id'           => $tx->supplier_id,
+                'quantity_change_grams' => -$tx->quantity_change_grams,
+                'transaction_type'      => $tx->transaction_type === 'IDM_REGRADING_OUT'
+                    ? 'IDM_REGRADING_REVERT_OUT'
+                    : 'IDM_REGRADING_REVERT_IN',
+                'reference_id'          => $mgmt->id,
+                'created_by'            => $userId,
+            ]);
+
+            $tx->deleted_by = $userId;
+            $tx->save();
+            $tx->delete();
+        }
+    }
+
+    private function hasOutflow(IdmManagement $mgmt): bool
+    {
+        $outputGradeIds = $mgmt->details->pluck('grade_company_id')->filter()->unique();
+
+        if ($outputGradeIds->isEmpty()) {
+            return false;
+        }
+
+        return InventoryTransaction::where('reference_id', '!=', $mgmt->id)
+            ->whereIn('grade_company_id', $outputGradeIds)
+            ->whereIn('transaction_type', self::OUTFLOW_TYPES)
+            ->exists();
+    }
+
+    private function assertNoOutflow(IdmManagement $mgmt, string $message): void
+    {
+        if ($this->hasOutflow($mgmt)) {
+            throw new \Exception($message);
+        }
     }
 }

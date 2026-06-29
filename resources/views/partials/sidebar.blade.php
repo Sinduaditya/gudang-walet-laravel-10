@@ -18,7 +18,6 @@
             $isBarangMasuk = request()->routeIs('incoming-goods.*');
             $isGrading = request()->routeIs('grading-goods.*');
             $isManajemenIdm = request()->routeIs('manajemen-idm.*');
-            $isTransferIdm = request()->routeIs('transfer-idm.*');
             $isBarangKeluar = request()->routeIs('barang.keluar.*');
             $isSortMaterials = request()->routeIs('sort-materials.*');
             $isTrackingStock = request()->routeIs('tracking-stock.*');

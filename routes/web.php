@@ -20,7 +20,6 @@ use App\Http\Controllers\Feature\ReceiveExternalController;
 use App\Http\Controllers\Feature\ReceiveInternalController;
 use App\Http\Controllers\Feature\TransferExternalController;
 use App\Http\Controllers\Feature\ManajemenIdmController;
-use App\Http\Controllers\Feature\TransferIdmController;
 use App\Http\Controllers\Feature\TransferInternalController;
 use App\Http\Controllers\SortMaterial\SortMaterialController;
 use App\Http\Controllers\Master\BulkAssignmentController;
@@ -166,20 +165,6 @@ Route::middleware(['auth'])->group(function () {
                         Route::delete('/{id}', [ReceiveExternalController::class, 'destroy'])->name('destroy');
                     });
 
-                Route::prefix('transfer-idm')
-                    ->name('transfer-idm.')
-                    ->group(function () {
-                        Route::get('/index', [TransferIdmController::class, 'index'])->name('index');
-                        Route::get('/create', [TransferIdmController::class, 'create'])->name('create');
-                        Route::get('/export', [TransferIdmController::class, 'export'])->name('export');
-
-                        Route::get('/step-2', [TransferIdmController::class, 'step2'])->name('step2.form');
-
-                        Route::post('/step-2', [TransferIdmController::class, 'step2'])->name('step2');
-                        Route::post('/store', [TransferIdmController::class, 'store'])->name('store');
-                        Route::get('/{id}', [TransferIdmController::class, 'show'])->name('show');
-                        Route::delete('/{id}', [TransferIdmController::class, 'destroy'])->name('destroy');
-                    });
             });
 
 

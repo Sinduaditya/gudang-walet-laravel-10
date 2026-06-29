@@ -11,8 +11,6 @@ use App\Models\ParentGradeCompany;
 use App\Models\User;
 use App\Models\SortMaterial;
 use App\Models\StockTransfer;
-use App\Models\IdmTransfer;
-use App\Models\IdmTransferDetail;
 use App\Models\InventoryTransaction;
 use App\Models\PurchaseReceipt;
 use App\Models\ReceiptItem;
@@ -120,14 +118,6 @@ class SystemLogController extends Controller
                 break;
 
 
-            case 'idm_transfers':
-                $query = IdmTransfer::onlyTrashed()->with('deletedBy');
-                if ($search) {
-                    $query->where('transfer_code', 'like', "%{$search}%");
-                }
-                $data = $query->latest('deleted_at')->paginate(10);
-                break;
-
             case 'sorting_results':
                 $query = SortingResult::onlyTrashed()->with([
                     'deletedBy',
@@ -144,14 +134,6 @@ class SystemLogController extends Controller
                 $data = $query->latest('deleted_at')->paginate(10);
                 break;
 
-
-            case 'idm_transfer_details':
-                $query = IdmTransferDetail::onlyTrashed()->with('deletedBy');
-                if ($search) {
-                    $query->where('item_name', 'like', "%{$search}%");
-                }
-                $data = $query->latest('deleted_at')->paginate(10);
-                break;
 
             case 'idm_managements':
                 $query = IdmManagement::onlyTrashed()->with([

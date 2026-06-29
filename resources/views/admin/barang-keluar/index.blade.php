@@ -181,34 +181,6 @@
                     </div>
                 </a>
 
-                {{-- Card 6: Transfer IDM --}}
-                <a href="{{ route('barang.keluar.transfer-idm.index') }}"
-                    class="group bg-white rounded-xl shadow-md p-8 border-2 border-transparent hover:border-blue-500 hover:shadow-xl transition-all duration-300">
-                    <div class="flex items-center mb-4">
-                        <div
-                            class="w-14 h-14 bg-blue-100 rounded-lg flex items-center justify-center group-hover:bg-blue-500 transition-all duration-300">
-                            <svg class="w-8 h-8 text-blue-600 group-hover:text-white transition-all duration-300"
-                                fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                    d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                        </div>
-                        <h3
-                            class="ml-4 text-xl font-bold text-gray-800 group-hover:text-blue-600 transition-all duration-300">
-                            Transfer IDM
-                        </h3>
-                    </div>
-                    <p class="text-gray-600 mb-4">Transfer barang ke IDM.</p>
-                    <div
-                        class="flex items-center text-blue-600 font-medium group-hover:translate-x-2 transition-all duration-300">
-                        Mulai Transfer
-                        <svg class="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M13 7l5 5m0 0l-5 5m5-5H6" />
-                        </svg>
-                    </div>
-                </a>
-
             </div>
 
         </div>

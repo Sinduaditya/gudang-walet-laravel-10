@@ -4,16 +4,18 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class IdmDetail extends Model
 {
-    use HasFactory, \Illuminate\Database\Eloquent\SoftDeletes;
+    use HasFactory, SoftDeletes;
 
     protected $table = 'idm_details';
 
     protected $fillable = [
         'idm_management_id',
         'grade_idm_name',
+        'grade_company_id',
         'weight',
     ];
 
@@ -22,9 +24,9 @@ class IdmDetail extends Model
         return $this->belongsTo(IdmManagement::class);
     }
 
-    public function transferDetails()
+    public function gradeCompany()
     {
-        return $this->hasMany(IdmTransferDetail::class, 'idm_detail_id');
+        return $this->belongsTo(GradeCompany::class);
     }
 
     public function deletedBy()
