@@ -313,24 +313,19 @@ class ManajemenIdmService
     {
         $userId = Auth::id();
 
+        // Cukup soft-delete IDM_REGRADING_OUT/IN yang aktif. TIDAK buat REVERT_IN/OUT.
+        //
+        // Alasan: kalau original di-soft-delete + REVERT di-create, REVERT jadi "active
+        // transaction" yang berdiri sendiri (original sudah di-exclude dari SUM).
+        // Net effect: over-cancellation (mis. Mgmt +100 jadi -100, bukan 0).
+        //
+        // Audit trail: Mgmt row (dengan deleted_at + shrinkage) + soft-deleted
+        // original transactions (dengan deleted_by). User bisa lihat di history Mgmt.
         $txs = InventoryTransaction::where('reference_id', $mgmt->id)
             ->whereIn('transaction_type', ['IDM_REGRADING_OUT', 'IDM_REGRADING_IN'])
             ->get();
 
         foreach ($txs as $tx) {
-            InventoryTransaction::create([
-                'transaction_date'      => now(),
-                'grade_company_id'      => $tx->grade_company_id,
-                'location_id'           => $tx->location_id,
-                'supplier_id'           => $tx->supplier_id,
-                'quantity_change_grams' => -$tx->quantity_change_grams,
-                'transaction_type'      => $tx->transaction_type === 'IDM_REGRADING_OUT'
-                    ? 'IDM_REGRADING_REVERT_OUT'
-                    : 'IDM_REGRADING_REVERT_IN',
-                'reference_id'          => $mgmt->id,
-                'created_by'            => $userId,
-            ]);
-
             $tx->deleted_by = $userId;
             $tx->save();
             $tx->delete();
@@ -348,7 +343,15 @@ class ManajemenIdmService
             return false;
         }
 
-        return InventoryTransaction::where('reference_id', '!=', $mgmt->id)
+        // Penting: include transactions dengan reference_id = NULL.
+        // SALE_OUT / TRANSFER_OUT dari Penjualan/Transfer tidak set reference_id
+        // ke Mgmt (NULL), tapi mereka reference ke IDM-SR. Filter
+        // 'reference_id != Mgmt.id' di SQL EXCLUDE NULL values — harus
+        // explicit `orWhereNull` untuk menangkap SALE_OUT, dll.
+        return InventoryTransaction::where(function ($q) use ($mgmt) {
+                $q->where('reference_id', '!=', $mgmt->id)
+                  ->orWhereNull('reference_id');
+            })
             ->whereIn('sorting_result_id', $idmSortingResultIds)
             ->whereIn('transaction_type', self::OUTFLOW_TYPES)
             ->exists();

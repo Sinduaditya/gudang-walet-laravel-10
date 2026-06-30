@@ -126,8 +126,12 @@
                                         <div class="flex items-center gap-2">
                                             <a href="{{ route('manajemen-idm.show', array_merge(['id' => $item->id], request()->query())) }}"
                                                 class="text-blue-600 hover:text-blue-800 font-medium">Detail</a>
-                                            <a href="{{ route('manajemen-idm.edit', array_merge(['id' => $item->id], request()->query())) }}"
-                                                class="text-yellow-600 hover:text-yellow-800 font-medium">Edit</a>
+                                            {{-- Edit dinonaktifkan per 30 Juni 2026: FIFO enforcement.
+                                                 User tidak boleh edit Mgmt — kalau ada perubahan,
+                                                 hapus Mgmt + buat ulang dari awal.
+                                                 Route juga di-comment di web.php. --}}
+                                            {{-- <a href="{{ route('manajemen-idm.edit', array_merge(['id' => $item->id], request()->query())) }}"
+                                                class="text-yellow-600 hover:text-yellow-800 font-medium">Edit</a> --}}
                                             <button onclick="confirmDelete({{ $item->id }})"
                                                 class="text-red-600 hover:text-red-800 font-medium">Hapus</button>
                                         </div>

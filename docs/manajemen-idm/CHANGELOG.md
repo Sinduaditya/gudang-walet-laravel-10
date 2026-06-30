@@ -455,6 +455,212 @@ Tab ke-3 di halaman Penjualan, dengan filter sendiri (`idm_*` prefix) dan tabel 
 
 ---
 
+## 24. Bug Fix — REVERT_IN/OUT Accumulation Drift
+
+**File**: `app/Services/Idm/ManajemenIdmService.php::revertRegradingTransactions()`
+
+### Problem
+
+Skenario historis (dari test Mgmt #7 update → delete):
+- Mgmt #7 v1 created: 1× OUT (-2040) + 3× IN (+1000 each)
+- Mgmt #7 v1 updated ke v2: 
+  - `revertRegradingTransactions` (lama) hanya create REVERT untuk v1 IN/OUT, soft-delete originals
+  - `createDetailsAndTransactions` create v2 IN/OUT
+- Mgmt #7 deleted: 
+  - `revertRegradingTransactions` create REVERT untuk v2 IN/OUT
+  - **REVERT_IN dari update TIDAK dibersihkan**
+
+Akibat: REVERT_IN terakumulasi:
+- Mgmt #7 update: REVERT_IN -1000 (v1 cancellation)
+- Mgmt #7 delete: REVERT_IN -800 (v2 cancellation)
+- Total Mgmt #7 REVERT_IN: -1800 (seharusnya cuma -800 untuk v2 final state)
+
+Stock drift kumulatif: IDM -3692 (seharusnya +1308 dari Mgmt aktif).
+
+### Fix
+
+Tambah step 1 di `revertRegradingTransactions`:
+```php
+// 1. Bersihkan REVERT_IN/OUT lama (dari update sebelumnya) — kalau ada,
+//    supaya REVERT tidak terakumulasi (akan menggandakan cancellation).
+$existingReverts = InventoryTransaction::where('reference_id', $mgmt->id)
+    ->whereIn('transaction_type', ['IDM_REGRADING_REVERT_OUT', 'IDM_REGRADING_REVERT_IN'])
+    ->get();
+foreach ($existingReverts as $r) {
+    $r->deleted_by = $userId;
+    $r->save();
+    $r->delete();
+}
+
+// 2. Cari IDM_REGRADING_OUT/IN yang masih aktif, lalu buat REVERT untuk setiap.
+$txs = InventoryTransaction::where('reference_id', $mgmt->id)
+    ->whereIn('transaction_type', ['IDM_REGRADING_OUT', 'IDM_REGRADING_IN'])
+    ->get();
+// ... (existing logic) ...
+```
+
+### Cleanup Historical Data
+
+Soft-delete 15 REVERT_IN/OUT transactions dari Mgmt #7, #8, #10 (sudah soft-deleted sebelumnya):
+- IDM_REGRADING_REVERT_OUT: 3 rows (-788, +2040, +2040)
+- IDM_REGRADING_REVERT_IN: 12 rows
+
+### Hasil Verifikasi
+
+| Grade | Sebelum cleanup | Sesudah cleanup | Expected |
+|---|---|---|---|
+| IDM | -3.692 gr | **+1.308 gr** | Mgmt #5 (1288) + Mgmt #6 (10) + Mgmt #9 (10) = 1.308 ✓ |
+| KAKIAN | -390 gr | **+1.010 gr** | Mgmt #5 (1000) + Mgmt #6 (10) = 1.010 ✓ |
+| PERUTAN | +720 gr | **+1.010 gr** | Mgmt #5 (1000) + Mgmt #6 (10) = 1.010 ✓ |
+| ALU/AFKIR | -70 gr | **+120 gr** | Mgmt #6 (20) + Mgmt #9 (100) = 120 ✓ |
+
+Test delete Mgmt #9 (no outflow, deletable):
+- Sebelum: IDM 1.308, ALU 120
+- Sesudah: IDM **1.288** (turun 10), ALU **20** (turun 100) ✓
+
+## 25.2 Bug Fix — SALE_OUT/Transfer Delete Block Terlalu Agresif
+
+**File**: 
+- `app/Http/Controllers/Feature/PenjualanController.php` (line 274-303)
+- `app/Http/Controllers/Feature/TransferInternalController.php` (line 282-308)
+- `app/Http/Controllers/Feature/TransferExternalController.php` (line 255-281)
+
+### Problem
+
+Block SALE_OUT/Transfer delete untuk IDM-SR (section 25) terlalu agresif. User request: SALE_OUT **harus bisa dihapus** sebagai FIFO reversal mechanism (delete SALE_OUT = buat SALE_REVERT, stok kembali). Block yang saya tambahkan malah mencegah reversal.
+
+### Konsep FIFO yang Benar
+
+| Aksi | Status | FIFO Behavior |
+|---|---|---|
+| Edit Mgmt (route) | ❌ Disabled | Sekali jalan (Mgmt immutable) |
+| Hapus Mgmt (kalau ada outflow) | ❌ BLOCKED | Mgmt lock sementara |
+| Hapus Mgmt (kalau NO outflow) | ✅ Allowed | Mgmt bersih |
+| Hapus SALE_OUT (regular grading) | ✅ Allowed | Stok kembali via SALE_REVERT |
+| Hapus SALE_OUT (dari IDM-SR) | ✅ Allowed | Stok kembali ke IDM-SR, Mgmt jadi editable lagi |
+| Hapus TRANSFER_OUT (regular/IDM-SR) | ✅ Allowed | Sama seperti SALE_OUT |
+
+### Fix
+
+Hapus block FIFO check di 3 controller. Sekarang SALE_OUT/Transfer bisa dihapus (regular atau dari IDM-SR). Delete otomatis create REVERT transaction yang mengembalikan stok. Mgmt delete tetap di-block (di `ManajemenIdmService::assertNoOutflow`) selama ada outflow aktif.
+
+### Flow End-to-End (Mgmt #15 test)
+
+```
+1. Mgmt #15 dibuat (initial 3504, output IDM 100, KAKIAN 50)
+2. SALE_OUT 30g IDM dari IDM-SR 8205
+3. Mgmt #15 → BLOCKED (hasOutflow = SALE_OUT aktif)
+   ✅ "Tidak bisa hapus — output sudah keluar via transfer/sale."
+4. Delete SALE_OUT 9680 → SALE_REVERT +30g dibuat
+5. Mgmt #15 → editable lagi (SALE_OUT soft-deleted, hasOutflow = false)
+6. Delete Mgmt #15 → ✅ success
+```
+
+## 25.1 Bug Fix — `hasOutflow()` NULL reference_id di-exclude
+
+**File**: `app/Services/Idm/ManajemenIdmService.php` (line 335-356)
+
+### Problem
+
+Test scenario per 30 Juni 2026:
+- Bikin Mgmt #13 → jual 30g IDM (SALE_OUT dengan `reference_id=NULL` + `sorting_result_id=IDM-SR`) → coba delete Mgmt → **Mgmt berhasil dihapus** (harusnya BLOCKED!)
+
+### Root Cause
+
+Query `where('reference_id', '!=', $mgmt->id)` di SQL **TIDAK match NULL values**. SALE_OUT dari PenjualanController tidak set `reference_id` (NULL), jadi ke-exclude dari `hasOutflow()` check. Mgmt #13 dianggap "no outflow" → delete sukses.
+
+### Fix
+
+Wrap dalam closure dengan `orWhereNull`:
+```php
+return InventoryTransaction::where(function ($q) use ($mgmt) {
+    $q->where('reference_id', '!=', $mgmt->id)
+      ->orWhereNull('reference_id');
+})
+    ->whereIn('sorting_result_id', $idmSortingResultIds)
+    ->whereIn('transaction_type', self::OUTFLOW_TYPES)
+    ->exists();
+```
+
+Sekarang SALE_OUT (reference_id=NULL) di-include dalam check.
+
+### Verifikasi
+
+Test scenario Mgmt #14:
+1. ✅ Mgmt #14 dibuat (initial 3504, output IDM 100, KAKIAN 50)
+2. ✅ SALE_OUT 30g IDM dibuat (sorting_result_id=8195, ref=NULL)
+3. ✅ Coba delete Mgmt → **BLOCKED** "Tidak bisa hapus — output sudah keluar via transfer/sale. Hapus transfer/sale terlebih dahulu."
+
+Plus:
+- Soft-delete SALE_OUT → Mgmt #14 jadi editable
+- Hapus Mgmt #14 → ✅ success (no outflow)
+
+## 25. FIFO Enforcement — Hide Edit MgMt + Block Delete IDM-Originated Tx
+
+Per 30 Juni 2026, ManajemenIDM flow menjadi **FIFO strict — sekali jalan, tidak bisa diedit/dihapus setelah dibuat**. Ini untuk audit safety: kalau ada perubahan, hapus + buat ulang (dengan audit trail yang jelas).
+
+### 25.1 Hide Edit Mgmt
+
+**File**:
+- `routes/web.php` (line 181-184) — comment out Edit + Update route
+- `resources/views/admin/manajemen-idm/index.blade.php` (line 129-131) — comment out Edit link
+
+```php
+// routes/web.php
+// Edit route dinonaktifkan per 30 Juni 2026: FIFO enforcement.
+// Kalau butuh update Mgmt, hapus + buat ulang dari awal.
+// Route::get('/{id}/edit', [ManajemenIdmController::class, 'edit'])->name('edit');
+// Route::put('/{id}', [ManajemenIdmController::class, 'update'])->name('update');
+```
+
+```blade
+{{-- resources/views/admin/manajemen-idm/index.blade.php --}}
+{{-- Edit dinonaktifkan per 30 Juni 2026: FIFO enforcement. --}}
+{{-- <a href="...">Edit</a> --}}
+```
+
+Route list setelah update:
+```
+GET     admin/manajemen-idm/{id}        show
+DELETE  admin/manajemen-idm/{id}        destroy
+(tidak ada lagi edit/update)
+```
+
+### 25.2 Block Delete IDM-Originated Transactions
+
+**File**:
+- `app/Http/Controllers/Feature/PenjualanController.php` (`destroy()` line 274-303)
+- `app/Http/Controllers/Feature/TransferInternalController.php` (`destroy()` line 282-308)
+- `app/Http/Controllers/Feature/TransferExternalController.php` (`destroy()` line 255-281)
+
+Logic yang ditambahkan (sama di 3 controller):
+```php
+// FIFO enforcement per 30 Juni 2026: Transaksi dari output Manajemen IDM
+// (sorting_result.idm_management_id IS NOT NULL) tidak boleh dihapus.
+if ($tx->sorting_result_id) {
+    $sr = SortingResult::withTrashed()->find($tx->sorting_result_id);
+    if ($sr && $sr->idm_management_id) {
+        $mgmt = IdmManagement::withTrashed()->find($sr->idm_management_id);
+        $mgmtLabel = $mgmt ? 'Mgmt #' . $mgmt->id : '(Mgmt sudah dihapus)';
+        return redirect()->back()->with('error', '... tidak bisa dihapus ...');
+    }
+}
+```
+
+**Kenapa pakai `withTrashed()`**: IDM-SR bisa sudah soft-deleted (kalau Mgmt di-delete duluan). Tetep harus di-block supaya audit trail utuh.
+
+### 25.3 Verifikasi
+
+Test scenario: bikin Mgmt #11 (test), SALE_OUT 20g dari IDM-SR, coba delete:
+- Mgmt #11 dibuat ✓
+- SALE_OUT 9650 (sorting_result_id=8188 = IDM-SR) dibuat ✓
+- Coba delete SALE_OUT 9650 → **BLOCKED** dengan error message: "Transaksi ini dari hasil Manajemen IDM (Mgmt #11) — tidak bisa dihapus" ✓
+
+Cleanup:
+- SALE_OUT 9650 soft-deleted manual
+- Mgmt #11 deleted (karena SALE_OUT-nya sudah di-soft-delete, hasOutflow = false)
+- IDM-SR 8188 auto soft-deleted oleh Mgmt delete
+
 ## Statistik Total Sesi 1+2+3
 
 ```

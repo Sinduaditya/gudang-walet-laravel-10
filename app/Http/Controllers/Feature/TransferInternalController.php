@@ -286,6 +286,10 @@ class TransferInternalController extends Controller
                 $transfer = \App\Models\StockTransfer::lockForUpdate()->findOrFail($id);
                 $userId = auth()->id();
 
+                // FIFO reversal: TRANSFER_OUT boleh dihapus (regular ATAU dari IDM-SR).
+                // Delete akan create TRANSFER_REVERT yang mengembalikan stok.
+                // Mgmt delete di-block terpisah di ManajemenIdmService::assertNoOutflow().
+
                 $totalDeduction = abs($transfer->weight_grams) + abs($transfer->susut_grams ?? 0);
 
                 $outTx = $transfer->transactions()->where("transaction_type", "TRANSFER_OUT")->first();
