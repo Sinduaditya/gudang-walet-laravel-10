@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Models\GradeCompany;
+use App\Models\ParentGradeCompany;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
@@ -13,6 +14,33 @@ class GradeCompanySeeder extends Seeder
      */
     public function run(): void
     {
+        $idmParent = ParentGradeCompany::where('name', 'IDM')->first();
+
+        // Grade IDM: 3 child categories di bawah parent "IDM"
+        // - IDM (output grade untuk ManajemenIDM regrading)
+        // - IDM A (input category saat grading)
+        // - IDM B (input category saat grading)
+        $idmGrades = [
+            ['name' => 'IDM', 'parent_grade_company_id' => $idmParent?->id],
+            ['name' => 'IDM A', 'parent_grade_company_id' => $idmParent?->id],
+            ['name' => 'IDM B', 'parent_grade_company_id' => $idmParent?->id],
+        ];
+
+        // Grade output bins untuk byproducts ManajemenIDM — masing-masing child dari parent-nya
+        $perutanParent = ParentGradeCompany::where('name', 'PERUTAN')->first();
+        $kakianParent  = ParentGradeCompany::where('name', 'KAKIAN')->first();
+        $aluParent     = ParentGradeCompany::where('name', 'ALU')->first();
+
+        $byproductGrades = [
+            ['name' => 'PERUTAN',   'parent_grade_company_id' => $perutanParent?->id],
+            ['name' => 'KAKIAN',    'parent_grade_company_id' => $kakianParent?->id],
+            ['name' => 'ALU/AFKIR', 'parent_grade_company_id' => $aluParent?->id],
+        ];
+
+        foreach (array_merge($idmGrades, $byproductGrades) as $g) {
+            GradeCompany::create($g);
+        }
+
         $gradeCompany = [
 
             // --- MANGKOK RPS ---

@@ -21,6 +21,7 @@ class DatabaseSeeder extends Seeder
             UserSeeder::class,
             LocationSeeder::class,
             GradeSupplierSeeder::class,
+            ParentGradeCompanySeeder::class,
             GradeCompanySeeder::class,
             SupplierSeeder::class,
         ]);

@@ -132,7 +132,55 @@ class TrackingStockService
             ->pluck('total_stock', 'grade_company_id')
             ->toArray();
 
-        return array_map(fn($v) => (int) round($v ?: 0), array_fill_keys($gradeIds, 0) + $results);
+        return array_combine(
+            $gradeIds,
+            array_map(fn($id) => (int) round($results[$id] ?? 0), $gradeIds)
+        );
+    }
+
+    public const IDM_TRANSACTION_TYPES = [
+        'IDM_REGRADING_IN',
+        'IDM_REGRADING_OUT',
+        'IDM_REGRADING_REVERT_IN',
+        'IDM_REGRADING_REVERT_OUT',
+    ];
+
+    public function calculateIdmStock(int $gradeId): int
+    {
+        return (int) round(InventoryTransaction::where('grade_company_id', $gradeId)
+            ->whereNull('deleted_at')
+            ->whereIn('transaction_type', self::IDM_TRANSACTION_TYPES)
+            ->sum('quantity_change_grams'));
+    }
+
+    public function calculateIdmStockBulk(array $gradeIds): array
+    {
+        if (empty($gradeIds)) {
+            return [];
+        }
+
+        $results = InventoryTransaction::select('grade_company_id')
+            ->selectRaw('SUM(quantity_change_grams) as total_stock')
+            ->whereIn('grade_company_id', $gradeIds)
+            ->whereNull('deleted_at')
+            ->whereIn('transaction_type', self::IDM_TRANSACTION_TYPES)
+            ->groupBy('grade_company_id')
+            ->pluck('total_stock', 'grade_company_id')
+            ->toArray();
+
+        return array_combine(
+            $gradeIds,
+            array_map(fn($id) => (int) round($results[$id] ?? 0), $gradeIds)
+        );
+    }
+
+    public function getIdmRelatedGrades(): Collection
+    {
+        $names = ['IDM', 'IDM A', 'IDM B', 'KAKIAN', 'PERUTAN', 'ALU/AFKIR'];
+
+        return GradeCompany::whereIn('name', $names)
+            ->orderByRaw("FIELD(name, 'IDM A', 'IDM B', 'IDM', 'KAKIAN', 'PERUTAN', 'ALU/AFKIR')")
+            ->get();
     }
 
     public function calculateParentSortStock(int $parentId): int

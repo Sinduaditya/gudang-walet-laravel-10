@@ -834,8 +834,17 @@ class BarangKeluarService
      */
     public function getGradingSourcesWithStock(string $outgoingType, int $locationId)
     {
-        $sources = \App\Models\SortingResult::with(['gradeCompany', 'receiptItem.purchaseReceipt.supplier'])
-            ->where('outgoing_type', $outgoingType)
+        $sources = \App\Models\SortingResult::with([
+                'gradeCompany',
+                'receiptItem.purchaseReceipt.supplier',
+                'idmManagement.supplier',
+            ])
+            ->where(function ($q) use ($outgoingType) {
+                // 1) Batch hasil Grading dengan outgoing_type yang match (penjualan/internal/external)
+                // 2) ATAU IDM-SR (synthesized dari ManajemenIDM) — auto-masuk ke semua modul barang-keluar
+                $q->where('outgoing_type', $outgoingType)
+                  ->orWhereNotNull('idm_management_id');
+            })
             ->orderBy('grading_date', 'desc')
             ->get();
 

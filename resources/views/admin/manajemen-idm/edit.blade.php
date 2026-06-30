@@ -2,6 +2,7 @@
 
 @section('title', 'Edit IDM')
 
+
 @section('content')
     <div class="bg-white min-h-screen">
         <div class="w-full px-4 sm:px-6 lg:px-8 py-8">
@@ -9,7 +10,7 @@
             <div class="flex items-center justify-between mb-6">
                 <div>
                     <h1 class="text-2xl font-semibold text-gray-900">Edit IDM</h1>
-                    <p class="mt-1 text-sm text-gray-600">Edit data estimasi IDM.</p>
+                    <p class="mt-1 text-sm text-gray-600">Edit data hasil regrading IDM.</p>
                 </div>
                 <a href="{{ route('manajemen-idm.index', ['page' => $page, 'supplier_id' => $supplier_id, 'grade_company_id' => $grade_company_id, 'category_grade' => $category_grade]) }}"
                     class="inline-flex items-center px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 text-sm">
@@ -24,7 +25,7 @@
                     </svg>
                     <div>
                         <p class="text-sm font-semibold text-yellow-800">Data tidak dapat diubah</p>
-                        <p class="text-sm text-yellow-700 mt-0.5">Data IDM ini sudah dikeluarkan melalui Transfer IDM. Hapus Transfer IDM terlebih dahulu untuk dapat mengedit data ini.</p>
+                        <p class="text-sm text-yellow-700 mt-0.5">Output IDM sudah keluar via transfer/sale. Batalkan transfer/sale terlebih dahulu untuk dapat mengedit data ini.</p>
                     </div>
                 </div>
             @endif
@@ -33,7 +34,7 @@
             <div class="bg-gray-50 shadow-sm border rounded-lg p-6 mb-6">
                 <dl class="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
-                        <dt class="text-sm font-medium text-gray-500">Grade</dt>
+                        <dt class="text-sm font-medium text-gray-500">Grade Input</dt>
                         <dd class="mt-1 text-sm text-gray-900 font-semibold flex items-center gap-2">
                             {{ $idmManagement->gradeCompany->name ?? '-' }}
                             @php $category = $idmManagement->sourceItems->first()->category_grade ?? '-'; @endphp
@@ -62,10 +63,11 @@
                 <input type="hidden" name="category_grade" value="{{ $category_grade }}">
 
                 @php
-                    $perutan = $idmManagement->details->where('grade_idm_name', 'perutan')->first();
-                    $kakian  = $idmManagement->details->where('grade_idm_name', 'kakian')->first();
-                    $idm     = $idmManagement->details->where('grade_idm_name', 'idm')->first();
-                    $disabled = $idmManagement->is_transferred ? 'disabled' : '';
+                    $idmRow     = $idmManagement->details->firstWhere('grade_idm_name', 'IDM');
+                    $kakianRow  = $idmManagement->details->firstWhere('grade_idm_name', 'KAKIAN');
+                    $perutanRow = $idmManagement->details->firstWhere('grade_idm_name', 'PERUTAN');
+                    $aluRow     = $idmManagement->details->firstWhere('grade_idm_name', 'ALU');
+                    $disabled   = $idmManagement->is_transferred ? 'disabled' : '';
                 @endphp
 
                 <div class="bg-white shadow-sm border rounded-lg p-6 max-w-2xl">
@@ -80,32 +82,43 @@
                             </div>
                         </div>
 
-                        <!-- Berat Perut -->
-                        <div class="border border-gray-200 rounded-lg p-4">
+                        <!-- IDM (wajib) — langsung ke parent IDM -->
+                        <div class="border border-blue-200 rounded-lg p-4 bg-blue-50">
                             <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
-                                <label class="block text-sm font-medium text-gray-700">Berat Perut</label>
-                                <input type="number" step="0.01" name="details[perutan][weight]" id="weight_perutan"
-                                    value="{{ $perutan->weight ?? 0 }}" placeholder="0.00" required min="0" {{ $disabled }}
+                                <label class="block text-sm font-medium text-gray-700">Berat IDM <span class="text-red-500">*</span></label>
+                                <input type="number" step="0.01" name="details[IDM][weight]" id="weight_idm"
+                                    value="{{ old('details.IDM.weight', $idmRow->weight ?? 0) }}" placeholder="0.00" required min="0.01" {{ $disabled }}
                                     class="block w-full rounded-md border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 text-base py-2.5 px-4 col-span-2 weight-input {{ $disabled ? 'bg-gray-100' : '' }}">
                             </div>
+                            <p class="text-xs text-gray-500 mt-2">Output langsung ke grade parent IDM</p>
                         </div>
 
-                        <!-- Berat Kakian -->
+                        <!-- KAKIAN -->
                         <div class="border border-gray-200 rounded-lg p-4">
                             <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
                                 <label class="block text-sm font-medium text-gray-700">Berat Kakian</label>
-                                <input type="number" step="0.01" name="details[kakian][weight]" id="weight_kakian"
-                                    value="{{ $kakian->weight ?? 0 }}" placeholder="0.00" required min="0" {{ $disabled }}
+                                <input type="number" step="0.01" name="details[KAKIAN][weight]" id="weight_kakian"
+                                    value="{{ old('details.KAKIAN.weight', $kakianRow->weight ?? 0) }}" placeholder="0.00" min="0" {{ $disabled }}
                                     class="block w-full rounded-md border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 text-base py-2.5 px-4 col-span-2 weight-input {{ $disabled ? 'bg-gray-100' : '' }}">
                             </div>
                         </div>
 
-                        <!-- Berat IDM -->
+                        <!-- PERUTAN -->
                         <div class="border border-gray-200 rounded-lg p-4">
                             <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
-                                <label class="block text-sm font-medium text-gray-700">Berat IDM</label>
-                                <input type="number" step="0.01" name="details[idm][weight]" id="weight_idm"
-                                    value="{{ $idm->weight ?? 0 }}" placeholder="0.00" required min="0" {{ $disabled }}
+                                <label class="block text-sm font-medium text-gray-700">Berat Perutan</label>
+                                <input type="number" step="0.01" name="details[PERUTAN][weight]" id="weight_perutan"
+                                    value="{{ old('details.PERUTAN.weight', $perutanRow->weight ?? 0) }}" placeholder="0.00" min="0" {{ $disabled }}
+                                    class="block w-full rounded-md border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 text-base py-2.5 px-4 col-span-2 weight-input {{ $disabled ? 'bg-gray-100' : '' }}">
+                            </div>
+                        </div>
+
+                        <!-- ALU -->
+                        <div class="border border-gray-200 rounded-lg p-4">
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
+                                <label class="block text-sm font-medium text-gray-700">Berat Alu/Afkir</label>
+                                <input type="number" step="0.01" name="details[ALU][weight]" id="weight_alu"
+                                    value="{{ old('details.ALU.weight', $aluRow->weight ?? 0) }}" placeholder="0.00" min="0" {{ $disabled }}
                                     class="block w-full rounded-md border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 text-base py-2.5 px-4 col-span-2 weight-input {{ $disabled ? 'bg-gray-100' : '' }}">
                             </div>
                         </div>
@@ -125,9 +138,8 @@
                         </div>
 
                         @unless($idmManagement->is_transferred)
-                            <!-- Error: melebihi berat awal -->
                             <div id="weight-error" class="hidden bg-red-50 border border-red-300 rounded-lg p-3 text-sm text-red-700">
-                                Total berat (perutan + kakian + IDM) melebihi berat awal. Kurangi salah satu berat.
+                                Total berat output melebihi berat awal. Kurangi salah satu berat.
                             </div>
 
                             <div class="pt-4">
@@ -166,16 +178,20 @@
                                         <span class="font-medium text-gray-900" id="modal-total-weight"></span>
                                     </div>
                                     <div class="flex justify-between">
-                                        <span class="text-gray-500">Berat Perut:</span>
-                                        <span class="font-medium text-gray-900" id="modal-weight-perutan"></span>
+                                        <span class="text-gray-500">IDM:</span>
+                                        <span class="font-medium text-gray-900" id="modal-weight-idm"></span>
                                     </div>
                                     <div class="flex justify-between">
-                                        <span class="text-gray-500">Berat Kakian:</span>
+                                        <span class="text-gray-500">Kakian:</span>
                                         <span class="font-medium text-gray-900" id="modal-weight-kakian"></span>
                                     </div>
                                     <div class="flex justify-between">
-                                        <span class="text-gray-500">Berat IDM:</span>
-                                        <span class="font-medium text-gray-900" id="modal-weight-idm"></span>
+                                        <span class="text-gray-500">Perutan:</span>
+                                        <span class="font-medium text-gray-900" id="modal-weight-perutan"></span>
+                                    </div>
+                                    <div class="flex justify-between">
+                                        <span class="text-gray-500">Alu/Afkir:</span>
+                                        <span class="font-medium text-gray-900" id="modal-weight-alu"></span>
                                     </div>
                                     <div class="flex justify-between pt-2 border-t border-gray-200 font-semibold">
                                         <span class="text-gray-700">Susut:</span>
@@ -206,16 +222,16 @@
             document.addEventListener('DOMContentLoaded', function () {
                 const totalWeightInput = document.getElementById('total_weight');
                 const shrinkageInput   = document.getElementById('shrinkage');
-
-                const submitBtn   = document.getElementById('submitBtn');
-                const weightError = document.getElementById('weight-error');
+                const submitBtn        = document.getElementById('submitBtn');
+                const weightError      = document.getElementById('weight-error');
 
                 function calculate() {
                     const totalWeight = parseFloat(totalWeightInput.value) || 0;
-                    const wPerut  = parseFloat(document.getElementById('weight_perutan').value) || 0;
-                    const wKakian = parseFloat(document.getElementById('weight_kakian').value) || 0;
-                    const wIdm    = parseFloat(document.getElementById('weight_idm').value) || 0;
-                    const shrinkage = totalWeight - wPerut - wKakian - wIdm;
+                    const wIdm        = parseFloat(document.getElementById('weight_idm').value) || 0;
+                    const wKakian     = parseFloat(document.getElementById('weight_kakian').value) || 0;
+                    const wPerutan    = parseFloat(document.getElementById('weight_perutan').value) || 0;
+                    const wAlu        = parseFloat(document.getElementById('weight_alu').value) || 0;
+                    const shrinkage   = totalWeight - wIdm - wKakian - wPerutan - wAlu;
                     shrinkageInput.value = shrinkage.toFixed(2);
 
                     if (shrinkage < 0) {
@@ -232,11 +248,13 @@
 
                 window.showConfirmationModal = function () {
                     if (submitBtn.disabled) return;
-                    document.getElementById('modal-total-weight').textContent   = (totalWeightInput.value || 0) + ' gr';
-                    document.getElementById('modal-weight-perutan').textContent = (document.getElementById('weight_perutan').value || 0) + ' gr';
-                    document.getElementById('modal-weight-kakian').textContent  = (document.getElementById('weight_kakian').value || 0) + ' gr';
-                    document.getElementById('modal-weight-idm').textContent     = (document.getElementById('weight_idm').value || 0) + ' gr';
-                    document.getElementById('modal-shrinkage').textContent      = (shrinkageInput.value || 0) + ' gr';
+
+                    document.getElementById('modal-total-weight').textContent = (totalWeightInput.value || 0) + ' gr';
+                    document.getElementById('modal-weight-idm').textContent   = (document.getElementById('weight_idm').value || 0) + ' gr';
+                    document.getElementById('modal-weight-kakian').textContent   = (document.getElementById('weight_kakian').value || 0) + ' gr';
+                    document.getElementById('modal-weight-perutan').textContent  = (document.getElementById('weight_perutan').value || 0) + ' gr';
+                    document.getElementById('modal-weight-alu').textContent      = (document.getElementById('weight_alu').value || 0) + ' gr';
+                    document.getElementById('modal-shrinkage').textContent       = (shrinkageInput.value || 0) + ' gr';
                     document.getElementById('confirmationModal').classList.remove('hidden');
                 };
 

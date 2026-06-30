@@ -29,6 +29,10 @@ class GradeCompanyService
 
     public function create(array $data)
     {
+        if (isset($data['name'])) {
+            $data['name'] = strtoupper($data['name']);
+        }
+
         $image = $data['image_url'] ?? null;
         if ($image instanceof \Illuminate\Http\UploadedFile) {
             $data['image_url'] = $image->store('grade-company', 'public');
@@ -41,6 +45,10 @@ class GradeCompanyService
 
     public function update(int $id, array $data)
     {
+        if (isset($data['name'])) {
+            $data['name'] = strtoupper($data['name']);
+        }
+
         $gradeCompany = $this->getById($id);
 
         $image = $data['image_url'] ?? ($data['image'] ?? null);

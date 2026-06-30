@@ -42,11 +42,16 @@ class TransferInternalController extends Controller
                 return [
                     'id' => $source->id,
                     'name' => $source->gradeCompany->name ?? 'Unknown',
-                    'supplier_name' => $source->receiptItem->purchaseReceipt->supplier->name ?? 'Unknown',
-                    'supplier_id' => $source->receiptItem->purchaseReceipt->supplier_id ?? null,
+                    'supplier_name' => $source->receiptItem?->purchaseReceipt?->supplier?->name
+                                       ?? $source->idmManagement?->supplier?->name
+                                       ?? 'Unknown',
+                    'supplier_id' => $source->receiptItem?->purchaseReceipt?->supplier_id
+                                     ?? $source->idmManagement?->supplier_id
+                                     ?? null,
                     'grading_date' => $source->grading_date ? $source->grading_date->format('d M Y') : '-',
                     'batch_stock_grams' => $source->adjusted_weight,
                     'total_stock_grams' => $source->real_global_stock,
+                    'is_idm_output' => !is_null($source->idm_management_id),
                 ];
             });
 

@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Feature;
 
 use App\Http\Controllers\Controller;
+use App\Models\IdmManagement;
+use App\Models\InventoryTransaction;
 use App\Services\Stock\TrackingStockService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -35,6 +37,55 @@ class TrackingStockController extends Controller
             ));
         } catch (\Exception $e) {
             Log::error('TrackingStock index error: ' . $e->getMessage(), [
+                'user_id' => auth()->id(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            return back()->with('error', 'Terjadi kesalahan saat memuat data. Silakan coba lagi.');
+        }
+    }
+
+    public function idmStocks(Request $request)
+    {
+        try {
+            $grades = $this->trackingStockService->getIdmRelatedGrades();
+            $stockMap = $this->trackingStockService->calculateIdmStockBulk($grades->pluck('id')->toArray());
+
+            foreach ($grades as $g) {
+                $g->idm_stock = $stockMap[$g->id] ?? 0;
+            }
+
+            $totalIdmIn  = InventoryTransaction::whereNull('deleted_at')
+                ->where('transaction_type', 'IDM_REGRADING_IN')
+                ->sum('quantity_change_grams');
+            $totalIdmOut = InventoryTransaction::whereNull('deleted_at')
+                ->where('transaction_type', 'IDM_REGRADING_OUT')
+                ->sum('quantity_change_grams');
+            $totalSusut  = abs($totalIdmOut) - $totalIdmIn;
+
+            // Ambil recent Manajemen IDM records, grouped by input grade
+            // Limit 5 di halaman ini; full list ada di /admin/manajemen-idm
+            $totalMgmtCount = IdmManagement::count();
+            $recentRecords = IdmManagement::with(['supplier', 'gradeCompany', 'details'])
+                ->latest('id')
+                ->limit(5)
+                ->get();
+
+            Log::channel('audit')->info('TrackingStock idmStocks accessed', [
+                'user_id' => auth()->id(),
+                'action' => 'idm-stocks',
+                'ip' => $request->ip(),
+            ]);
+
+            return view('admin.stock.idm-stocks', compact(
+                'grades',
+                'totalIdmIn',
+                'totalIdmOut',
+                'totalSusut',
+                'recentRecords',
+                'totalMgmtCount'
+            ));
+        } catch (\Exception $e) {
+            Log::error('TrackingStock idmStocks error: ' . $e->getMessage(), [
                 'user_id' => auth()->id(),
                 'trace' => $e->getTraceAsString(),
             ]);

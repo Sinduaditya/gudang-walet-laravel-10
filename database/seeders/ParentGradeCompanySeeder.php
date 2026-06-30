@@ -11,9 +11,11 @@ class ParentGradeCompanySeeder extends Seeder
     {
         $data = [
             ['name' => 'LEMPENG'],
-            ['name' => 'IDM A'],
-            ['name' => 'IDM B'],
             ['name' => 'MANGKOK'],
+            ['name' => 'IDM'],
+            ['name' => 'PERUTAN'],
+            ['name' => 'KAKIAN'],
+            ['name' => 'ALU'],
         ];
 
         foreach ($data as $item) {

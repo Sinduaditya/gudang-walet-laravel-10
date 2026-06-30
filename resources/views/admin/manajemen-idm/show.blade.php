@@ -79,7 +79,8 @@
                             <thead class="text-left text-xs font-medium text-gray-500 bg-gray-50">
                                 <tr>
                                     <th class="px-4 py-3 rounded-tl-md">No</th>
-                                    <th class="px-4 py-3">Jenis</th>
+                                    <th class="px-4 py-3">Bin</th>
+                                    <th class="px-4 py-3">Grade Company</th>
                                     <th class="px-4 py-3 rounded-tr-md">Berat (gr)</th>
                                 </tr>
                             </thead>
@@ -87,8 +88,11 @@
                                 @foreach ($idmManagement->details as $index => $detail)
                                     <tr class="hover:bg-gray-50 transition-colors">
                                         <td class="px-4 py-3 font-semibold text-gray-900">{{ $index + 1 }}</td>
-                                        <td class="px-4 py-3 text-gray-900 font-medium capitalize">
+                                        <td class="px-4 py-3 text-gray-900 font-medium">
                                             {{ $detail->grade_idm_name }}
+                                        </td>
+                                        <td class="px-4 py-3 text-gray-700">
+                                            {{ $detail->gradeCompany->name ?? '-' }}
                                         </td>
                                         <td class="px-4 py-3 font-mono text-gray-700">
                                             {{ number_format($detail->weight, 2) }}

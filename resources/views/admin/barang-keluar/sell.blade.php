@@ -41,6 +41,10 @@
                     class="py-2.5 px-4 font-semibold text-sm border-b-2 border-blue-600 text-blue-600 transition-all focus:outline-none">
                     Stok Hasil Grading
                 </button>
+                <button type="button" onclick="switchFormTab('idm')" id="formTabBtnIdm"
+                    class="py-2.5 px-4 font-semibold text-sm text-gray-500 hover:text-gray-700 transition-all border-b-2 border-transparent focus:outline-none">
+                    Stok Hasil Manajemen IDM
+                </button>
                 <button type="button" onclick="switchFormTab('sortir')" id="formTabBtnSortir"
                     class="py-2.5 px-4 font-semibold text-sm text-gray-500 hover:text-gray-700 transition-all border-b-2 border-transparent focus:outline-none">
                     Stok Hasil Sortir Bahan
@@ -120,11 +124,15 @@
                                             class="w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                                             <option value="">-- Pilih Grade --</option>
                                             @foreach($gradesWithStock as $g)
-                                                <option value="{{ $g['id'] }}" 
+                                                <option value="{{ $g['id'] }}"
                                                     data-stock="{{ $g['batch_stock_grams'] }}"
                                                     data-supplier-id="{{ $g['supplier_id'] }}"
                                                     {{ old('grade_company_id') == $g['id'] ? 'selected' : '' }}>
-                                                    {{ $g['name'] }} - {{ $g['supplier_name'] }} - {{ $g['grading_date'] }} (Batch: {{ number_format($g['batch_stock_grams'], 0, ',', '.') }} gr)
+                                                    @if(!empty($g['is_idm_output']))
+                                                        [IDM] {{ $g['name'] }} — {{ $g['supplier_name'] }} — {{ $g['grading_date'] }} (Batch: {{ number_format($g['batch_stock_grams'], 0, ',', '.') }} gr)
+                                                    @else
+                                                        {{ $g['name'] }} — {{ $g['supplier_name'] }} — {{ $g['grading_date'] }} (Batch: {{ number_format($g['batch_stock_grams'], 0, ',', '.') }} gr)
+                                                    @endif
                                                 </option>
                                             @endforeach
                                         </select>
@@ -204,6 +212,123 @@
                                 <button type="submit"
                                     class="flex-1 inline-flex items-center justify-center px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white font-semibold rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all duration-200 shadow-lg">
                                     Simpan Penjualan Grading
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+
+                    {{-- 1B. FORM PENJUALAN DARI MANAJEMEN IDM --}}
+                    <div id="formIdm" class="bg-white rounded-xl shadow-md border border-emerald-200 hidden">
+                        <div class="px-6 py-4 border-b border-emerald-100 bg-emerald-50">
+                            <h2 class="text-lg font-semibold text-emerald-900">Form Penjualan (Stok Hasil Manajemen IDM)</h2>
+                            <p class="text-sm text-emerald-700 mt-1">Lengkapi data penjualan barang dari batch hasil regrading Manajemen IDM (IDM, KAKIAN, PERUTAN, ALU/AFKIR).</p>
+                        </div>
+
+                        <form action="{{ route('barang.keluar.sell.store') }}" method="POST" class="p-6">
+                            @csrf
+
+                            <div class="space-y-6">
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    {{-- Filter Supplier for IDM Grade --}}
+                                    <div>
+                                        <label class="block font-semibold text-gray-700 mb-2">
+                                            Filter Supplier <span class="text-gray-400 font-normal text-xs">(Opsional)</span>
+                                        </label>
+                                        <select id="filter_supplier_idm"
+                                            class="w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-emerald-500 focus:border-transparent">
+                                            <option value="">-- Semua Supplier --</option>
+                                            @foreach($suppliers as $s)
+                                                <option value="{{ $s->id }}">{{ $s->name }}</option>
+                                            @endforeach
+                                        </select>
+                                    </div>
+
+                                    {{-- Grade Select (IDM-SR only) --}}
+                                    <div>
+                                        <label class="block font-semibold text-gray-700 mb-2">
+                                            Batch Hasil IDM <span class="text-red-500">*</span>
+                                        </label>
+                                        <select name="grade_company_id" id="grade_company_id_idm" required
+                                            class="w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-emerald-500 focus:border-transparent">
+                                            <option value="">-- Pilih Batch IDM --</option>
+                                            @forelse($idmGradesWithStock as $g)
+                                                <option value="{{ $g['id'] }}"
+                                                    data-stock="{{ $g['batch_stock_grams'] }}"
+                                                    data-supplier-id="{{ $g['supplier_id'] }}"
+                                                    {{ old('grade_company_id') == $g['id'] ? 'selected' : '' }}>
+                                                    {{ $g['name'] }} — {{ $g['supplier_name'] }} — {{ $g['grading_date'] }} (Batch: {{ number_format($g['batch_stock_grams'], 0, ',', '.') }} gr)
+                                                </option>
+                                            @empty
+                                                <option value="" disabled>Belum ada stok hasil Manajemen IDM.</option>
+                                            @endforelse
+                                        </select>
+                                        <p id="grade-stock-hint-idm" class="mt-2 text-sm text-gray-500 hidden">
+                                            Stok tersedia: <span id="grade-stock-value-idm" class="font-semibold">-</span>
+                                        </p>
+                                        @error('grade_company_id')
+                                            <p class="mt-1.5 text-sm text-red-600">{{ $message }}</p>
+                                        @enderror
+                                    </div>
+                                </div>
+
+                                <input type="hidden" name="location_id" value="{{ $defaultLocation->id ?? 1 }}">
+
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div>
+                                        <label class="block font-semibold text-gray-700 mb-2">
+                                            Berat Penjualan (gram) <span class="text-red-500">*</span>
+                                        </label>
+                                        <div class="flex gap-2">
+                                            <input type="number" name="weight_grams" id="weight_grams_idm"
+                                                step="0.01" min="0.01" required
+                                                value="{{ old('weight_grams') }}"
+                                                class="flex-1 border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                                                placeholder="Masukkan berat dalam gram">
+                                            <button type="button" onclick="checkStockIdm()" id="btnCheckStockIdm"
+                                                class="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors whitespace-nowrap">
+                                                Cek Stok
+                                            </button>
+                                        </div>
+                                        <p id="stock-check-result-idm" class="mt-2 text-sm hidden"></p>
+                                        @error('weight_grams')
+                                            <p class="mt-1.5 text-sm text-red-600">{{ $message }}</p>
+                                        @enderror
+                                    </div>
+
+                                    <div>
+                                        <label class="block font-semibold text-gray-700 mb-2">Tanggal Penjualan</label>
+                                        <input type="date" name="transaction_date"
+                                            value="{{ old('transaction_date', date('Y-m-d')) }}"
+                                            class="w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-emerald-500 focus:border-transparent">
+                                        @error('transaction_date')
+                                            <p class="mt-1.5 text-sm text-red-600">{{ $message }}</p>
+                                        @enderror
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label class="block font-semibold text-gray-700 mb-2 flex items-center gap-2">
+                                        <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                        </svg>
+                                        Catatan
+                                        <span class="text-gray-400 font-normal text-xs">(Opsional)</span>
+                                    </label>
+                                    <textarea name="notes" rows="3"
+                                        class="w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                                        placeholder="Catatan tambahan...">{{ old('notes') }}</textarea>
+                                </div>
+                            </div>
+
+                            <div class="mt-8 flex justify-end gap-3">
+                                <button type="reset" class="px-6 py-3 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors">
+                                    Reset
+                                </button>
+                                <button type="submit" class="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-emerald-600 hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500">
+                                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                    </svg>
+                                    Catat Penjualan dari IDM
                                 </button>
                             </div>
                         </form>
@@ -343,6 +468,10 @@
                         <button type="button" onclick="switchHistoryTab('grading')" id="historyTabBtnGrading"
                             class="py-2 px-4 font-semibold text-sm border-b-2 border-blue-600 text-blue-600 transition-all focus:outline-none">
                             Riwayat Penjualan Grading
+                        </button>
+                        <button type="button" onclick="switchHistoryTab('idm')" id="historyTabBtnIdm"
+                            class="py-2 px-4 font-semibold text-sm text-gray-500 hover:text-gray-700 transition-all border-b-2 border-transparent focus:outline-none">
+                            Riwayat Penjualan dari Manajemen IDM
                         </button>
                         <button type="button" onclick="switchHistoryTab('sortir')" id="historyTabBtnSortir"
                             class="py-2 px-4 font-semibold text-sm text-gray-500 hover:text-gray-700 transition-all border-b-2 border-transparent focus:outline-none">
@@ -507,7 +636,172 @@
                         @endif
                     </div>
 
-                    {{-- 2. HISTORY PENJUALAN SORTIR --}}
+                    {{-- 2. HISTORY PENJUALAN DARI MANAJEMEN IDM --}}
+                    <div id="historyIdm" class="bg-white rounded-xl shadow-md border border-gray-200 hidden">
+                        <div class="px-6 py-4 border-b border-gray-200 bg-emerald-50">
+                            <div class="flex items-center gap-2 mb-3">
+                                <svg class="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                </svg>
+                                <h3 class="text-sm font-semibold text-emerald-800">Penjualan yang bersumber dari output Manajemen IDM (IDM-SR)</h3>
+                            </div>
+                            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                <form action="{{ route('barang.keluar.sell.form') }}" method="GET"
+                                    class="flex flex-wrap items-end gap-4">
+                                    <input type="hidden" name="active_tab" value="idm">
+                                    @if (request('idm_page'))
+                                        <input type="hidden" name="idm_page" value="{{ request('idm_page') }}">
+                                    @endif
+
+                                    <div>
+                                        <label for="idm_start_date" class="block text-sm font-medium text-gray-700 mb-1">Dari Tanggal</label>
+                                        <input type="date" name="idm_start_date" id="idm_start_date"
+                                            value="{{ request('idm_start_date') }}"
+                                            class="w-full md:w-auto text-sm border-gray-300 rounded-md px-3 py-2 focus:ring-emerald-500 focus:border-emerald-500">
+                                    </div>
+
+                                    <div>
+                                        <label for="idm_end_date" class="block text-sm font-medium text-gray-700 mb-1">Sampai Tanggal</label>
+                                        <input type="date" name="idm_end_date" id="idm_end_date"
+                                            value="{{ request('idm_end_date') }}"
+                                            class="w-full md:w-auto text-sm border-gray-300 rounded-md px-3 py-2 focus:ring-emerald-500 focus:border-emerald-500">
+                                    </div>
+
+                                    <div>
+                                        <label for="idm_supplier_id" class="block text-sm font-medium text-gray-700 mb-1">Supplier</label>
+                                        <select name="idm_supplier_id" class="w-full md:w-auto text-sm border-gray-300 rounded-md px-3 py-2 focus:ring-emerald-500 focus:border-emerald-500">
+                                            <option value="">Semua Supplier</option>
+                                            @foreach($suppliers as $supplier)
+                                                <option value="{{ $supplier->id }}" {{ request('idm_supplier_id') == $supplier->id ? 'selected' : '' }}>
+                                                    {{ $supplier->name }}
+                                                </option>
+                                            @endforeach
+                                        </select>
+                                    </div>
+
+                                    <div>
+                                        <label for="idm_grade_company_id" class="block text-sm font-medium text-gray-700 mb-1">Grade</label>
+                                        <select name="idm_grade_company_id" class="w-full md:w-auto text-sm border-gray-300 rounded-md px-3 py-2 focus:ring-emerald-500 focus:border-emerald-500">
+                                            <option value="">Semua Grade</option>
+                                            @foreach($grades as $grade)
+                                                <option value="{{ $grade->id }}" {{ request('idm_grade_company_id') == $grade->id ? 'selected' : '' }}>
+                                                    {{ $grade->name }}
+                                                </option>
+                                            @endforeach
+                                        </select>
+                                    </div>
+
+                                    <div class="flex gap-2">
+                                        <button type="submit"
+                                            class="px-4 py-2 bg-emerald-600 text-white text-sm font-medium rounded-md hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 transition-colors">
+                                            Filter
+                                        </button>
+
+                                        @if (request('idm_start_date') || request('idm_end_date') || request('idm_supplier_id') || request('idm_grade_company_id'))
+                                            <a href="{{ route('barang.keluar.sell.form', ['active_tab' => 'idm']) }}"
+                                                class="px-4 py-2 bg-white border border-gray-300 text-gray-700 text-sm font-medium rounded-md hover:bg-gray-50 transition-colors">
+                                                Reset
+                                            </a>
+                                        @endif
+                                    </div>
+                                </form>
+                            </div>
+
+                            {{-- Summary --}}
+                            @if(isset($idmSummary) && $idmSummary->count() > 0)
+                                <div class="mt-4 p-4 bg-white rounded-lg border border-emerald-100">
+                                    <h4 class="text-sm font-semibold text-emerald-800 mb-2">Total Stok Terjual dari IDM per Grade</h4>
+                                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                        @foreach($idmSummary as $gradeName => $totalWeight)
+                                            <div class="bg-emerald-50 p-3 rounded shadow-sm border border-emerald-100">
+                                                <div class="text-xs text-gray-500">{{ $gradeName }}</div>
+                                                <div class="text-lg font-bold text-emerald-600">
+                                                    {{ number_format($totalWeight, 0, ',', '.') }} <span class="text-xs font-normal text-gray-500">gr</span>
+                                                </div>
+                                            </div>
+                                        @endforeach
+                                    </div>
+                                </div>
+                            @endif
+                        </div>
+
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full divide-y divide-gray-200">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Tanggal</th>
+                                        <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Grade</th>
+                                        <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Supplier</th>
+                                        <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Mgmt IDM</th>
+                                        <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Lokasi</th>
+                                        <th class="px-6 py-3 text-right text-xs font-semibold text-gray-600 uppercase">Stok Berkurang</th>
+                                        <th class="px-6 py-3 text-center text-xs font-semibold text-gray-600 uppercase">Referensi</th>
+                                        <th class="px-6 py-3 text-center text-xs font-semibold text-gray-600 uppercase">Aksi</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="bg-white divide-y divide-gray-200">
+                                    @forelse($idmPenjualanTransactions as $tx)
+                                        <tr class="hover:bg-emerald-50/30">
+                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                                {{ \Carbon\Carbon::parse($tx->transaction_date)->format('d/m/Y') }}
+                                            </td>
+                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                                {{ $tx->gradeCompany->name ?? '-' }}
+                                            </td>
+                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                                {{ $tx->sortingResult?->idmManagement?->supplier?->name ?? '-' }}
+                                            </td>
+                                            <td class="px-6 py-4 whitespace-nowrap text-sm">
+                                                @if($tx->sortingResult?->idmManagement)
+                                                    <a href="{{ route('manajemen-idm.show', $tx->sortingResult->idmManagement->id) }}"
+                                                        class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-emerald-100 text-emerald-800 hover:bg-emerald-200">
+                                                        #{{ $tx->sortingResult->idmManagement->id }}
+                                                    </a>
+                                                @else
+                                                    <span class="text-gray-400">—</span>
+                                                @endif
+                                            </td>
+                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                                {{ $tx->location->name ?? '-' }}
+                                            </td>
+                                            <td class="px-6 py-4 whitespace-nowrap text-sm font-semibold text-emerald-600 text-right">
+                                                {{ number_format(abs($tx->quantity_change_grams), 2) }} gr
+                                            </td>
+                                            <td class="px-6 py-4 whitespace-nowrap text-center text-sm font-mono text-gray-600 bg-gray-50">
+                                                #{{ $tx->id }}
+                                            </td>
+                                            <td class="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
+                                                <form action="{{ route('barang.keluar.sell.destroy', $tx->id) }}" method="POST" onsubmit="return confirm('Apakah Anda yakin ingin menghapus transaksi penjualan ini?');">
+                                                    @csrf
+                                                    @method('DELETE')
+                                                    <button type="submit" class="text-red-600 hover:text-red-900" title="Hapus">
+                                                        <svg class="w-5 h-5 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                        </svg>
+                                                    </button>
+                                                </form>
+                                            </td>
+                                        </tr>
+                                    @empty
+                                        <tr>
+                                            <td colspan="8" class="px-6 py-12 text-center text-gray-500">
+                                                <p class="text-base text-gray-600">Belum ada riwayat penjualan dari Manajemen IDM.</p>
+                                                <p class="text-xs text-gray-500 mt-1">Penjualan dari stok hasil regrading akan muncul di sini.</p>
+                                            </td>
+                                        </tr>
+                                    @endforelse
+                                </tbody>
+                            </table>
+                        </div>
+
+                        @if ($idmPenjualanTransactions->hasPages())
+                            <div class="px-6 py-4 border-t border-gray-200 bg-gray-50">
+                                {{ $idmPenjualanTransactions->links() }}
+                            </div>
+                        @endif
+                    </div>
+
+                    {{-- 3. HISTORY PENJUALAN SORTIR --}}
                     <div id="historySortir" class="bg-white rounded-xl shadow-md border border-gray-200 hidden">
                         <div class="px-6 py-4 border-b border-gray-200 bg-gray-50">
                             <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -643,48 +937,64 @@
             let currentFormTab = 'grading';
             let currentHistoryTab = 'grading';
 
-            // Toggle Form Tab (Stok Grading vs Stok Sortir)
+            // Toggle Form Tab (Stok Grading vs IDM vs Stok Sortir)
             function switchFormTab(tab) {
                 currentFormTab = tab;
                 const formGrading = document.getElementById('formGrading');
-                const formSortir = document.getElementById('formSortir');
-                const btnGrading = document.getElementById('formTabBtnGrading');
-                const btnSortir = document.getElementById('formTabBtnSortir');
+                const formIdm     = document.getElementById('formIdm');
+                const formSortir  = document.getElementById('formSortir');
+                const btnGrading  = document.getElementById('formTabBtnGrading');
+                const btnIdm      = document.getElementById('formTabBtnIdm');
+                const btnSortir   = document.getElementById('formTabBtnSortir');
+
+                const inactiveClass = "py-2.5 px-4 font-semibold text-sm text-gray-500 hover:text-gray-700 transition-all border-b-2 border-transparent focus:outline-none";
+
+                formGrading.classList.add('hidden');
+                formIdm.classList.add('hidden');
+                formSortir.classList.add('hidden');
+                btnGrading.className = inactiveClass;
+                btnIdm.className = inactiveClass;
+                btnSortir.className = inactiveClass;
 
                 if (tab === 'grading') {
                     formGrading.classList.remove('hidden');
-                    formSortir.classList.add('hidden');
-                    
                     btnGrading.className = "py-2.5 px-4 font-semibold text-sm border-b-2 border-blue-600 text-blue-600 transition-all focus:outline-none";
-                    btnSortir.className = "py-2.5 px-4 font-semibold text-sm text-gray-500 hover:text-gray-700 transition-all border-b-2 border-transparent focus:outline-none";
+                } else if (tab === 'idm') {
+                    formIdm.classList.remove('hidden');
+                    btnIdm.className = "py-2.5 px-4 font-semibold text-sm border-b-2 border-emerald-600 text-emerald-600 transition-all focus:outline-none";
                 } else {
-                    formGrading.classList.add('hidden');
                     formSortir.classList.remove('hidden');
-
-                    btnGrading.className = "py-2.5 px-4 font-semibold text-sm text-gray-500 hover:text-gray-700 transition-all border-b-2 border-transparent focus:outline-none";
                     btnSortir.className = "py-2.5 px-4 font-semibold text-sm border-b-2 border-purple-600 text-purple-600 transition-all focus:outline-none";
                 }
             }
 
-            // Toggle History Tab (Penjualan Grading vs Penjualan Sortir)
+            // Toggle History Tab (Penjualan Grading vs IDM vs Sortir)
             function switchHistoryTab(tab) {
                 currentHistoryTab = tab;
                 const histGrading = document.getElementById('historyGrading');
-                const histSortir = document.getElementById('historySortir');
-                const btnGrading = document.getElementById('historyTabBtnGrading');
-                const btnSortir = document.getElementById('historyTabBtnSortir');
+                const histIdm     = document.getElementById('historyIdm');
+                const histSortir  = document.getElementById('historySortir');
+                const btnGrading  = document.getElementById('historyTabBtnGrading');
+                const btnIdm      = document.getElementById('historyTabBtnIdm');
+                const btnSortir   = document.getElementById('historyTabBtnSortir');
+
+                const inactiveClass = "py-2 px-4 font-semibold text-sm text-gray-500 hover:text-gray-700 transition-all border-b-2 border-transparent focus:outline-none";
+
+                histGrading.classList.add('hidden');
+                histIdm.classList.add('hidden');
+                histSortir.classList.add('hidden');
+                btnGrading.className = inactiveClass;
+                btnIdm.className = inactiveClass;
+                btnSortir.className = inactiveClass;
 
                 if (tab === 'grading') {
                     histGrading.classList.remove('hidden');
-                    histSortir.classList.add('hidden');
-
                     btnGrading.className = "py-2 px-4 font-semibold text-sm border-b-2 border-blue-600 text-blue-600 transition-all focus:outline-none";
-                    btnSortir.className = "py-2 px-4 font-semibold text-sm text-gray-500 hover:text-gray-700 transition-all border-b-2 border-transparent focus:outline-none";
+                } else if (tab === 'idm') {
+                    histIdm.classList.remove('hidden');
+                    btnIdm.className = "py-2 px-4 font-semibold text-sm border-b-2 border-emerald-600 text-emerald-600 transition-all focus:outline-none";
                 } else {
-                    histGrading.classList.add('hidden');
                     histSortir.classList.remove('hidden');
-
-                    btnGrading.className = "py-2 px-4 font-semibold text-sm text-gray-500 hover:text-gray-700 transition-all border-b-2 border-transparent focus:outline-none";
                     btnSortir.className = "py-2 px-4 font-semibold text-sm border-b-2 border-purple-600 text-purple-600 transition-all focus:outline-none";
                 }
             }
@@ -726,7 +1036,7 @@
             supplierFilter.addEventListener('change', function() {
                 const selectedSupplierId = this.value;
                 const options = gradeSelect.querySelectorAll('option');
-                
+
                 gradeSelect.value = "";
                 gradeStockValue.textContent = '-';
                 gradeStockValue.classList.remove('text-green-600', 'text-red-600');
@@ -736,10 +1046,10 @@
                     if (option.value === "") return;
                     const gradeSupplierId = option.dataset.supplierId;
                     if (!selectedSupplierId || gradeSupplierId == selectedSupplierId) {
-                        option.style.display = '';
+                        option.hidden = false;
                         option.disabled = false;
                     } else {
-                        option.style.display = 'none';
+                        option.hidden = true;
                         option.disabled = true;
                     }
                 });
@@ -818,6 +1128,89 @@
                 else if (type === 'error') resultEl.classList.add('text-red-600');
                 else resultEl.classList.add('text-blue-600');
                 resultEl.textContent = message;
+            }
+
+            // ────────────────────────────────────────────────────────
+            // JS LOGIC FOR IDM TAB
+            // ────────────────────────────────────────────────────────
+            const idmGradeSelect = document.getElementById('grade_company_id_idm');
+            const idmSupplierFilter = document.getElementById('filter_supplier_idm');
+            const idmStockHint = document.getElementById('grade-stock-hint-idm');
+            const idmStockValue = document.getElementById('grade-stock-value-idm');
+
+            function updateIdmStockDisplay() {
+                const opt = idmGradeSelect.options[idmGradeSelect.selectedIndex];
+                if (opt && opt.value) {
+                    const stock = parseFloat(opt.dataset.stock || 0);
+                    idmStockValue.textContent = new Intl.NumberFormat('id-ID').format(stock) + ' gr';
+                    idmStockHint.classList.remove('hidden');
+                } else {
+                    idmStockHint.classList.add('hidden');
+                }
+            }
+
+            // Filter IDM grade options by selected supplier
+            idmSupplierFilter.addEventListener('change', function() {
+                const supplierId = this.value;
+                const options = idmGradeSelect.querySelectorAll('option');
+                idmGradeSelect.value = '';
+                options.forEach(option => {
+                    if (option.value === '') return; // skip placeholder
+                    if (!supplierId || option.dataset.supplierId == supplierId) {
+                        option.hidden = false;
+                        option.disabled = false;
+                    } else {
+                        option.hidden = true;
+                        option.disabled = true;
+                    }
+                });
+                updateIdmStockDisplay();
+            });
+            idmGradeSelect.addEventListener('change', updateIdmStockDisplay);
+            updateIdmStockDisplay();
+
+            function showStockResultIdm(message, type) {
+                const resultEl = document.getElementById('stock-check-result-idm');
+                resultEl.classList.remove('hidden', 'text-red-600', 'text-green-600', 'text-blue-600');
+                if (type === 'success') resultEl.classList.add('text-green-600');
+                else if (type === 'error') resultEl.classList.add('text-red-600');
+                else resultEl.classList.add('text-blue-600');
+                resultEl.textContent = message;
+            }
+
+            function checkStockIdm() {
+                const gradeId = document.getElementById('grade_company_id_idm').value;
+                const weight = parseFloat(document.getElementById('weight_grams_idm').value || 0);
+
+                if (!gradeId) {
+                    showStockResultIdm('Pilih batch IDM terlebih dahulu.', 'error');
+                    return;
+                }
+                if (weight <= 0) {
+                    showStockResultIdm('Masukkan berat yang valid.', 'error');
+                    return;
+                }
+
+                showStockResultIdm('Mengecek stok...', 'info');
+
+                fetch(`{{ route('barang.keluar.sell.stock_check') }}?grade_company_id=${gradeId}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (!data.ok) {
+                            showStockResultIdm('Gagal mengecek stok.', 'error');
+                            return;
+                        }
+
+                        const available = parseFloat(data.available_grams);
+                        if (available >= weight) {
+                            showStockResultIdm(`✓ Stok mencukupi! Tersedia ${new Intl.NumberFormat('id-ID').format(available)} gram.`, 'success');
+                        } else {
+                            showStockResultIdm(`⚠ Stok tidak mencukupi! Hanya tersedia ${new Intl.NumberFormat('id-ID').format(available)} gram.`, 'error');
+                        }
+                    })
+                    .catch(() => {
+                        showStockResultIdm('Gagal mengecek stok.', 'error');
+                    });
             }
 
             // ────────────────────────────────────────────────────────
@@ -923,6 +1316,9 @@
                 if (activeTab === 'sortir') {
                     switchFormTab('sortir');
                     switchHistoryTab('sortir');
+                } else if (activeTab === 'idm') {
+                    switchFormTab('idm');
+                    switchHistoryTab('idm');
                 }
 
                 if (urlParams.has('page') || urlParams.has('start_date') || urlParams.has('end_date') || urlParams.has('sort_start_date') || urlParams.has('sort_end_date')) {

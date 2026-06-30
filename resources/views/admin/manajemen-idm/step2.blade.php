@@ -2,6 +2,7 @@
 
 @section('title', 'Tambah IDM - Step 2')
 
+
 @section('content')
     <div class="bg-white min-h-screen">
         <div class="w-full px-4 sm:px-6 lg:px-8 py-8">
@@ -9,7 +10,7 @@
             <div class="flex items-center justify-between mb-6">
                 <div>
                     <h1 class="text-2xl font-semibold text-gray-900">Tambah IDM Step 2</h1>
-                    <p class="mt-1 text-sm text-gray-600">Masukkan berat masing-masing bagian.</p>
+                    <p class="mt-1 text-sm text-gray-600">Isi grade IDM (wajib) + berat per bin output.</p>
                 </div>
                 <a href="{{ route('manajemen-idm.create') }}"
                     class="inline-flex items-center px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 text-sm">
@@ -33,7 +34,7 @@
                         <div class="w-10 h-10 flex items-center justify-center rounded-full bg-blue-500 text-white font-semibold text-sm shadow-sm">
                             2
                         </div>
-                        <span class="mt-2 text-xs sm:text-sm font-medium text-blue-600">Masukkan Berat</span>
+                        <span class="mt-2 text-xs sm:text-sm font-medium text-blue-600">Isi Output</span>
                     </div>
                     <div class="flex-1 h-0.5 bg-gray-200 mx-2 sm:mx-4 -mt-6"></div>
                     <div class="flex flex-col items-center flex-1">
@@ -49,7 +50,7 @@
             <div class="bg-gray-50 shadow-sm border rounded-lg p-6 mb-6">
                 <dl class="grid grid-cols-1 md:grid-cols-4 gap-4">
                     <div>
-                        <dt class="text-sm font-medium text-gray-500">Grade</dt>
+                        <dt class="text-sm font-medium text-gray-500">Grade Input</dt>
                         <dd class="mt-1 text-sm text-gray-900 font-semibold">{{ $firstItem->gradeCompany->name ?? '-' }}</dd>
                     </div>
                     <div>
@@ -94,32 +95,45 @@
                             </div>
                         </div>
 
-                        <!-- Berat Perut -->
-                        <div class="border border-gray-200 rounded-lg p-4">
+                        <!-- Berat IDM (wajib) — langsung ke parent IDM -->
+                        <div class="border border-blue-200 rounded-lg p-4 bg-blue-50">
                             <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
-                                <label class="block text-sm font-medium text-gray-700">Berat Perut</label>
-                                <input type="number" step="0.01" name="details[perutan][weight]" id="weight_perutan"
-                                    placeholder="0.00" required min="0"
+                                <label class="block text-sm font-medium text-gray-700">
+                                    Berat IDM <span class="text-red-500">*</span>
+                                </label>
+                                <input type="number" step="0.01" name="details[IDM][weight]" id="weight_idm"
+                                    placeholder="0.00" required min="0.01" value="{{ old('details.IDM.weight') }}"
                                     class="block w-full rounded-md border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 text-base py-2.5 px-4 col-span-2 weight-input">
                             </div>
+                            <p class="text-xs text-gray-500 mt-2">Output langsung ke grade parent IDM</p>
                         </div>
 
-                        <!-- Berat Kakian -->
+                        <!-- Berat KAKIAN (opsional) -->
                         <div class="border border-gray-200 rounded-lg p-4">
                             <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
                                 <label class="block text-sm font-medium text-gray-700">Berat Kakian</label>
-                                <input type="number" step="0.01" name="details[kakian][weight]" id="weight_kakian"
-                                    placeholder="0.00" required min="0"
+                                <input type="number" step="0.01" name="details[KAKIAN][weight]" id="weight_kakian"
+                                    placeholder="0.00" min="0" value="{{ old('details.KAKIAN.weight', 0) }}"
                                     class="block w-full rounded-md border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 text-base py-2.5 px-4 col-span-2 weight-input">
                             </div>
                         </div>
 
-                        <!-- Berat IDM -->
+                        <!-- Berat PERUTAN (opsional) -->
                         <div class="border border-gray-200 rounded-lg p-4">
                             <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
-                                <label class="block text-sm font-medium text-gray-700">Berat IDM</label>
-                                <input type="number" step="0.01" name="details[idm][weight]" id="weight_idm"
-                                    placeholder="0.00" required min="0"
+                                <label class="block text-sm font-medium text-gray-700">Berat Perutan</label>
+                                <input type="number" step="0.01" name="details[PERUTAN][weight]" id="weight_perutan"
+                                    placeholder="0.00" min="0" value="{{ old('details.PERUTAN.weight', 0) }}"
+                                    class="block w-full rounded-md border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 text-base py-2.5 px-4 col-span-2 weight-input">
+                            </div>
+                        </div>
+
+                        <!-- Berat ALU (opsional) -->
+                        <div class="border border-gray-200 rounded-lg p-4">
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
+                                <label class="block text-sm font-medium text-gray-700">Berat Alu/Afkir</label>
+                                <input type="number" step="0.01" name="details[ALU][weight]" id="weight_alu"
+                                    placeholder="0.00" min="0" value="{{ old('details.ALU.weight', 0) }}"
                                     class="block w-full rounded-md border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 text-base py-2.5 px-4 col-span-2 weight-input">
                             </div>
                         </div>
@@ -140,7 +154,7 @@
 
                         <!-- Error: melebihi berat awal -->
                         <div id="weight-error" class="hidden bg-red-50 border border-red-300 rounded-lg p-3 text-sm text-red-700">
-                            Total berat (perutan + kakian + IDM) melebihi berat awal. Kurangi salah satu berat.
+                            Total berat output melebihi berat awal. Kurangi salah satu berat.
                         </div>
 
                         <!-- Submit -->
@@ -170,7 +184,7 @@
                             </svg>
                         </div>
                         <div class="mt-3 text-center w-full">
-                            <h3 class="text-lg leading-6 font-medium text-gray-900">Konfirmasi IDM</h3>
+                            <h3 class="text-lg leading-6 font-medium text-gray-900">Konfirmasi Output IDM</h3>
                             <div class="mt-4 text-left">
                                 <div class="bg-gray-50 rounded-lg p-4 space-y-3 text-sm">
                                     <div class="flex justify-between">
@@ -178,16 +192,20 @@
                                         <span class="font-medium text-gray-900" id="modal-total-weight"></span>
                                     </div>
                                     <div class="flex justify-between">
-                                        <span class="text-gray-500">Berat Perut:</span>
-                                        <span class="font-medium text-gray-900" id="modal-weight-perutan"></span>
+                                        <span class="text-gray-500">IDM:</span>
+                                        <span class="font-medium text-gray-900" id="modal-weight-idm"></span>
                                     </div>
                                     <div class="flex justify-between">
-                                        <span class="text-gray-500">Berat Kakian:</span>
+                                        <span class="text-gray-500">Kakian:</span>
                                         <span class="font-medium text-gray-900" id="modal-weight-kakian"></span>
                                     </div>
                                     <div class="flex justify-between">
-                                        <span class="text-gray-500">Berat IDM:</span>
-                                        <span class="font-medium text-gray-900" id="modal-weight-idm"></span>
+                                        <span class="text-gray-500">Perutan:</span>
+                                        <span class="font-medium text-gray-900" id="modal-weight-perutan"></span>
+                                    </div>
+                                    <div class="flex justify-between">
+                                        <span class="text-gray-500">Alu/Afkir:</span>
+                                        <span class="font-medium text-gray-900" id="modal-weight-alu"></span>
                                     </div>
                                     <div class="flex justify-between pt-2 border-t border-gray-200 font-semibold">
                                         <span class="text-gray-700">Susut:</span>
@@ -218,16 +236,16 @@
             document.addEventListener('DOMContentLoaded', function () {
                 const totalWeightInput = document.getElementById('total_weight');
                 const shrinkageInput   = document.getElementById('shrinkage');
-
-                const submitBtn   = document.getElementById('submitBtn');
-                const weightError = document.getElementById('weight-error');
+                const submitBtn        = document.getElementById('submitBtn');
+                const weightError      = document.getElementById('weight-error');
 
                 function calculate() {
                     const totalWeight = parseFloat(totalWeightInput.value) || 0;
-                    const wPerut  = parseFloat(document.getElementById('weight_perutan').value) || 0;
-                    const wKakian = parseFloat(document.getElementById('weight_kakian').value) || 0;
-                    const wIdm    = parseFloat(document.getElementById('weight_idm').value) || 0;
-                    const shrinkage = totalWeight - wPerut - wKakian - wIdm;
+                    const wIdm        = parseFloat(document.getElementById('weight_idm').value) || 0;
+                    const wKakian     = parseFloat(document.getElementById('weight_kakian').value) || 0;
+                    const wPerutan    = parseFloat(document.getElementById('weight_perutan').value) || 0;
+                    const wAlu        = parseFloat(document.getElementById('weight_alu').value) || 0;
+                    const shrinkage   = totalWeight - wIdm - wKakian - wPerutan - wAlu;
                     shrinkageInput.value = shrinkage.toFixed(2);
 
                     if (shrinkage < 0) {
@@ -240,13 +258,16 @@
                 }
 
                 document.querySelectorAll('.weight-input').forEach(el => el.addEventListener('input', calculate));
+                calculate();
 
                 window.showConfirmationModal = function () {
                     if (submitBtn.disabled) return;
-                    document.getElementById('modal-total-weight').textContent    = (totalWeightInput.value || 0) + ' gr';
-                    document.getElementById('modal-weight-perutan').textContent  = (document.getElementById('weight_perutan').value || 0) + ' gr';
+
+                    document.getElementById('modal-total-weight').textContent = (totalWeightInput.value || 0) + ' gr';
+                    document.getElementById('modal-weight-idm').textContent   = (document.getElementById('weight_idm').value || 0) + ' gr';
                     document.getElementById('modal-weight-kakian').textContent   = (document.getElementById('weight_kakian').value || 0) + ' gr';
-                    document.getElementById('modal-weight-idm').textContent      = (document.getElementById('weight_idm').value || 0) + ' gr';
+                    document.getElementById('modal-weight-perutan').textContent  = (document.getElementById('weight_perutan').value || 0) + ' gr';
+                    document.getElementById('modal-weight-alu').textContent      = (document.getElementById('weight_alu').value || 0) + ' gr';
                     document.getElementById('modal-shrinkage').textContent       = (shrinkageInput.value || 0) + ' gr';
                     document.getElementById('confirmationModal').classList.remove('hidden');
                 };
