@@ -73,7 +73,7 @@ class ManajemenIdmService
 
         if (!empty($filters['search'])) {
             $query->whereHas('gradeCompany', function ($q) use ($filters) {
-                $q->where('grade_name', 'like', '%' . $filters['search'] . '%');
+                $q->where('name', 'like', '%' . $filters['search'] . '%');
             });
         }
 
@@ -140,6 +140,17 @@ class ManajemenIdmService
 
             $this->revertRegradingTransactions($mgmt);
 
+            // Soft-delete IDM-SR lama (akan dibuat ulang dengan berat baru)
+            $oldIdmSRIds = SortingResult::where('idm_management_id', $id)
+                ->whereNull('receipt_item_id')
+                ->pluck('id');
+            if ($oldIdmSRIds->isNotEmpty()) {
+                $userId = Auth::id();
+                SortingResult::whereIn('id', $oldIdmSRIds)
+                    ->update(['deleted_by' => $userId]);
+                SortingResult::whereIn('id', $oldIdmSRIds)->delete();
+            }
+
             $mgmt->details()->delete();
 
             $mgmt->update(['shrinkage' => $shrinkage]);
@@ -179,7 +190,19 @@ class ManajemenIdmService
 
             $this->revertRegradingTransactions($mgmt);
 
-            SortingResult::where('idm_management_id', $id)->update(['idm_management_id' => null]);
+            // Unlink source SortingResult agar bisa di-regrade lagi
+            SortingResult::where('idm_management_id', $id)
+                ->whereNotNull('receipt_item_id') // hanya source SR (IDM-SR punya receipt_item_id = null)
+                ->update(['idm_management_id' => null]);
+
+            // Soft-delete IDM-SR (synthesized output bins) supaya tidak jadi orphan
+            $idmSRIds = SortingResult::where('idm_management_id', $id)->pluck('id');
+            if ($idmSRIds->isNotEmpty()) {
+                $userId = Auth::id();
+                SortingResult::whereIn('id', $idmSRIds)
+                    ->update(['deleted_by' => $userId]);
+                SortingResult::whereIn('id', $idmSRIds)->delete();
+            }
 
             $mgmt->details()->delete();
             $mgmt->delete();
@@ -246,7 +269,10 @@ class ManajemenIdmService
             'created_by'            => $userId,
         ]);
 
-        // 2. Per-output: buat idm_detail + (kalau weight > 0) inventory_transaction IDM_REGRADING_IN
+        // 2. Per-output: synthesize SortingResult (IDM-SR) + buat idm_detail + inventory_transaction
+        //    IDM-SR adalah batch virtual yang dibuat dari output ManajemenIDM, supaya 4 modul
+        //    barang-keluar (Penjualan, Transfer Internal, Transfer External, Receive External)
+        //    bisa pilih output IDM sebagai sumber via getGradingSourcesWithStock().
         foreach ($outputs as $name => $out) {
             IdmDetail::create([
                 'idm_management_id' => $mgmt->id,
@@ -256,6 +282,18 @@ class ManajemenIdmService
             ]);
 
             if ($out['weight'] > 0 && $out['grade_company_id']) {
+                $idmSortingResult = SortingResult::create([
+                    'grading_date'      => now(),
+                    'receipt_item_id'   => null,
+                    'grade_company_id'  => $out['grade_company_id'],
+                    'weight_grams'      => $out['weight'],
+                    'outgoing_type'     => null,
+                    'category_grade'    => null,
+                    'notes'             => "Auto-generated from ManajemenIDM #{$mgmt->id}",
+                    'idm_management_id' => $mgmt->id,
+                    'created_by'        => $userId,
+                ]);
+
                 InventoryTransaction::create([
                     'transaction_date'      => now(),
                     'grade_company_id'      => $out['grade_company_id'],
@@ -264,6 +302,7 @@ class ManajemenIdmService
                     'quantity_change_grams' => $out['weight'],
                     'transaction_type'      => 'IDM_REGRADING_IN',
                     'reference_id'          => $mgmt->id,
+                    'sorting_result_id'     => $idmSortingResult->id,
                     'created_by'            => $userId,
                 ]);
             }
@@ -300,14 +339,17 @@ class ManajemenIdmService
 
     private function hasOutflow(IdmManagement $mgmt): bool
     {
-        $outputGradeIds = $mgmt->details->pluck('grade_company_id')->filter()->unique();
+        // Filter ke IDM-SR rows yang dibuat oleh Mgmt ini saja, supaya tidak salah match
+        // dengan outflow di grade yang sama dari Grading biasa (yang bukan berasal dari Mgmt).
+        $idmSortingResultIds = SortingResult::where('idm_management_id', $mgmt->id)
+            ->pluck('id');
 
-        if ($outputGradeIds->isEmpty()) {
+        if ($idmSortingResultIds->isEmpty()) {
             return false;
         }
 
         return InventoryTransaction::where('reference_id', '!=', $mgmt->id)
-            ->whereIn('grade_company_id', $outputGradeIds)
+            ->whereIn('sorting_result_id', $idmSortingResultIds)
             ->whereIn('transaction_type', self::OUTFLOW_TYPES)
             ->exists();
     }

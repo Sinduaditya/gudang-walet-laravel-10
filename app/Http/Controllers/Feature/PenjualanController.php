@@ -47,13 +47,23 @@ class PenjualanController extends Controller
                 return [
                     'id'               => $source->id,
                     'name'             => $source->gradeCompany->name ?? 'Unknown',
-                    'supplier_name'    => $source->receiptItem->purchaseReceipt->supplier->name ?? 'Unknown',
-                    'supplier_id'      => $source->receiptItem->purchaseReceipt->supplier_id ?? null,
+                    'supplier_name'    => $source->receiptItem?->purchaseReceipt?->supplier?->name
+                                          ?? $source->idmManagement?->supplier?->name
+                                          ?? 'Unknown',
+                    'supplier_id'      => $source->receiptItem?->purchaseReceipt?->supplier_id
+                                          ?? $source->idmManagement?->supplier_id
+                                          ?? null,
                     'grading_date'     => $source->grading_date ? $source->grading_date->format('d M Y') : '-',
                     'batch_stock_grams' => $source->adjusted_weight,
                     'total_stock_grams' => $source->real_global_stock,
+                    'is_idm_output'    => !is_null($source->idm_management_id),
                 ];
             });
+
+            // Pisahkan: Grading form hanya tampilkan batch grading reguler.
+            // IDM-SR dipindah ke variable khusus untuk tab "Stok Hasil Manajemen IDM".
+            $idmGradesWithStock = $gradesWithStock->where('is_idm_output', true)->values();
+            $gradesWithStock    = $gradesWithStock->where('is_idm_output', false)->values();
 
             $suppliers = \App\Models\Supplier::all();
             $grades    = \App\Models\GradeCompany::all();
@@ -88,6 +98,43 @@ class PenjualanController extends Controller
 
             $penjualanTransactions = $query->paginate(10)->withQueryString();
 
+            // ── RIWAYAT PENJUALAN DARI MANAJEMEN IDM ──────────────
+            // Tampilkan SALE_OUT yang bersumber dari IDM-SR (sorting_result.idm_management_id IS NOT NULL)
+            $idmQuery = InventoryTransaction::where('transaction_type', 'SALE_OUT')
+                ->whereHas('sortingResult', function ($q) {
+                    $q->whereNotNull('idm_management_id');
+                })
+                ->with([
+                    'gradeCompany',
+                    'location',
+                    'sortingResult.idmManagement.supplier',
+                ])
+                ->orderBy('transaction_date', 'desc')
+                ->orderBy('id', 'desc');
+
+            if ($request->filled('idm_start_date')) {
+                $idmQuery->whereDate('transaction_date', '>=', $request->idm_start_date);
+            }
+            if ($request->filled('idm_end_date')) {
+                $idmQuery->whereDate('transaction_date', '<', $request->idm_end_date);
+            }
+            if ($request->filled('idm_supplier_id')) {
+                $idmQuery->whereHas('sortingResult.idmManagement', function ($q) use ($request) {
+                    $q->where('supplier_id', $request->idm_supplier_id);
+                });
+            }
+            if ($request->filled('idm_grade_company_id')) {
+                $idmQuery->where('grade_company_id', $request->idm_grade_company_id);
+            }
+
+            $idmSummary = (clone $idmQuery)->get()
+                ->groupBy('gradeCompany.name')
+                ->map(function ($group) {
+                    return $group->sum(fn($tx) => abs($tx->quantity_change_grams));
+                });
+
+            $idmPenjualanTransactions = $idmQuery->paginate(10, ['*'], 'idm_page')->withQueryString();
+
             // ── STOK SORTIR ───────────────────────────────────────
             $this->sortService->recalculateAllParentStocks();
             $sortStocks           = $this->sortService->getAvailableSortStock();
@@ -106,7 +153,10 @@ class PenjualanController extends Controller
 
             return view('admin.barang-keluar.sell', compact(
                 'gradesWithStock',
+                'idmGradesWithStock',
                 'penjualanTransactions',
+                'idmPenjualanTransactions',
+                'idmSummary',
                 'defaultLocation',
                 'suppliers',
                 'grades',

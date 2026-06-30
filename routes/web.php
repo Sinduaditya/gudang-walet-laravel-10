@@ -189,6 +189,8 @@ Route::middleware(['auth'])->group(function () {
             ->group(function () {
                 Route::get('/', [TrackingStockController::class, 'index'])->name('get.grade.company');
 
+                Route::get('/idm', [TrackingStockController::class, 'idmStocks'])->name('idm-stocks');
+
                 // New routes for hierarchy
                 Route::get('/parent/{id}/grades', [TrackingStockController::class, 'parentGrades'])->name('parent-grades');
                 Route::get('/parent/{id}/sorts', [TrackingStockController::class, 'parentSorts'])->name('parent-sorts');

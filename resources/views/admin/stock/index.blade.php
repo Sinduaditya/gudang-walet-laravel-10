@@ -44,7 +44,34 @@
                 </form>
             </div>
 
+            {{-- Card Manajemen IDM (global, span 2 kolom = sepasang card parent) --}}
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div class="md:col-span-2 lg:col-span-2 bg-white rounded-xl shadow-sm hover:shadow-lg transition-all duration-300 border border-gray-100 overflow-hidden group">
+                    <div class="p-5">
+                        <div class="flex justify-between items-start mb-4">
+                            <div class="w-12 h-12 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600">
+                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                </svg>
+                            </div>
+                            <span class="bg-emerald-100 text-emerald-800 text-xs font-semibold px-2.5 py-0.5 rounded border border-emerald-200">
+                                6 Grades
+                            </span>
+                        </div>
+                        <h3 class="text-lg font-bold text-gray-800 mb-1 group-hover:text-emerald-600 transition-colors">
+                            Manajemen IDM (Regrade)
+                        </h3>
+                        <p class="text-sm text-gray-500 mb-4">
+                            Lihat stok hasil regrading IDM
+                        </p>
+                        <a href="{{ route('tracking-stock.idm-stocks') }}"
+                            class="block w-full text-center py-2 px-4 bg-gray-50 hover:bg-emerald-50 text-gray-700 hover:text-emerald-700 rounded-lg text-sm font-medium transition-colors border border-gray-200 hover:border-emerald-200">
+                            Buka Detail
+                        </a>
+                    </div>
+                </div>
+
                 @forelse($parentGrades as $parent)
                     {{-- Card 1: Child Grades --}}
                     <div
