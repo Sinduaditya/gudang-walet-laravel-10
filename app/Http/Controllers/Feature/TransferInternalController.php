@@ -286,44 +286,10 @@ class TransferInternalController extends Controller
                 $transfer = \App\Models\StockTransfer::lockForUpdate()->findOrFail($id);
                 $userId = auth()->id();
 
-                // FIFO reversal: TRANSFER_OUT boleh dihapus (regular ATAU dari IDM-SR).
-                // Delete akan create TRANSFER_REVERT yang mengembalikan stok.
-                // Mgmt delete di-block terpisah di ManajemenIdmService::assertNoOutflow().
-
-                $totalDeduction = abs($transfer->weight_grams) + abs($transfer->susut_grams ?? 0);
-
-                $outTx = $transfer->transactions()->where("transaction_type", "TRANSFER_OUT")->first();
-                if ($outTx) {
-                    InventoryTransaction::create([
-                        "transaction_date" => now(),
-                        "grade_company_id" => $transfer->grade_company_id,
-                        "location_id" => $transfer->from_location_id,
-                        "supplier_id" => $outTx->supplier_id,
-                        "quantity_change_grams" => $totalDeduction,
-                        "transaction_type" => "TRANSFER_REVERT_OUT",
-                        "reference_id" => $transfer->id,
-                        "sorting_result_id" => $transfer->sorting_result_id,
-                        "created_by" => $userId,
-                    ]);
-                }
-
-                $inTx = $transfer->transactions()->where("transaction_type", "TRANSFER_IN")->first();
-                $toLocation = Location::find($transfer->to_location_id);
-                // Untuk lokasi non-jasa-cuci (exit-point seperti DMK), TRANSFER_IN tidak pernah
-                // dibuat saat transfer, jadi saat reverts juga tidak perlu dibuat.
-                if ($inTx && $toLocation && !$toLocation->is_jasa_cuci) {
-                    InventoryTransaction::create([
-                        "transaction_date" => now(),
-                        "grade_company_id" => $transfer->grade_company_id,
-                        "location_id" => $transfer->to_location_id,
-                        "supplier_id" => $inTx->supplier_id,
-                        "quantity_change_grams" => -abs($transfer->weight_grams),
-                        "transaction_type" => "TRANSFER_REVERT_IN",
-                        "reference_id" => $transfer->id,
-                        "sorting_result_id" => $transfer->sorting_result_id,
-                        "created_by" => $userId,
-                    ]);
-                }
+                // FIFO reversal: TIDAK create TRANSFER_REVERT_OUT/IN. Cukup soft-delete
+                // TRANSFER_OUT/IN existing. Kalau REVERT dibuat, REVERT jadi "active" +
+                // original soft-deleted = over-cancellation.
+                // Audit trail: TRANSFER_OUT/IN (soft-deleted dengan deleted_by) + log.
 
                 foreach ($transfer->transactions as $transaction) {
                     $transaction->deleted_by = $userId;

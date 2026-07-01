@@ -558,6 +558,169 @@ Hapus block FIFO check di 3 controller. Sekarang SALE_OUT/Transfer bisa dihapus 
 
 ---
 
+## 25.6 Bug Fix — Grading Tab Ikut Tampilkan SALE dari IDM-SR + Supplier Name Missing
+
+**File**:
+- `app/Http/Controllers/Feature/PenjualanController.php` (line 72-86)
+- `app/Models/SortingResult.php` (line 76-79)
+- `resources/views/admin/barang-keluar/sell.blade.php` (line 598, 752)
+
+### Problem
+
+User report 1 Juli 2026:
+1. "Riwayat penjualan dari manajemen idm masih muncul di riwayat penjualan grading"
+2. "Nama suppliernya belum muncul"
+
+### Fix 1: Filter IDM-SR dari Grading Tab
+
+Tambah filter `whereHas('sortingResult', fn($q) => $q->whereNull('idm_management_id'))` di query grading — SALE dari IDM-SR tampil hanya di tab khusus "Riwayat Penjualan dari Manajemen IDM".
+
+### Fix 2: Supplier Name Robust Lookup
+
+View pakai fallback chain (line 598 + 752):
+```blade
+{{ $tx->sortingResult?->receiptItem?->purchaseReceipt?->supplier?->name
+   ?? $tx->sortingResult?->idmManagement?->supplier?->name
+   ?? optional(\App\Models\Supplier::find($tx->supplier_id))->name
+   ?? '-' }}
+```
+
+Priority: receipt → Mgmt → transaction.supplier_id (sudah ter-populate dengan benar oleh `getSupplierIdFromSortingResult`).
+
+### Fix 3: `idmManagement` Relation `withTrashed()`
+
+`SortingResult::idmManagement()` — sebelumnya default `belongsTo` (exclude soft-deleted Mgmt). Setelah Mgmt di-delete, supplier relation null. Tambah `->withTrashed()`:
+```php
+public function idmManagement()
+{
+    return $this->belongsTo(IdmManagement::class)->withTrashed();
+}
+```
+
+Sekarang supplier name tampil walaupun Mgmt sudah soft-deleted.
+
+### Verifikasi
+
+| Skenario | Sebelum | Sesudah |
+|---|---|---|
+| Grading tab menampilkan SALE dari IDM-SR | 148 rows IDM-SR (incorrect) | 0 (filtered out) |
+| IDM tab menampilkan SALE_OUT (Mgmt #12 soft-deleted, supplier_id=12 Hengki) | Empty (Mgmt #12 null) | "Hengki" ✓ |
+
+## 25.5 Bug Fix — IDM Page Tidak Reflect Outflow (SALE/Transfer dari IDM-SR)
+
+**File**: `app/Services/Stock/TrackingStockService.php` (line 141-220)
+
+### Problem
+
+User report 1 Juli 2026: "jual 1000g dari IDM, tracking stock IDM di /admin/tracking-stock/idm tidak berkurang".
+
+`calculateIdmStockBulk` hanya menghitung transactions dengan type `IDM_REGRADING_*` (Mgmt input/output). SALE_OUT, TRANSFER_OUT, dll — yang linked ke IDM-SR — TIDAK dihitung. Akibatnya IDM page selalu tampilkan "IDM_REGRADING_IN" saja, tidak berkurang saat ada SALE dari IDM-SR.
+
+### Fix
+
+Tambah `IDM_OUTFLOW_TYPES` constant + update `calculateIdmStock` dan `calculateIdmStockBulk` untuk juga menghitung outflow yang linked ke IDM-SR:
+
+```php
+public const IDM_OUTFLOW_TYPES = [
+    'SALE_OUT',
+    'TRANSFER_OUT',
+    'EXTERNAL_TRANSFER_OUT',
+    'RECEIVE_EXTERNAL_OUT',
+    'IDM_TRANSFER_OUT',
+];
+
+public function calculateIdmStockBulk(array $gradeIds): array
+{
+    $idmSRIds = SortingResult::whereNotNull('idm_management_id')->pluck('id');
+
+    $results = [];
+    foreach ($gradeIds as $gid) {
+        // 1. Sum IDM_REGRADING_* (Mgmt in/out)
+        $inOut = InventoryTransaction::where('grade_company_id', $gid)
+            ->whereNull('deleted_at')
+            ->whereIn('transaction_type', self::IDM_TRANSACTION_TYPES)
+            ->sum('quantity_change_grams');
+
+        // 2. Subtract outflows yang linked ke IDM-SR
+        $outflow = 0;
+        if ($idmSRIds->isNotEmpty()) {
+            $outflow = InventoryTransaction::where('grade_company_id', $gid)
+                ->whereNull('deleted_at')
+                ->whereIn('sorting_result_id', $idmSRIds)
+                ->whereIn('transaction_type', self::IDM_OUTFLOW_TYPES)
+                ->sum('quantity_change_grams');
+        }
+
+        $results[$gid] = (int) round($inOut + $outflow);
+    }
+    return array_combine($gradeIds, array_map(fn($id) => $results[$id] ?? 0, $gradeIds));
+}
+```
+
+Logic: IDM page sekarang menampilkan "stok tersedia" (Mgmt output - outflow). Outflow di-filter by `sorting_result_id IN (idmSRIds)` supaya SALE_OUT regular (non-IDM) TIDAK ikut terhitung.
+
+### Verifikasi
+
+| Step | IDM Stok |
+|---|---|
+| Mgmt #21 IDM_REGRADING_IN | +2000g |
+| Outflow pre-existing (dari test sebelumnya) | -1000g |
+| **Sebelum jual** | **1000g** ✓ |
+| SALE 100g | -100g |
+| **Setelah jual** | **900g** ✓ |
+
+Sekarang halaman `/admin/tracking-stock/idm` akurat: IDM card berkurang saat user jual dari IDM-SR.
+
+## 25.4 Bug Fix — SALE_REVERT/TRANSFER_REVERT Over-Cancellation Pattern
+
+**File**:
+- `app/Http/Controllers/Feature/PenjualanController.php` (`destroy()` line 274-323)
+- `app/Http/Controllers/Feature/TransferInternalController.php` (`destroy()` line 285-340)
+- `app/Http/Controllers/Feature/TransferExternalController.php` (`destroy()` line 258-307)
+- `app/Http/Controllers/Feature/ReceiveExternalController.php` (`destroy()` line 358-405)
+
+### Problem
+
+User report 1 Juli 2026: "jual 1000g, tracking stock IDM tidak berubah. Hapus riwayat, stock kembali 2000, harusnya 1000".
+
+Investigasi: bug sama dengan IDM_REGRADING_REVERT (section 24). Pattern `create REVERT + soft-delete original` causes over-cancellation:
+- Original SALE_OUT -1000g (soft-deleted, excluded from SUM)
+- SALE_REVERT +1000g (active, included in SUM)
+- Net: +1000g extra (over-cancellation)
+
+Jadi delete = "tambah 1000g" bukan "kurangi 1000g".
+
+### Root Cause
+
+4 controller punya logic `delete` yang create REVERT transactions:
+- `PenjualanController::destroy()` — SALE_REVERT
+- `TransferInternalController::destroy()` — TRANSFER_REVERT_OUT + TRANSFER_REVERT_IN
+- `TransferExternalController::destroy()` — EXTERNAL_TRANSFER_REVERT_OUT + EXTERNAL_TRANSFER_REVERT_IN
+- `ReceiveExternalController::destroy()` — RECEIVE_EXTERNAL_REVERT_IN + RECEIVE_EXTERNAL_REVERT_OUT
+
+### Fix
+
+Hapus REVERT creation. Cukup soft-delete original transactions. Audit trail via:
+- Original transactions (soft-deleted dengan `deleted_by`)
+- Log entry di controller
+
+### Historical Cleanup
+
+Soft-delete 3 SALE_REVERT transactions:
+- 9624 (qty 200)
+- 9682 (qty 10)
+- 9728 (qty 1000)
+
+### Verifikasi End-to-End
+
+| Step | Stok IDM |
+|---|---|
+| Awal (Mgmt #21) | 2000g |
+| SALE 100g | **1900g** ✓ |
+| Hapus SALE | **2000g** ✓ (kembali ke asal, BUKAN 2100g) |
+
+Bug over-cancellation fixed. Stok sekarang akurat sebelum/sesudah sale dan delete.
+
 ## 25.3 Bug Fix — `getSupplierIdFromSortingResult` Tidak Handle IDM-SR
 
 **File**: `app/Services/BarangKeluar/BarangKeluarService.php` (line 34-55)

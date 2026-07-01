@@ -361,45 +361,22 @@ class ReceiveExternalController extends Controller
             return DB::transaction(function () use ($id) {
                 $transfer = \App\Models\StockTransfer::lockForUpdate()->findOrFail($id);
                 $userId = auth()->id();
-                
-                $totalDeduction = abs($transfer->weight_grams) + abs($transfer->susut_grams ?? 0);
-                
-                $inTx = $transfer->transactions()->where("transaction_type", "RECEIVE_EXTERNAL_IN")->first();
-                $outTx = $transfer->transactions()->where("transaction_type", "RECEIVE_EXTERNAL_OUT")->first();
-                
-                if ($inTx) {
-                    InventoryTransaction::create([
-                        "transaction_date" => now(),
-                        "grade_company_id" => $transfer->grade_company_id,
-                        "location_id" => $transfer->to_location_id,
-                        "supplier_id" => $inTx->supplier_id,
-                        "quantity_change_grams" => -abs($transfer->weight_grams),
-                        "transaction_type" => "RECEIVE_EXTERNAL_REVERT_IN",
-                        "reference_id" => $transfer->id,
-                        "sorting_result_id" => $transfer->sorting_result_id,
-                        "created_by" => $userId,
-                    ]);
+
+                // FIFO reversal: TIDAK create RECEIVE_EXTERNAL_REVERT_*. Cukup soft-delete
+                // existing RECEIVE_EXTERNAL_IN/OUT. Kalau REVERT dibuat, REVERT jadi "active" +
+                // original soft-deleted = over-cancellation.
+                // Audit trail: original (soft-deleted dengan deleted_by) + log.
+
+                foreach ($transfer->transactions as $transaction) {
+                    $transaction->deleted_by = $userId;
+                    $transaction->save();
+                    $transaction->delete();
                 }
-                
-                if ($outTx) {
-                    InventoryTransaction::create([
-                        "transaction_date" => now(),
-                        "grade_company_id" => $transfer->grade_company_id,
-                        "location_id" => $transfer->from_location_id,
-                        "supplier_id" => $outTx->supplier_id,
-                        "quantity_change_grams" => $totalDeduction,
-                        "transaction_type" => "RECEIVE_EXTERNAL_REVERT_OUT",
-                        "reference_id" => $transfer->id,
-                        "sorting_result_id" => $transfer->sorting_result_id,
-                        "created_by" => $userId,
-                    ]);
-                }
-                
-                $transfer->transactions()->delete();
+
                 $transfer->deleted_by = $userId;
                 $transfer->save();
                 $transfer->delete();
-                
+
                 return redirect()->route("barang.keluar.receive-external.step1")
                     ->with("success", "Penerimaan berhasil dihapus dan stok dikembalikan.");
             });

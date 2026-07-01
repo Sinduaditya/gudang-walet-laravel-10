@@ -145,12 +145,40 @@ class TrackingStockService
         'IDM_REGRADING_REVERT_OUT',
     ];
 
+    // Outflow types yang counted kalau linked ke IDM-SR (sorting_result.idm_management_id IS NOT NULL)
+    public const IDM_OUTFLOW_TYPES = [
+        'SALE_OUT',
+        'TRANSFER_OUT',
+        'EXTERNAL_TRANSFER_OUT',
+        'RECEIVE_EXTERNAL_OUT',
+        'IDM_TRANSFER_OUT',
+    ];
+
     public function calculateIdmStock(int $gradeId): int
     {
-        return (int) round(InventoryTransaction::where('grade_company_id', $gradeId)
+        return (int) round($this->calculateIdmAvailableStock($gradeId));
+    }
+
+    public function calculateIdmAvailableStock(int $gradeId): float
+    {
+        // 1. Sum IDM_REGRADING_IN/OUT + REVERT_IN/OUT (Mgmt output + REVERT)
+        $inOut = (float) InventoryTransaction::where('grade_company_id', $gradeId)
             ->whereNull('deleted_at')
             ->whereIn('transaction_type', self::IDM_TRANSACTION_TYPES)
-            ->sum('quantity_change_grams'));
+            ->sum('quantity_change_grams');
+
+        // 2. Subtract outflows (SALE_OUT, TRANSFER_OUT, etc.) yang linked ke IDM-SR
+        $idmSRIds = \App\Models\SortingResult::whereNotNull('idm_management_id')->pluck('id');
+        $outflow = 0.0;
+        if ($idmSRIds->isNotEmpty()) {
+            $outflow = (float) InventoryTransaction::where('grade_company_id', $gradeId)
+                ->whereNull('deleted_at')
+                ->whereIn('sorting_result_id', $idmSRIds)
+                ->whereIn('transaction_type', self::IDM_OUTFLOW_TYPES)
+                ->sum('quantity_change_grams');
+        }
+
+        return $inOut + $outflow;  // outflow sudah negative
     }
 
     public function calculateIdmStockBulk(array $gradeIds): array
@@ -159,19 +187,28 @@ class TrackingStockService
             return [];
         }
 
-        $results = InventoryTransaction::select('grade_company_id')
-            ->selectRaw('SUM(quantity_change_grams) as total_stock')
-            ->whereIn('grade_company_id', $gradeIds)
-            ->whereNull('deleted_at')
-            ->whereIn('transaction_type', self::IDM_TRANSACTION_TYPES)
-            ->groupBy('grade_company_id')
-            ->pluck('total_stock', 'grade_company_id')
-            ->toArray();
+        $idmSRIds = \App\Models\SortingResult::whereNotNull('idm_management_id')->pluck('id');
 
-        return array_combine(
-            $gradeIds,
-            array_map(fn($id) => (int) round($results[$id] ?? 0), $gradeIds)
-        );
+        $results = [];
+        foreach ($gradeIds as $gid) {
+            $inOut = (float) InventoryTransaction::where('grade_company_id', $gid)
+                ->whereNull('deleted_at')
+                ->whereIn('transaction_type', self::IDM_TRANSACTION_TYPES)
+                ->sum('quantity_change_grams');
+
+            $outflow = 0.0;
+            if ($idmSRIds->isNotEmpty()) {
+                $outflow = (float) InventoryTransaction::where('grade_company_id', $gid)
+                    ->whereNull('deleted_at')
+                    ->whereIn('sorting_result_id', $idmSRIds)
+                    ->whereIn('transaction_type', self::IDM_OUTFLOW_TYPES)
+                    ->sum('quantity_change_grams');
+            }
+
+            $results[$gid] = (int) round($inOut + $outflow);
+        }
+
+        return array_combine($gradeIds, array_map(fn($id) => $results[$id] ?? 0, $gradeIds));
     }
 
     public function getIdmRelatedGrades(): Collection
