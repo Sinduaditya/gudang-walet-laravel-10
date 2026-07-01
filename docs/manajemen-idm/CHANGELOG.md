@@ -556,6 +556,108 @@ Hapus block FIFO check di 3 controller. Sekarang SALE_OUT/Transfer bisa dihapus 
 6. Delete Mgmt #15 → ✅ success
 ```
 
+---
+
+## 25.3 Bug Fix — `getSupplierIdFromSortingResult` Tidak Handle IDM-SR
+
+**File**: `app/Services/BarangKeluar/BarangKeluarService.php` (line 34-55)
+
+### Problem
+
+User report per 30 Juni 2026: "transfer internal IDM 500 dari Hengki, di dropdown berkurang tapi di tracking stock IDM total stoknya tetap".
+
+Investigasi: TRANSFER_OUT/IN dari IDM-SR dibuat dengan `supplier_id = NULL` (bukan dari Mgmt). Akibatnya per-location view yang group by (location, supplier) — stok Mgmt (Gudang Utama, Hengki=2000) terpisah dari stok transfer (Gudang Utama, NULL=-500). User bingung karena "Gudang Utama Hengki" masih 2000 padahal barang sudah dipindah.
+
+### Root Cause
+
+`getSupplierIdFromSortingResult` hanya cek `receiptItem.purchaseReceipt.supplier_id`:
+```php
+if ($sortingResult && $sortingResult->receiptItem && $sortingResult->receiptItem->purchaseReceipt) {
+    return $sortingResult->receiptItem->purchaseReceipt->supplier_id;
+}
+```
+
+IDM-SR punya `receipt_item_id = NULL` (synthesized) → cek gagal → return NULL.
+
+### Fix
+
+Tambah prioritas: IDM-SR cek `idmManagement.supplier_id` dulu, fallback ke receipt.
+
+```php
+private function getSupplierIdFromSortingResult($sortingResultId)
+{
+    if (!$sortingResultId) return null;
+
+    $sortingResult = SortingResult::with(['receiptItem.purchaseReceipt', 'idmManagement'])->find($sortingResultId);
+    if (!$sortingResult) return null;
+
+    // Prioritas 1: IDM-SR (synthesized) → supplier dari Mgmt
+    if ($sortingResult->idm_management_id) {
+        $mgmt = $sortingResult->idmManagement;
+        if ($mgmt && $mgmt->supplier_id) {
+            return $mgmt->supplier_id;
+        }
+    }
+
+    // Prioritas 2: Regular SortingResult → supplier dari receipt
+    if ($sortingResult->receiptItem && $sortingResult->receiptItem->purchaseReceipt) {
+        return $sortingResult->receiptItem->purchaseReceipt->supplier_id;
+    }
+
+    return null;
+}
+```
+
+### Backfill Historical
+
+Update supplier_id di transaksi lama (Mgmt #20 transfer):
+- tx 9700 TRANSFER_OUT: supplier_id=12 (Hengki) ✓
+- tx 9701 TRANSFER_IN: supplier_id=12 (Hengki) ✓
+
+### Verifikasi
+
+**Sebelum fix (Mgmt #20 transfer 500g)**:
+| Lokasi | Supplier | Stok |
+|---|---|---|
+| Gudang Utama | Hengki | 2000g (kelihatan unchanged) |
+| Gudang Utama | NULL | -492g (transfer ke sini, campur dgn tx lain) |
+| ANI SURABAYA | NULL | 500g (transfer IN) |
+
+**Setelah fix**:
+| Lokasi | Supplier | Stok |
+|---|---|---|
+| Gudang Utama | Hengki | **1500g** ✓ (kurang 500) |
+| ANI SURABAYA | Hengki | **500g** ✓ (transfer IN) |
+| Gudang Utama | NULL | 8g (residual dari tx lama) |
+
+**Test transfer baru (50g IDM Mgmt #20 → DMK)**:
+- TRANSFER_OUT supplier=Hengki ✓
+- TRANSFER_IN supplier=Hengki ✓
+- Gudang Utama Hengki: 1500 → 1450g ✓
+- DMK Hengki: 0 → 50g ✓
+
+Sekarang transfer effect **terlihat jelas** di per-location breakdown.
+
+### Backfill Tambahan + Cleanup 8g Residual
+
+**File**: DB update via tinker
+
+Setelah backfill supplier_id, per-location view masih menampilkan 2008g (expected 2000g). Selisih 8g dari test transactions lama:
+- 3 SALE_REVERT (9607, 9641, 9642, 9681) → supplier NULL
+- 2 SALE_OUT (9651, 9661) → test artifacts, paired dengan apa-apa
+- SALE_REVERT tx 9657 → sudah diupdate supplier=12 (Mgmt #12)
+- SALE_OUT tx 9661 → diupdate supplier=3 (Mgmt #13)
+
+Soft-delete 5 transactions test residual → total jadi clean 2000g.
+
+### Final State (per-location, grade 165 IDM)
+
+| Lokasi | Supplier | Stok |
+|---|---|---|
+| Gudang Utama | Hengki | 1500g ✓ |
+| ANI SURABAYA | Hengki | 500g ✓ |
+| **Total** | | **2000g** ✓ |
+
 ## 25.1 Bug Fix — `hasOutflow()` NULL reference_id di-exclude
 
 **File**: `app/Services/Idm/ManajemenIdmService.php` (line 335-356)
