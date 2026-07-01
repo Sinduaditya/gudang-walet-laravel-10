@@ -40,7 +40,8 @@ class ReceiveExternalController extends Controller
                     'gradeCompany',
                     'location',
                     'stockTransfer.fromLocation',
-                    'sortingResult.receiptItem.purchaseReceipt.supplier'
+                    'sortingResult.receiptItem.purchaseReceipt.supplier',
+                    'sortingResult.idmManagement.supplier',
                 ])
                 ->whereHas('stockTransfer.fromLocation', function($q) {
                     $q->where('is_jasa_cuci', true);

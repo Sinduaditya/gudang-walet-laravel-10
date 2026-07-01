@@ -145,13 +145,12 @@ class TrackingStockService
         'IDM_REGRADING_REVERT_OUT',
     ];
 
-    // Outflow types yang counted kalau linked ke IDM-SR (sorting_result.idm_management_id IS NOT NULL)
+    // Outflow types yang counted kalau linked ke IDM-SR.
+    // HANYA SALE_OUT — karena goods yang dijual = consumption (permanently keluar sistem).
+    // TRANSFER_OUT, EXTERNAL_TRANSFER_OUT, RECEIVE_EXTERNAL_OUT TIDAK dihitung —
+    // karena goods masih ada di sistem (hanya pindah lokasi: DMK / Jasa Cuci).
     public const IDM_OUTFLOW_TYPES = [
         'SALE_OUT',
-        'TRANSFER_OUT',
-        'EXTERNAL_TRANSFER_OUT',
-        'RECEIVE_EXTERNAL_OUT',
-        'IDM_TRANSFER_OUT',
     ];
 
     public function calculateIdmStock(int $gradeId): int

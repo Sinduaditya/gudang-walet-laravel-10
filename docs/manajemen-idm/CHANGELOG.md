@@ -558,6 +558,115 @@ Hapus block FIFO check di 3 controller. Sekarang SALE_OUT/Transfer bisa dihapus 
 
 ---
 
+## 25.9 Bug Fix — Supplier Name Tidak Muncul di Riwayat Kembali External
+
+**File**:
+- `app/Http/Controllers/Feature/ReceiveExternalController.php` (line 38-49)
+- `resources/views/admin/barang-keluar/receive-external-step1.blade.php` (line 499-503)
+
+### Problem
+
+User report 1 Juli 2026: "yang kembali external itu suppliernya juga belum muncul".
+
+View line 499: `{{ $tx->sortingResult->receiptItem->purchaseReceipt->supplier->name ?? '-' }}` — untuk IDM-SR (no receiptItem), ini fall through ke '-'.
+
+### Fix
+
+1. Tambah eager load `sortingResult.idmManagement.supplier` di controller
+2. Update view pakai fallback chain (sama dengan Transfer Internal/External):
+```blade
+{{ $tx->sortingResult?->receiptItem?->purchaseReceipt?->supplier?->name
+   ?? $tx->sortingResult?->idmManagement?->supplier?->name
+   ?? optional(\App\Models\Supplier::find($tx->supplier_id))->name
+   ?? '-' }}
+```
+
+### Verifikasi
+
+- tx 9745 (Mgmt #21 IDM-SR 8221) → supplier "Aan" ✓
+- Test active: hanya ada 1 RECEIVE_EXTERNAL_IN (tx 9745) dari IDM-SR. Untuk regular Receive External, supplier_name resolved via receipt.
+
+## 25.8 Bug Fix — Supplier Name Tidak Muncul di Riwayat Transfer Internal/External
+
+**File**:
+- `app/Http/Controllers/Feature/TransferInternalController.php` (line 71-79)
+- `app/Http/Controllers/Feature/TransferExternalController.php` (line 64-72)
+- `resources/views/admin/barang-keluar/transfer-step1.blade.php` (line 474-478)
+- `resources/views/admin/barang-keluar/external-transfer-step1.blade.php` (line 495-499)
+
+### Problem
+
+User report 1 Juli 2026: "suppliernya belum muncul yang di riwayat transfer internal, external".
+
+View line 475/496: `{{ $transfer->sortingResult->receiptItem->purchaseReceipt->supplier->name ?? '-' }}` — untuk IDM-SR (no receiptItem), ini fall through ke '-' jadi supplier name tidak tampil.
+
+### Fix
+
+1. Tambah eager load `sortingResult.idmManagement.supplier` di 2 controller.
+2. Update view pakai fallback chain:
+```blade
+{{ $tx->sortingResult?->receiptItem?->purchaseReceipt?->supplier?->name
+   ?? $tx->sortingResult?->idmManagement?->supplier?->name
+   ?? optional(\App\Models\Supplier::find($tx->sortingResult?->idmManagement?->supplier_id ?? $tx->supplier_id))->name
+   ?? '-' }}
+```
+
+Priority: receipt → Mgmt → transaction.supplier_id (fallback).
+
+### Verifikasi
+
+| Tipe | Source | Supplier |
+|---|---|---|
+| Transfer dari IDM-SR (Mgmt #21) | IDM-SR 8221 | "Aan" (idmManagement) |
+| Transfer regular | SR 6331 | "Amay (Waluyo)" (supplier_id tx) |
+| Transfer regular | SR 7316 | "Batok" (supplier_id tx) |
+
+Sekarang supplier name tampil di riwayat Transfer Internal/External — baik dari IDM-SR maupun dari grading regular.
+
+## 25.7 Bug Fix — IDM Page Ikut Ngurang Saat Transfer (Seharusnya Cuma SALE)
+
+**File**: `app/Services/Stock/TrackingStockService.php` (line 148-156)
+
+### Problem
+
+User report 1 Juli 2026: "transfer internal/external di IDM page ngga ngurang, harusnya ngga ngurang soalnya ngga dijual".
+
+Setelah fix section 25.5, IDM card reflect semua outflow (SALE, TRANSFER, EXTERNAL_TRANSFER, RECEIVE_EXTERNAL). User bingung — transfer hanya memindahkan barang, BUKAN mengurangi stok. Yang mengurangi = SALE (barang keluar permanen ke customer).
+
+### Fix
+
+Perkecil `IDM_OUTFLOW_TYPES` jadi cuma `SALE_OUT`:
+
+```php
+// Outflow types yang counted kalau linked ke IDM-SR.
+// HANYA SALE_OUT — karena goods yang dijual = consumption (permanently keluar sistem).
+// TRANSFER_OUT, EXTERNAL_TRANSFER_OUT, RECEIVE_EXTERNAL_OUT TIDAK dihitung —
+// karena goods masih ada di sistem (hanya pindah lokasi: DMK / Jasa Cuci).
+public const IDM_OUTFLOW_TYPES = [
+    'SALE_OUT',
+];
+```
+
+### Konsep
+
+| Aksi | Tipe Transaksi | Kurangi IDM Card? | Alasan |
+|---|---|---|---|
+| Jual (SALE_OUT) | Outflow | ✅ Ya | Barang keluar permanen (customer) |
+| Transfer Internal (TRANSFER_OUT) | Pindah lokasi | ❌ Tidak | Barang masih di sistem (DMK) |
+| Transfer External (EXTERNAL_TRANSFER_OUT) | Pindah lokasi | ❌ Tidak | Barang masih di sistem (Jasa Cuci) |
+| Receive External (RECEIVE_EXTERNAL_OUT) | Inbound | ❌ Tidak | Barang kembali dari laundry |
+
+### Verifikasi
+
+| Step | Stok |
+|---|---|
+| Mgmt #21 IN | +2000g |
+| SALE 1000g | -1000g |
+| TRANSFER 500g (ke DMK) | (tidak dikurangi) |
+| **IDM card** | **1000g** ✓ |
+
+Per-location view tetap menampilkan 1500g (Gudang Utama) + 500g (DMK) = 2000g (total tidak berubah). Konsisten dengan konsep: barang pindah, bukan hilang.
+
 ## 25.6 Bug Fix — Grading Tab Ikut Tampilkan SALE dari IDM-SR + Supplier Name Missing
 
 **File**:

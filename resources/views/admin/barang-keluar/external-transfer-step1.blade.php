@@ -493,7 +493,10 @@
                                                 {{ $tx->gradeCompany->name ?? '-' }}
                                             </td>
                                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                                {{ $tx->sortingResult->receiptItem->purchaseReceipt->supplier->name ?? '-' }}
+                                                {{ $tx->sortingResult?->receiptItem?->purchaseReceipt?->supplier?->name
+                                                   ?? $tx->sortingResult?->idmManagement?->supplier?->name
+                                                   ?? optional(\App\Models\Supplier::find($tx->sortingResult?->idmManagement?->supplier_id ?? $tx->supplier_id))->name
+                                                   ?? '-' }}
                                             </td>
                                             <td class="px-6 py-4 whitespace-nowrap text-sm">
                                                 @php

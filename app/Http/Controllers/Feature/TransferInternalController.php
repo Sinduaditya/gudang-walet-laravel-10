@@ -72,7 +72,13 @@ class TransferInternalController extends Controller
             $query = StockTransfer::whereHas('transactions', function ($q) {
                 $q->where('transaction_type', 'TRANSFER_OUT');
             })
-                ->with(['gradeCompany', 'fromLocation', 'toLocation', 'sortingResult.receiptItem.purchaseReceipt.supplier'])
+                ->with([
+                    'gradeCompany',
+                    'fromLocation',
+                    'toLocation',
+                    'sortingResult.receiptItem.purchaseReceipt.supplier',
+                    'sortingResult.idmManagement.supplier',
+                ])
                 ->orderBy('transfer_date', 'desc');
 
             // Apply Filters

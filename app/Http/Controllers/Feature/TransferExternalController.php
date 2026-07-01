@@ -64,7 +64,14 @@ class TransferExternalController extends Controller
             $grades = \App\Models\GradeCompany::all();
 
             $query = InventoryTransaction::where('transaction_type', 'EXTERNAL_TRANSFER_OUT')
-                ->with(['gradeCompany', 'location', 'stockTransfer.fromLocation', 'stockTransfer.toLocation', 'sortingResult.receiptItem.purchaseReceipt.supplier'])
+                ->with([
+                    'gradeCompany',
+                    'location',
+                    'stockTransfer.fromLocation',
+                    'stockTransfer.toLocation',
+                    'sortingResult.receiptItem.purchaseReceipt.supplier',
+                    'sortingResult.idmManagement.supplier',
+                ])
                 ->orderBy('transaction_date', 'desc');
 
             // Apply Filters
