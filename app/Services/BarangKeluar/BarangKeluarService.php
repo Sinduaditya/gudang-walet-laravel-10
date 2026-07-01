@@ -37,10 +37,22 @@ class BarangKeluarService
             return null;
         }
 
-        $sortingResult = SortingResult::with('receiptItem.purchaseReceipt')->find($sortingResultId);
+        $sortingResult = SortingResult::with(['receiptItem.purchaseReceipt', 'idmManagement'])->find($sortingResultId);
 
-        // Pengecekan bertingkat agar tidak error "Attempt to read property on null"
-        if ($sortingResult && $sortingResult->receiptItem && $sortingResult->receiptItem->purchaseReceipt) {
+        if (!$sortingResult) {
+            return null;
+        }
+
+        // Prioritas 1: IDM-SR (synthesized from ManajemenIDM) → supplier dari Mgmt
+        if ($sortingResult->idm_management_id) {
+            $mgmt = $sortingResult->idmManagement;
+            if ($mgmt && $mgmt->supplier_id) {
+                return $mgmt->supplier_id;
+            }
+        }
+
+        // Prioritas 2: Regular SortingResult → supplier dari receipt
+        if ($sortingResult->receiptItem && $sortingResult->receiptItem->purchaseReceipt) {
             return $sortingResult->receiptItem->purchaseReceipt->supplier_id;
         }
 
