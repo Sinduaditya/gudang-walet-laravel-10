@@ -259,6 +259,10 @@ class TransferExternalController extends Controller
                 $transfer = \App\Models\StockTransfer::lockForUpdate()->findOrFail($id);
                 $userId = auth()->id();
 
+                // FIFO reversal: EXTERNAL_TRANSFER_OUT boleh dihapus (regular ATAU dari IDM-SR).
+                // Delete akan create EXTERNAL_TRANSFER_REVERT_* yang mengembalikan stok.
+                // Mgmt delete di-block terpisah di ManajemenIdmService::assertNoOutflow().
+
                 $totalDeduction = abs($transfer->weight_grams) + abs($transfer->susut_grams ?? 0);
 
                 $outTx = $transfer->transactions()->where("transaction_type", "EXTERNAL_TRANSFER_OUT")->first();

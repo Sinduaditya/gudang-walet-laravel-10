@@ -178,8 +178,10 @@ Route::middleware(['auth'])->group(function () {
                 Route::get('/step2', [ManajemenIdmController::class, 'createStep2'])->name('step2');
                 Route::post('/step2', [ManajemenIdmController::class, 'storeStep2'])->name('store-step2');
                 Route::get('/{id}', [ManajemenIdmController::class, 'show'])->name('show');
-                Route::get('/{id}/edit', [ManajemenIdmController::class, 'edit'])->name('edit');
-                Route::put('/{id}', [ManajemenIdmController::class, 'update'])->name('update');
+                // Edit route dinonaktifkan per 30 Juni 2026: FIFO enforcement.
+                // Kalau butuh update Mgmt, hapus + buat ulang dari awal.
+                // Route::get('/{id}/edit', [ManajemenIdmController::class, 'edit'])->name('edit');
+                // Route::put('/{id}', [ManajemenIdmController::class, 'update'])->name('update');
                 Route::delete('/{id}', [ManajemenIdmController::class, 'destroy'])->name('destroy');
             });
 

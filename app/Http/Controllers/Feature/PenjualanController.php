@@ -285,6 +285,11 @@ class PenjualanController extends Controller
                         ->with('error', 'Transaksi sudah dihapus sebelumnya.');
                 }
 
+                // FIFO reversal: SALE_OUT boleh dihapus (regular grading ATAU dari IDM-SR).
+                // Delete akan create SALE_REVERT yang mengembalikan stok.
+                // Mgmt delete sendirinya di-block oleh ManajemenIdmService::assertNoOutflow()
+                // ketika ada outflow — jadi hapus SALE_OUT dulu, baru Mgmt jadi editable lagi.
+
                 $existingRevert = \App\Models\InventoryTransaction::where('reference_id', $tx->id)
                     ->where('transaction_type', 'SALE_REVERT')
                     ->first();
