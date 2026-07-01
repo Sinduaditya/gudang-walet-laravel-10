@@ -75,7 +75,7 @@ class SortingResult extends Model
     }
     public function idmManagement()
     {
-        return $this->belongsTo(IdmManagement::class);
+        return $this->belongsTo(IdmManagement::class)->withTrashed();
     }
 
     public function deletedBy()

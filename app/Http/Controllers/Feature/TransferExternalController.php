@@ -259,44 +259,17 @@ class TransferExternalController extends Controller
                 $transfer = \App\Models\StockTransfer::lockForUpdate()->findOrFail($id);
                 $userId = auth()->id();
 
-                // FIFO reversal: EXTERNAL_TRANSFER_OUT boleh dihapus (regular ATAU dari IDM-SR).
-                // Delete akan create EXTERNAL_TRANSFER_REVERT_* yang mengembalikan stok.
-                // Mgmt delete di-block terpisah di ManajemenIdmService::assertNoOutflow().
+                // FIFO reversal: TIDAK create EXTERNAL_TRANSFER_REVERT_*. Cukup soft-delete
+                // EXTERNAL_TRANSFER_OUT/IN existing. Kalau REVERT dibuat, REVERT jadi "active" +
+                // original soft-deleted = over-cancellation.
+                // Audit trail: original (soft-deleted dengan deleted_by) + log.
 
-                $totalDeduction = abs($transfer->weight_grams) + abs($transfer->susut_grams ?? 0);
-
-                $outTx = $transfer->transactions()->where("transaction_type", "EXTERNAL_TRANSFER_OUT")->first();
-                $inTx = $transfer->transactions()->where("transaction_type", "EXTERNAL_TRANSFER_IN")->first();
-
-                if ($outTx) {
-                    InventoryTransaction::create([
-                        "transaction_date" => now(),
-                        "grade_company_id" => $transfer->grade_company_id,
-                        "location_id" => $transfer->from_location_id,
-                        "supplier_id" => $outTx->supplier_id,
-                        "quantity_change_grams" => $totalDeduction,
-                        "transaction_type" => "EXTERNAL_TRANSFER_REVERT_OUT",
-                        "reference_id" => $transfer->id,
-                        "sorting_result_id" => $transfer->sorting_result_id,
-                        "created_by" => $userId,
-                    ]);
+                foreach ($transfer->transactions as $transaction) {
+                    $transaction->deleted_by = $userId;
+                    $transaction->save();
+                    $transaction->delete();
                 }
 
-                if ($inTx) {
-                    InventoryTransaction::create([
-                        "transaction_date" => now(),
-                        "grade_company_id" => $transfer->grade_company_id,
-                        "location_id" => $transfer->to_location_id,
-                        "supplier_id" => $inTx->supplier_id,
-                        "quantity_change_grams" => -abs($transfer->weight_grams),
-                        "transaction_type" => "EXTERNAL_TRANSFER_REVERT_IN",
-                        "reference_id" => $transfer->id,
-                        "sorting_result_id" => $transfer->sorting_result_id,
-                        "created_by" => $userId,
-                    ]);
-                }
-
-                $transfer->transactions()->delete();
                 $transfer->deleted_by = $userId;
                 $transfer->save();
                 $transfer->delete();

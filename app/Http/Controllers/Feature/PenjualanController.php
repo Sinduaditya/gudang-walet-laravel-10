@@ -68,9 +68,14 @@ class PenjualanController extends Controller
             $suppliers = \App\Models\Supplier::all();
             $grades    = \App\Models\GradeCompany::all();
 
-            // Riwayat penjualan grading
+            // Riwayat penjualan grading — exclude SALE dari IDM-SR (sorting_result.idm_management_id IS NOT NULL)
+            // karena penjualan dari IDM-SR tampil di tab khusus "Riwayat Penjualan dari Manajemen IDM"
             $query = InventoryTransaction::where('transaction_type', 'SALE_OUT')
-                ->with(['gradeCompany', 'location', 'sortingResult.receiptItem.purchaseReceipt.supplier'])
+                ->whereNotNull('sorting_result_id')
+                ->whereHas('sortingResult', function ($q) {
+                    $q->whereNull('idm_management_id');
+                })
+                ->with(['gradeCompany', 'location', 'sortingResult.receiptItem.purchaseReceipt.supplier', 'sortingResult.idmManagement.supplier'])
                 ->orderBy('transaction_date', 'desc')
                 ->orderBy('id', 'desc');
 
@@ -285,31 +290,12 @@ class PenjualanController extends Controller
                         ->with('error', 'Transaksi sudah dihapus sebelumnya.');
                 }
 
-                // FIFO reversal: SALE_OUT boleh dihapus (regular grading ATAU dari IDM-SR).
-                // Delete akan create SALE_REVERT yang mengembalikan stok.
-                // Mgmt delete sendirinya di-block oleh ManajemenIdmService::assertNoOutflow()
-                // ketika ada outflow — jadi hapus SALE_OUT dulu, baru Mgmt jadi editable lagi.
-
-                $existingRevert = \App\Models\InventoryTransaction::where('reference_id', $tx->id)
-                    ->where('transaction_type', 'SALE_REVERT')
-                    ->first();
-
-                if (!$existingRevert && $tx->transaction_type === 'SALE_OUT') {
-                    $revertAmount = abs($tx->quantity_change_grams);
-
-                    InventoryTransaction::create([
-                        'transaction_date'     => now(),
-                        'grade_company_id'     => $tx->grade_company_id,
-                        'location_id'          => $tx->location_id,
-                        'quantity_change_grams' => $revertAmount,
-                        'supplier_id'          => $tx->supplier_id,
-                        'transaction_type'     => 'SALE_REVERT',
-                        'reference_id'         => $tx->id,
-                        'sorting_result_id'    => null,
-                        'notes'                => 'Revert dari delete penjualan ID: ' . $id,
-                        'created_by'           => auth()->id(),
-                    ]);
-                }
+                // FIFO reversal: soft-delete SALE_OUT (excluded dari SUM).
+                // TIDAK create SALE_REVERT — kalau dibuat, REVERT jadi "active" + original
+                // soft-deleted, REVERT berdiri sendiri sebagai +Xg (over-cancellation).
+                // Audit trail: SALE_OUT (soft-deleted dengan deleted_by) + log entry.
+                //
+                // Mgmt delete di-block terpisah di ManajemenIdmService::assertNoOutflow().
 
                 if ($tx->sorting_result_id) {
                     $sortMaterial = \App\Models\SortMaterial::where('sorting_result_id', $tx->sorting_result_id)->first();
