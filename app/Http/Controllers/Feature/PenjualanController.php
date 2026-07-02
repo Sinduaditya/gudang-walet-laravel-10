@@ -323,33 +323,28 @@ class PenjualanController extends Controller
                         ->with('error', 'Tidak dapat menghapus penjualan — grade ini sedang di-regrading di Manajemen IDM #' . $lockedIdm->idm_management_id . '. Batalkan proses IDM terlebih dahulu.');
                 }
 
-                // FIFO reversal: SALE_OUT boleh dihapus (regular grading ATAU dari IDM-SR).
-                // Delete akan create SALE_REVERT yang mengembalikan stok.
-                // Mgmt delete sendirinya di-block oleh ManajemenIdmService::assertNoOutflow()
-                // ketika ada outflow — jadi hapus SALE_OUT dulu, baru Mgmt jadi editable lagi.
-
-                $existingRevert = \App\Models\InventoryTransaction::where('reference_id', $tx->id)
-                    ->where('transaction_type', 'SALE_REVERT')
-                    ->first();
-
-                if (!$existingRevert && $tx->transaction_type === 'SALE_OUT') {
-                    $revertAmount = abs($tx->quantity_change_grams);
-
-                    InventoryTransaction::create([
-                        'transaction_date'     => now(),
-                        'grade_company_id'     => $tx->grade_company_id,
-                        'location_id'          => $tx->location_id,
-                        'quantity_change_grams' => $revertAmount,
-                        'supplier_id'          => $tx->supplier_id,
-                        'transaction_type'     => 'SALE_REVERT',
-                        'category'             => $tx->category,
-                        'is_revert'            => true,
-                        'reference_id'         => $tx->id,
-                        'sorting_result_id'    => $tx->sorting_result_id,
-                        'notes'                => 'Revert dari delete penjualan ID: ' . $id,
-                        'created_by'           => auth()->id(),
-                    ]);
-                }
+                // ✅ PENTING: Soft-delete SALE_OUT sudah cukup untuk "undo" transaksi
+                //
+                // Alasan TIDAK membuat SALE_REVERT:
+                // - SALE_OUT: -100 (soft-delete → excluded dari SUM)
+                // - Soft-delete otomatis mengembalikan stok ke semula
+                // - Jika tambah SALE_REVERT: -100 + (+100) = 0 jadi +100, stock DOUBLED!
+                // -
+                // Ledger sebelum delete:
+                //   GRADING_IN: +100
+                //   SALE_OUT: -100
+                //   Total: 0
+                //
+                // Ledger setelah delete (HANYA soft-delete, NO REVERT):
+                //   GRADING_IN: +100
+                //   SALE_OUT: -100 (deleted_at != NULL → excluded)
+                //   Total: 100 ✓
+                //
+                // Jika buat SALE_REVERT (SALAH):
+                //   GRADING_IN: +100
+                //   SALE_OUT: -100 (soft-deleted, excluded)
+                //   SALE_REVERT: +100
+                //   Total: 200 ✗ DOUBLED!
 
                 if ($tx->sorting_result_id) {
                     $sortMaterial = \App\Models\SortMaterial::where('sorting_result_id', $tx->sorting_result_id)->first();
