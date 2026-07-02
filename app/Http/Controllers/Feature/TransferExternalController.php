@@ -259,6 +259,19 @@ class TransferExternalController extends Controller
                 $transfer = \App\Models\StockTransfer::lockForUpdate()->findOrFail($id);
                 $userId = auth()->id();
 
+                // ✅ Proteksi: Jangan hapus EXTERNAL_TRANSFER jika sudah ada RECEIVE_EXTERNAL
+                // Alasan: Deletion hierarchy — harus hapus yang terima (RECEIVE_EXTERNAL) dulu
+                $hasReceiveExternal = InventoryTransaction::whereIn('transaction_type', ['RECEIVE_EXTERNAL_IN', 'RECEIVE_EXTERNAL_OUT'])
+                    ->where('reference_id', $transfer->id)
+                    ->where('is_revert', false)
+                    ->whereNull('deleted_at')
+                    ->exists();
+
+                if ($hasReceiveExternal) {
+                    return redirect()->route('barang.keluar.external-transfer.step1')
+                        ->with('error', 'Tidak dapat menghapus pengiriman ke jasa cuci — barang sudah diterima kembali. Batalkan penerimaan dari jasa cuci terlebih dahulu.');
+                }
+
                 // FIFO reversal: EXTERNAL_TRANSFER_OUT boleh dihapus (regular ATAU dari IDM-SR).
                 // Delete akan create EXTERNAL_TRANSFER_REVERT_* yang mengembalikan stok.
                 // Mgmt delete di-block terpisah di ManajemenIdmService::assertNoOutflow().
