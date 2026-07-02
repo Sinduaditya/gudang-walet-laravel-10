@@ -20,7 +20,6 @@ class LocationService
                 'stockTransfersFrom',
                 'stockTransfersTo',
                 'inventoryTransactions',
-                'saleItems',
             ]);
 
         if ($search) {

@@ -1,147 +1,119 @@
 @extends('layouts.app')
 
+@section('title', 'Barang Keluar')
+
 @section('content')
-<div class="bg-white min-h-screen">
-    <div class="w-full px-4 sm:px-6 lg:px-8 py-8">
+<div class="bg-gray-50 min-h-screen py-8 px-4 sm:px-6 lg:px-8">
+    <div class="max-w-7xl mx-auto">
 
         {{-- Header --}}
-        <div class="mb-10">
-            <h1 class="text-2xl font-bold text-gray-900">Pergerakan Barang</h1>
-            <p class="mt-1 text-gray-500 text-sm">Pilih jenis aktivitas sesuai dengan apa yang sedang terjadi di gudang.</p>
+        <div class="mb-8">
+            <h1 class="text-2xl font-bold text-gray-900">Barang Keluar</h1>
+            <p class="text-sm text-gray-500 mt-1">
+                Pilih jenis aktivitas sesuai dengan operasional gudang Anda.
+            </p>
         </div>
 
-        {{-- Section: Barang Keluar --}}
+        {{-- Barang Keluar Section --}}
         <div class="mb-10">
-            <div class="flex items-center gap-3 mb-5">
+            <div class="mb-4 flex items-center gap-3">
                 <div class="flex items-center gap-2">
-                    <div class="w-2.5 h-2.5 rounded-full bg-red-400"></div>
-                    <span class="text-xs font-semibold uppercase tracking-widest text-gray-400">Barang Keluar dari Gudang</span>
+                    <div class="w-2 h-2 rounded-full bg-red-500"></div>
+                    <h2 class="text-sm font-bold text-gray-700 uppercase tracking-wider">Barang Keluar dari Gudang</h2>
                 </div>
                 <div class="flex-1 h-px bg-gray-200"></div>
             </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
 
                 {{-- Penjualan Langsung --}}
                 <a href="{{ route('barang.keluar.sell.form') }}"
-                   class="group relative bg-white rounded-2xl border border-gray-200 p-6 hover:border-blue-400 hover:shadow-lg transition-all duration-200">
-                    <div class="flex items-start gap-4">
-                        <div class="shrink-0 w-11 h-11 bg-blue-50 rounded-xl flex items-center justify-center group-hover:bg-blue-500 transition-colors duration-200">
-                            <svg class="w-5 h-5 text-blue-500 group-hover:text-white transition-colors duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    class="group bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md hover:border-blue-300 transition-all duration-200 p-5">
+                    <div class="flex items-start gap-4 mb-4">
+                        <div class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0 group-hover:bg-blue-600 transition-colors duration-200">
+                            <svg class="w-5 h-5 text-blue-600 group-hover:text-white transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
                             </svg>
                         </div>
-                        <div class="flex-1 min-w-0">
-                            <h3 class="font-semibold text-gray-900 group-hover:text-blue-600 transition-colors duration-200">Jual ke Pembeli</h3>
-                            <p class="mt-1 text-sm text-gray-500 leading-relaxed">Barang dibeli oleh pelanggan dan langsung keluar dari stok gudang.</p>
-                            <div class="mt-3 inline-flex items-center gap-1 text-xs text-gray-400 bg-gray-50 rounded-lg px-2.5 py-1.5">
-                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
-                                Ada transaksi pembayaran dari pelanggan
-                            </div>
+                        <div class="flex-1">
+                            <h3 class="font-bold text-gray-900 text-sm group-hover:text-blue-600 transition-colors">Jual ke Pembeli</h3>
+                            <p class="text-xs text-gray-500 mt-1">Catat penjualan barang dari stok ke customer</p>
                         </div>
                     </div>
-                    <div class="absolute bottom-5 right-5 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                        <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6" />
-                        </svg>
+                    <div class="text-xs text-gray-400 bg-gray-50 rounded px-2 py-1.5 inline-block">
+                        Ada transaksi pembayaran dari pelanggan
                     </div>
                 </a>
 
                 {{-- Transfer Internal --}}
                 <a href="{{ route('barang.keluar.transfer.step1') }}"
-                   class="group relative bg-white rounded-2xl border border-gray-200 p-6 hover:border-purple-400 hover:shadow-lg transition-all duration-200">
-                    <div class="flex items-start gap-4">
-                        <div class="shrink-0 w-11 h-11 bg-purple-50 rounded-xl flex items-center justify-center group-hover:bg-purple-500 transition-colors duration-200">
-                            <svg class="w-5 h-5 text-purple-500 group-hover:text-white transition-colors duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    class="group bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md hover:border-purple-300 transition-all duration-200 p-5">
+                    <div class="flex items-start gap-4 mb-4">
+                        <div class="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center flex-shrink-0 group-hover:bg-purple-600 transition-colors duration-200">
+                            <svg class="w-5 h-5 text-purple-600 group-hover:text-white transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
                             </svg>
                         </div>
-                        <div class="flex-1 min-w-0">
-                            <h3 class="font-semibold text-gray-900 group-hover:text-purple-600 transition-colors duration-200">Pindah ke Gudang Lain</h3>
-                            <p class="mt-1 text-sm text-gray-500 leading-relaxed">Barang dipindahkan ke lokasi internal lain seperti IDM atau DMK — masih milik perusahaan.</p>
-                            <div class="mt-3 inline-flex items-center gap-1 text-xs text-gray-400 bg-gray-50 rounded-lg px-2.5 py-1.5">
-                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
-                                Barang tidak hilang, hanya berpindah lokasi
-                            </div>
+                        <div class="flex-1">
+                            <h3 class="font-bold text-gray-900 text-sm group-hover:text-purple-600 transition-colors">Pindah ke Gudang Lain</h3>
+                            <p class="text-xs text-gray-500 mt-1">Transfer ke lokasi internal seperti IDM atau DMK</p>
                         </div>
                     </div>
-                    <div class="absolute bottom-5 right-5 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                        <svg class="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6" />
-                        </svg>
+                    <div class="text-xs text-gray-400 bg-gray-50 rounded px-2 py-1.5 inline-block">
+                        Barang tetap milik perusahaan
                     </div>
                 </a>
 
                 {{-- Transfer External --}}
                 <a href="{{ route('barang.keluar.external-transfer.step1') }}"
-                   class="group relative bg-white rounded-2xl border border-gray-200 p-6 hover:border-orange-400 hover:shadow-lg transition-all duration-200">
-                    <div class="flex items-start gap-4">
-                        <div class="shrink-0 w-11 h-11 bg-orange-50 rounded-xl flex items-center justify-center group-hover:bg-orange-500 transition-colors duration-200">
-                            <svg class="w-5 h-5 text-orange-500 group-hover:text-white transition-colors duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    class="group bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md hover:border-orange-300 transition-all duration-200 p-5">
+                    <div class="flex items-start gap-4 mb-4">
+                        <div class="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center flex-shrink-0 group-hover:bg-orange-600 transition-colors duration-200">
+                            <svg class="w-5 h-5 text-orange-600 group-hover:text-white transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7M12 3v18" />
                             </svg>
                         </div>
-                        <div class="flex-1 min-w-0">
-                            <h3 class="font-semibold text-gray-900 group-hover:text-orange-600 transition-colors duration-200">Kirim ke Jasa Cuci</h3>
-                            <p class="mt-1 text-sm text-gray-500 leading-relaxed">Barang dikirim ke pihak luar untuk proses pencucian sebelum kembali ke gudang.</p>
-                            <div class="mt-3 inline-flex items-center gap-1 text-xs text-gray-400 bg-gray-50 rounded-lg px-2.5 py-1.5">
-                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
-                                Stok akan tercatat sebagai "sedang di cuci"
-                            </div>
+                        <div class="flex-1">
+                            <h3 class="font-bold text-gray-900 text-sm group-hover:text-orange-600 transition-colors">Kirim ke Jasa Cuci</h3>
+                            <p class="text-xs text-gray-500 mt-1">Kirim barang untuk proses pencucian eksternal</p>
                         </div>
                     </div>
-                    <div class="absolute bottom-5 right-5 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                        <svg class="w-4 h-4 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6" />
-                        </svg>
+                    <div class="text-xs text-gray-400 bg-gray-50 rounded px-2 py-1.5 inline-block">
+                        Stok tercatat sebagai "sedang di cuci"
                     </div>
                 </a>
 
             </div>
         </div>
 
-        {{-- Section: Barang Masuk / Kembali --}}
+        {{-- Barang Kembali Section --}}
         <div>
-            <div class="flex items-center gap-3 mb-5">
+            <div class="mb-4 flex items-center gap-3">
                 <div class="flex items-center gap-2">
-                    <div class="w-2.5 h-2.5 rounded-full bg-green-400"></div>
-                    <span class="text-xs font-semibold uppercase tracking-widest text-gray-400">Barang Kembali ke Gudang</span>
+                    <div class="w-2 h-2 rounded-full bg-green-500"></div>
+                    <h2 class="text-sm font-bold text-gray-700 uppercase tracking-wider">Barang Kembali ke Gudang</h2>
                 </div>
                 <div class="flex-1 h-px bg-gray-200"></div>
             </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
 
                 {{-- Kembali dari Jasa Cuci --}}
                 <a href="{{ route('barang.keluar.receive-external.step1') }}"
-                   class="group relative bg-white rounded-2xl border border-gray-200 p-6 hover:border-green-400 hover:shadow-lg transition-all duration-200">
-                    <div class="flex items-start gap-4">
-                        <div class="shrink-0 w-11 h-11 bg-green-50 rounded-xl flex items-center justify-center group-hover:bg-green-500 transition-colors duration-200">
-                            <svg class="w-5 h-5 text-green-500 group-hover:text-white transition-colors duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    class="group bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md hover:border-green-300 transition-all duration-200 p-5">
+                    <div class="flex items-start gap-4 mb-4">
+                        <div class="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center flex-shrink-0 group-hover:bg-green-600 transition-colors duration-200">
+                            <svg class="w-5 h-5 text-green-600 group-hover:text-white transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
                             </svg>
                         </div>
-                        <div class="flex-1 min-w-0">
-                            <h3 class="font-semibold text-gray-900 group-hover:text-green-600 transition-colors duration-200">Terima dari Jasa Cuci</h3>
-                            <p class="mt-1 text-sm text-gray-500 leading-relaxed">Barang yang sudah selesai dicuci diterima kembali dan stoknya masuk ke gudang.</p>
-                            <div class="mt-3 inline-flex items-center gap-1 text-xs text-gray-400 bg-gray-50 rounded-lg px-2.5 py-1.5">
-                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
-                                Lakukan setelah "Kirim ke Jasa Cuci" selesai
-                            </div>
+                        <div class="flex-1">
+                            <h3 class="font-bold text-gray-900 text-sm group-hover:text-green-600 transition-colors">Terima dari Jasa Cuci</h3>
+                            <p class="text-xs text-gray-500 mt-1">Terima barang yang sudah selesai dicuci</p>
                         </div>
                     </div>
-                    <div class="absolute bottom-5 right-5 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                        <svg class="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6" />
-                        </svg>
+                    <div class="text-xs text-gray-400 bg-gray-50 rounded px-2 py-1.5 inline-block">
+                        Lakukan setelah "Kirim ke Jasa Cuci"
                     </div>
                 </a>
 
