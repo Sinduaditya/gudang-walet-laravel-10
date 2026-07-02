@@ -35,7 +35,12 @@
                         </thead>
                         <tbody class="bg-white divide-y divide-gray-200">
                             @forelse($sortingResults as $item)
-                                <tr class="hover:bg-gray-50">
+                                {{-- Check if this grading is locked --}}
+                                @php
+                                    $status = $lockStatus[$item->id] ?? ['isLocked' => false, 'reason' => null];
+                                    $isLocked = $status['isLocked'];
+                                @endphp
+                                <tr class="{{ $isLocked ? 'bg-gray-50 opacity-60' : 'hover:bg-gray-50' }}">
                                     <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                                         {{ $item->gradeCompany->name ?? '-' }}
                                     </td>
@@ -46,7 +51,11 @@
                                         {{ number_format($item->quantity, 0, ',', '.') }}
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm" id="category-badge-{{ $item->id }}">
-                                        @if($item->category_grade)
+                                        @if($isLocked)
+                                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                                🔒 DIKUNCI
+                                            </span>
+                                        @elseif($item->category_grade)
                                             <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
                                                 {{ $item->category_grade }}
                                             </span>
@@ -55,20 +64,28 @@
                                         @endif
                                     </td>
                                     <td class="px-6 py-4 text-sm">
-                                        <select name="outgoing_types[{{ $item->id }}]"
-                                                onchange="checkCategoryMutualExclusivity({{ $item->id }}, this, '{{ $item->category_grade ?? '' }}')"
-                                                class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm py-2 px-3 border bg-white">
-                                            <option value="">-- Pilih Jenis Keluar --</option>
-                                            <option value="penjualan_langsung" {{ $item->outgoing_type === 'penjualan_langsung' ? 'selected' : '' }}>Penjualan Langsung</option>
-                                            <option value="internal" {{ $item->outgoing_type === 'internal' ? 'selected' : '' }}>Internal</option>
-                                            <option value="external" {{ $item->outgoing_type === 'external' ? 'selected' : '' }}>External</option>
-                                        </select>
+                                        <div>
+                                            <select name="outgoing_types[{{ $item->id }}]"
+                                                    onchange="checkCategoryMutualExclusivity({{ $item->id }}, this, '{{ $item->category_grade ?? '' }}')"
+                                                    {{ $isLocked ? 'disabled' : '' }}
+                                                    class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm py-2 px-3 border bg-white {{ $isLocked ? 'bg-gray-100 cursor-not-allowed' : '' }}">
+                                                <option value="">-- Pilih Jenis Keluar --</option>
+                                                <option value="penjualan_langsung" {{ $item->outgoing_type === 'penjualan_langsung' ? 'selected' : '' }}>Penjualan Langsung</option>
+                                                <option value="internal" {{ $item->outgoing_type === 'internal' ? 'selected' : '' }}>Internal</option>
+                                                <option value="external" {{ $item->outgoing_type === 'external' ? 'selected' : '' }}>External</option>
+                                            </select>
 
-                                        @if($item->category_grade)
-                                            <p class="text-[11px] text-orange-600 mt-1.5 font-medium italic transition-colors" id="warning-mut-excl-{{ $item->id }}">
-                                                * Memilih jenis keluar akan menghapus kategori {{ $item->category_grade }}
-                                            </p>
-                                        @endif
+                                            @if($isLocked)
+                                                <p class="text-xs text-red-600 mt-2 font-medium flex items-center gap-1">
+                                                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd" /></svg>
+                                                    {{ $status['reason'] }}
+                                                </p>
+                                            @elseif($item->category_grade)
+                                                <p class="text-[11px] text-orange-600 mt-1.5 font-medium italic transition-colors" id="warning-mut-excl-{{ $item->id }}">
+                                                    * Memilih jenis keluar akan menghapus kategori {{ $item->category_grade }}
+                                                </p>
+                                            @endif
+                                        </div>
                                     </td>
                                 </tr>
                             @empty

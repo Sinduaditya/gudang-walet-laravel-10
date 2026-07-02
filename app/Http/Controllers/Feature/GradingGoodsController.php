@@ -200,7 +200,35 @@ class GradingGoodsController extends Controller
 
         $grading = $sortingResults->first();
 
-        return view('admin.grading-goods.edit', compact('grading', 'sortingResults', 'receiptItemId'));
+        // ✅ Hitung lock status untuk setiap grading
+        $lockStatus = [];
+        foreach ($sortingResults as $sr) {
+            $isLocked = false;
+            $lockReason = null;
+
+            // Check 1: Sudah punya transaksi keluar
+            $hasOutgoing = \App\Models\InventoryTransaction::where('sorting_result_id', $sr->id)
+                ->where('transaction_type', '!=', 'GRADING_IN')
+                ->exists();
+
+            if ($hasOutgoing) {
+                $isLocked = true;
+                $lockReason = 'Sudah memiliki transaksi keluar (penjualan/transfer)';
+            }
+
+            // Check 2: Sudah di-regrade di IDM
+            if (!is_null($sr->idm_management_id)) {
+                $isLocked = true;
+                $lockReason = 'Sedang/sudah di-regrading di Manajemen IDM #' . $sr->idm_management_id;
+            }
+
+            $lockStatus[$sr->id] = [
+                'isLocked' => $isLocked,
+                'reason' => $lockReason,
+            ];
+        }
+
+        return view('admin.grading-goods.edit', compact('grading', 'sortingResults', 'receiptItemId', 'lockStatus'));
     }
 
     public function update(Request $request, $receiptItemId)
@@ -211,6 +239,25 @@ class GradingGoodsController extends Controller
         ]);
 
         try {
+            // ✅ Proteksi: Cek apakah ada grading yang sudah di-lock
+            $sortingResults = \App\Models\SortingResult::where('receipt_item_id', $receiptItemId)->get();
+
+            foreach ($sortingResults as $sr) {
+                // Lock 1: Sudah punya transaksi keluar (SALE_OUT, TRANSFER_OUT, dll)
+                $hasOutgoing = \App\Models\InventoryTransaction::where('sorting_result_id', $sr->id)
+                    ->where('transaction_type', '!=', 'GRADING_IN')
+                    ->exists();
+
+                if ($hasOutgoing) {
+                    throw new \Exception('Tidak dapat mengubah grading yang sudah memiliki transaksi keluar (penjualan/transfer). Hubungi administrator jika perlu koreksi.');
+                }
+
+                // Lock 2: Sudah di-regrade di IDM (idm_management_id != NULL)
+                if (!is_null($sr->idm_management_id)) {
+                    throw new \Exception('Tidak dapat mengubah grading yang sedang/sudah di-regrading di Manajemen IDM #' . $sr->idm_management_id . '. Batalkan proses IDM terlebih dahulu.');
+                }
+            }
+
             \Illuminate\Support\Facades\DB::transaction(function () use ($request, $receiptItemId) {
                 foreach ($request->input('outgoing_types') as $sortingResultId => $outgoingType) {
                     $sortingResult = \App\Models\SortingResult::where('receipt_item_id', $receiptItemId)
