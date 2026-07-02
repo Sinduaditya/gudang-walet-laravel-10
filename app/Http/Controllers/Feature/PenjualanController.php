@@ -288,6 +288,15 @@ class PenjualanController extends Controller
                         ->with('error', 'Transaksi sudah dihapus sebelumnya.');
                 }
 
+                // Validasi: Grading tidak boleh dihapus jika sudah dijadikan input untuk regrading IDM
+                if ($tx->transaction_type === 'SALE_OUT' && $tx->sorting_result_id) {
+                    $sr = \App\Models\SortingResult::find($tx->sorting_result_id);
+                    if ($sr && !is_null($sr->idm_management_id)) {
+                        return redirect()->route('barang.keluar.sell.form')
+                            ->with('error', 'Tidak dapat menghapus penjualan dari grading yang sedang di-regrading di Manajemen IDM. Batalkan proses IDM terlebih dahulu.');
+                    }
+                }
+
                 // FIFO reversal: SALE_OUT boleh dihapus (regular grading ATAU dari IDM-SR).
                 // Delete akan create SALE_REVERT yang mengembalikan stok.
                 // Mgmt delete sendirinya di-block oleh ManajemenIdmService::assertNoOutflow()
