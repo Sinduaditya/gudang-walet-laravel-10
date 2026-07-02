@@ -68,8 +68,11 @@ class PenjualanController extends Controller
             $suppliers = \App\Models\Supplier::all();
             $grades    = \App\Models\GradeCompany::all();
 
-            // Riwayat penjualan grading
+            // Riwayat penjualan grading (EXCLUDE penjualan dari IDM)
             $query = InventoryTransaction::where('transaction_type', 'SALE_OUT')
+                ->whereDoesntHave('sortingResult', function ($q) {
+                    $q->whereNotNull('idm_output_id');
+                })
                 ->with(['gradeCompany', 'location', 'sortingResult.receiptItem.purchaseReceipt.supplier'])
                 ->orderBy('transaction_date', 'desc')
                 ->orderBy('id', 'desc');
@@ -304,10 +307,10 @@ class PenjualanController extends Controller
                         'quantity_change_grams' => $revertAmount,
                         'supplier_id'          => $tx->supplier_id,
                         'transaction_type'     => 'SALE_REVERT',
-                        'category'             => InventoryTransaction::CAT_SALE,
+                        'category'             => $tx->category,
                         'is_revert'            => true,
                         'reference_id'         => $tx->id,
-                        'sorting_result_id'    => null,
+                        'sorting_result_id'    => $tx->sorting_result_id,
                         'notes'                => 'Revert dari delete penjualan ID: ' . $id,
                         'created_by'           => auth()->id(),
                     ]);
