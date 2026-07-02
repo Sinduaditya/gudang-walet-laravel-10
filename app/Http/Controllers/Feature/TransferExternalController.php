@@ -272,7 +272,11 @@ class TransferExternalController extends Controller
                         ->with('error', 'Tidak dapat menghapus pengiriman ke jasa cuci — barang sudah diterima kembali. Batalkan penerimaan dari jasa cuci terlebih dahulu.');
                 }
 
-                foreach ($transfer->transactions as $transaction) {
+                $ownTxs = $transfer->transactions()
+                    ->whereIn('transaction_type', ['EXTERNAL_TRANSFER_OUT', 'EXTERNAL_TRANSFER_IN'])
+                    ->get();
+
+                foreach ($ownTxs as $transaction) {
                     $transaction->deleted_by = $userId;
                     $transaction->save();
                     $transaction->delete();

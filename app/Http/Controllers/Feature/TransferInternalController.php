@@ -286,7 +286,11 @@ class TransferInternalController extends Controller
                 $transfer = \App\Models\StockTransfer::lockForUpdate()->findOrFail($id);
                 $userId = auth()->id();
 
-                foreach ($transfer->transactions as $transaction) {
+                $ownTxs = $transfer->transactions()
+                    ->whereIn('transaction_type', ['TRANSFER_OUT', 'TRANSFER_IN'])
+                    ->get();
+
+                foreach ($ownTxs as $transaction) {
                     $transaction->deleted_by = $userId;
                     $transaction->save();
                     $transaction->delete();
