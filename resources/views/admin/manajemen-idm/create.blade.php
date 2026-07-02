@@ -106,16 +106,51 @@
                     <div class="p-6">
                         <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
                             @forelse ($items as $item)
-                                <div class="bg-white border border-gray-200 rounded-xl p-6 hover:shadow-md transition-shadow cursor-pointer relative group" onclick="toggleCheckbox(this)">
+                                {{-- Jika stok sudah habis (remaining_weight <= 0), tampilkan badge depleted dan disable checkbox --}}
+                                <div class="bg-white border @if($item->is_depleted) border-red-200 bg-red-50 @else border-gray-200 @endif rounded-xl p-6 @if(!$item->is_depleted) hover:shadow-md transition-shadow cursor-pointer @endif relative group {{ $item->is_depleted ? 'opacity-60' : '' }}"
+                                     @if(!$item->is_depleted) onclick="toggleCheckbox(this)" @endif>
                                     <div class="absolute top-4 right-4">
-                                        <input type="checkbox" name="selected_items[]" value="{{ $item->id }}" class="h-5 w-5 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded pointer-events-none">
+                                        <input type="checkbox" name="selected_items[]" value="{{ $item->id }}"
+                                               class="h-5 w-5 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded pointer-events-none"
+                                               @if($item->is_depleted) disabled @endif>
                                     </div>
-                                    <div class="flex flex-col h-full justify-center items-center text-center space-y-2">
-                                        <h3 class="text-lg font-semibold text-gray-900">{{ $item->gradeCompany->name ?? 'Unknown Grade' }}</h3>
-                                        <p class="text-sm text-gray-500">{{ $item->receiptItem->purchaseReceipt->supplier->name ?? 'Unknown Supplier' }}</p>
-                                        <div class="mt-2 text-xs text-gray-400">
-                                            {{ number_format($item->weight_grams, 0, ',', '.') }} gr
+
+                                    {{-- Badge: Depleted atau Remaining Stock --}}
+                                    @if($item->is_depleted)
+                                        <div class="absolute top-4 left-4">
+                                            <span class="inline-block bg-red-500 text-white text-xs font-bold px-2 py-1 rounded">
+                                                HABIS
+                                            </span>
                                         </div>
+                                    @else
+                                        <div class="absolute top-4 left-4">
+                                            <span class="inline-block bg-green-500 text-white text-xs font-bold px-2 py-1 rounded">
+                                                TERSEDIA
+                                            </span>
+                                        </div>
+                                    @endif
+
+                                    <div class="flex flex-col h-full justify-center items-center text-center space-y-2 mt-6">
+                                        <h3 class="text-lg font-semibold @if($item->is_depleted) text-gray-500 @else text-gray-900 @endif">
+                                            {{ $item->gradeCompany->name ?? 'Unknown Grade' }}
+                                        </h3>
+                                        <p class="text-sm text-gray-500">{{ $item->receiptItem->purchaseReceipt->supplier->name ?? 'Unknown Supplier' }}</p>
+
+                                        {{-- Tampilkan remaining_weight (yang tersisa setelah transaksi) --}}
+                                        <div class="mt-2">
+                                            <div class="text-xs text-gray-400">
+                                                Stok Asli: {{ number_format($item->weight_grams, 0, ',', '.') }} gr
+                                            </div>
+                                            <div class="text-lg font-bold @if($item->is_depleted) text-red-600 @else text-green-600 @endif">
+                                                Sisa: {{ number_format($item->remaining_weight, 0, ',', '.') }} gr
+                                            </div>
+                                        </div>
+
+                                        @if($item->is_depleted)
+                                            <div class="text-xs text-red-600 font-semibold mt-2">
+                                                Stok sudah habis
+                                            </div>
+                                        @endif
                                     </div>
                                 </div>
                             @empty
