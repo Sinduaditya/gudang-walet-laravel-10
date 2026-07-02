@@ -885,10 +885,15 @@ class BarangKeluarService
                 'idmOutput.idmManagement.supplier',
             ])
             ->where(function ($q) use ($outgoingType) {
-                // 1) Batch hasil Grading dengan outgoing_type yang match atau null
+                // 1) Regular grading (tanpa kategori IDM) dengan outgoing_type yang match atau null
+                //    → Exclude grading dengan category_grade = "IDM A" atau "IDM B"
+                $q->where(function ($q2) use ($outgoingType) {
+                    $q2->whereNull('category_grade')  // Regular grading only
+                       ->whereIn('outgoing_type', [$outgoingType, null]);
+                })
                 // 2) ATAU IDM-SR proxy (idm_output_id IS NOT NULL)
-                $q->whereIn('outgoing_type', [$outgoingType, null])
-                  ->orWhereNotNull('idm_output_id');
+                //    → Hanya IDM outputs yang sudah di-regrade yang bisa dipakai
+                ->orWhereNotNull('idm_output_id');
             })
             ->orderBy('grading_date', 'desc')
             ->get();
