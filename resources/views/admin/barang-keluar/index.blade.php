@@ -50,7 +50,7 @@
                     class="group bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md hover:border-purple-300 transition-all duration-200 p-5 relative">
                     <div class="absolute top-3 right-3">
                         <span class="inline-block bg-purple-100 text-purple-700 text-xs font-semibold px-2.5 py-1 rounded">
-                            EKSTERNAL
+                            INTERNAL
                         </span>
                     </div>
                     <div class="flex items-start gap-4 mb-4">
@@ -74,7 +74,7 @@
                     class="group bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md hover:border-orange-300 transition-all duration-200 p-5 relative">
                     <div class="absolute top-3 right-3">
                         <span class="inline-block bg-orange-100 text-orange-700 text-xs font-semibold px-2.5 py-1 rounded">
-                            INTERNAL
+                            EKSTERNAL
                         </span>
                     </div>
                     <div class="flex items-start gap-4 mb-4">
