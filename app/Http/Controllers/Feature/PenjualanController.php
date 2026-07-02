@@ -288,31 +288,13 @@ class PenjualanController extends Controller
                         ->with('error', 'Transaksi sudah dihapus sebelumnya.');
                 }
 
-                // Validasi: Transaksi tidak boleh dihapus jika SortingResult memiliki transaksi "locking" dari proses upstream
+                // Validasi: Transaksi tidak boleh dihapus jika SortingResult dijadikan input untuk IDM
                 if ($tx->sorting_result_id) {
                     $sr = \App\Models\SortingResult::find($tx->sorting_result_id);
-                    if ($sr) {
-                        // Check: apakah SortingResult ini menjadi input IDM? (transaksi IDM_REGRADING_IN ada)
-                        $hasIdmLock = \App\Models\InventoryTransaction::where('sorting_result_id', $sr->id)
-                            ->where('transaction_type', 'IDM_REGRADING_IN')
-                            ->whereNull('deleted_at')
-                            ->exists();
-
-                        if ($hasIdmLock) {
-                            return redirect()->route('barang.keluar.sell.form')
-                                ->with('error', 'Tidak dapat menghapus transaksi dari grading yang sedang di-regrading di Manajemen IDM. Batalkan proses IDM terlebih dahulu.');
-                        }
-
-                        // Check: apakah ada transaksi "lock" lainnya yang mencegah penghapusan
-                        $lockingTransactions = \App\Models\InventoryTransaction::where('sorting_result_id', $sr->id)
-                            ->whereIn('transaction_type', ['IDM_REGRADING_IN', 'TRANSFER_OUT'])
-                            ->whereNull('deleted_at')
-                            ->exists();
-
-                        if ($lockingTransactions && $tx->transaction_type !== 'TRANSFER_OUT') {
-                            return redirect()->route('barang.keluar.sell.form')
-                                ->with('error', 'Tidak dapat menghapus transaksi dari grading yang sedang diproses di tingkat yang lebih atas. Batalkan proses yang lebih atas terlebih dahulu.');
-                        }
+                    if ($sr && !is_null($sr->idm_management_id)) {
+                        // Grading ini sudah dijadikan input untuk IDM — tidak boleh dihapus transaksinya
+                        return redirect()->route('barang.keluar.sell.form')
+                            ->with('error', 'Tidak dapat menghapus penjualan dari grading yang sedang di-regrading di Manajemen IDM #' . $sr->idm_management_id . '. Batalkan proses IDM terlebih dahulu.');
                     }
                 }
 
