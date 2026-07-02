@@ -54,18 +54,8 @@ class ManajemenIdmController extends Controller
             return redirect()->route('manajemen-idm.create')->with('error', 'Item tidak ditemukan.');
         }
 
-        // ✅ Calculate remaining weight for each item (after outgoing transactions)
-        $items = $items->map(function ($item) {
-            $remaining = (float) \App\Models\InventoryTransaction::where('sorting_result_id', $item->id)
-                ->whereNull('deleted_at')
-                ->sum('quantity_change_grams');
-
-            $item->remaining_weight = max(0, $remaining);
-            return $item;
-        });
-
-        $firstItem = $items->first();
-        $totalWeight = $items->sum('remaining_weight');  // Use remaining_weight, not weight_grams
+        $firstItem   = $items->first();
+        $totalWeight = $items->sum('weight_grams');
 
         return view('admin.manajemen-idm.step2', compact('items', 'firstItem', 'totalWeight', 'itemIds'));
     }

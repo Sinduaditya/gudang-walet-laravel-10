@@ -79,23 +79,7 @@ class ManajemenIdmService
             });
         }
 
-        $items = $query->paginate(12)->withQueryString();
-
-        // ✅ Calculate actual remaining stock (account for outgoing transactions)
-        // Alasan: Jika grading sudah di jual (SALE_OUT), harus kurangi dari weight_grams
-        $items->getCollection()->transform(function ($item) {
-            $remaining = (float) InventoryTransaction::where('sorting_result_id', $item->id)
-                ->whereNull('deleted_at')
-                ->sum('quantity_change_grams');
-
-            // Store both original and remaining for display
-            $item->remaining_weight = max(0, $remaining);
-            $item->is_depleted = $remaining <= 0;
-
-            return $item;
-        });
-
-        return $items;
+        return $query->paginate(12)->withQueryString();
     }
 
     public function getItemsByIds(array $ids): Collection
