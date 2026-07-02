@@ -4,10 +4,8 @@ namespace App\Services\Dashboard;
 
 use Carbon\Carbon;
 use App\Models\User;
-use App\Models\Sale;
 use App\Models\Location;
 use App\Models\Supplier;
-use App\Models\SaleItem;
 use App\Models\GradeCompany;
 use App\Models\StockTransfer;
 use App\Models\SortingResult;
@@ -91,18 +89,7 @@ class DashboardService
             $dmkKirim = 0;
 
             if ($dmkLocation) {
-                // Dari stock transfers
                 $dmkKirim += StockTransfer::whereDate('transfer_date', $date)->where('to_location_id', $dmkLocation->id)->sum('weight_grams') / 1000;
-
-                // Dari sales ke DMK
-                $dmkKirim +=
-                    SaleItem::whereHas('sale', function ($query) use ($date) {
-                        $query->whereDate('sale_date', $date);
-                    })
-                        ->whereHas('sale', function ($query) {
-                            $query->where('buyer_name', 'LIKE', '%DMK%')->orWhere('buyer_name', 'LIKE', '%Demak%');
-                        })
-                        ->sum('weight_grams') / 1000;
             }
 
             $dmkData[] = round($dmkKirim, 2);

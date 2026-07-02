@@ -34,6 +34,11 @@ class IdmManagement extends Model
         return $this->hasMany(IdmDetail::class);
     }
 
+    public function outputs()
+    {
+        return $this->hasMany(IdmOutput::class);
+    }
+
     public function sourceItems()
     {
         return $this->hasMany(SortingResult::class, 'idm_management_id');

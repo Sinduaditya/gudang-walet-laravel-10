@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use Illuminate\Support\ServiceProvider;
 use App\Observers\UserStampObserver;
+use App\Observers\InventoryTransactionObserver;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -31,5 +32,6 @@ class AppServiceProvider extends ServiceProvider
         \App\Models\SortingResult::observe(UserStampObserver::class);
         \App\Models\IdmManagement::observe(UserStampObserver::class);
         \App\Models\IdmDetail::observe(UserStampObserver::class);
+        \App\Models\InventoryTransaction::observe(InventoryTransactionObserver::class);
     }
 }

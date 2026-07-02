@@ -43,15 +43,15 @@ class TransferInternalController extends Controller
                     'id' => $source->id,
                     'name' => $source->gradeCompany->name ?? 'Unknown',
                     'supplier_name' => $source->receiptItem?->purchaseReceipt?->supplier?->name
-                                       ?? $source->idmManagement?->supplier?->name
+                                       ?? $source->idmOutput?->idmManagement?->supplier?->name
                                        ?? 'Unknown',
                     'supplier_id' => $source->receiptItem?->purchaseReceipt?->supplier_id
-                                     ?? $source->idmManagement?->supplier_id
+                                     ?? $source->idmOutput?->idmManagement?->supplier_id
                                      ?? null,
                     'grading_date' => $source->grading_date ? $source->grading_date->format('d M Y') : '-',
                     'batch_stock_grams' => $source->adjusted_weight,
                     'total_stock_grams' => $source->real_global_stock,
-                    'is_idm_output' => !is_null($source->idm_management_id),
+                    'is_idm_output' => !is_null($source->idm_output_id),
                 ];
             });
 
@@ -301,6 +301,8 @@ class TransferInternalController extends Controller
                         "supplier_id" => $outTx->supplier_id,
                         "quantity_change_grams" => $totalDeduction,
                         "transaction_type" => "TRANSFER_REVERT_OUT",
+                        "category" => InventoryTransaction::CAT_TRANSFER,
+                        "is_revert" => true,
                         "reference_id" => $transfer->id,
                         "sorting_result_id" => $transfer->sorting_result_id,
                         "created_by" => $userId,
@@ -319,6 +321,8 @@ class TransferInternalController extends Controller
                         "supplier_id" => $inTx->supplier_id,
                         "quantity_change_grams" => -abs($transfer->weight_grams),
                         "transaction_type" => "TRANSFER_REVERT_IN",
+                        "category" => InventoryTransaction::CAT_TRANSFER,
+                        "is_revert" => true,
                         "reference_id" => $transfer->id,
                         "sorting_result_id" => $transfer->sorting_result_id,
                         "created_by" => $userId,

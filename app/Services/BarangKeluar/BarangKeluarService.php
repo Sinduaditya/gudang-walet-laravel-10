@@ -37,17 +37,17 @@ class BarangKeluarService
             return null;
         }
 
-        $sortingResult = SortingResult::with(['receiptItem.purchaseReceipt', 'idmManagement'])->find($sortingResultId);
+        $sortingResult = SortingResult::with(['receiptItem.purchaseReceipt', 'idmOutput.idmManagement'])->find($sortingResultId);
 
         if (!$sortingResult) {
             return null;
         }
 
-        // Prioritas 1: IDM-SR (synthesized from ManajemenIDM) → supplier dari Mgmt
-        if ($sortingResult->idm_management_id) {
-            $mgmt = $sortingResult->idmManagement;
-            if ($mgmt && $mgmt->supplier_id) {
-                return $mgmt->supplier_id;
+        // Prioritas 1: IDM-SR proxy → supplier dari IdmOutput → IdmManagement
+        if ($sortingResult->idm_output_id) {
+            $supplierId = $sortingResult->idmOutput?->idmManagement?->supplier_id;
+            if ($supplierId) {
+                return $supplierId;
             }
         }
 
@@ -168,6 +168,15 @@ class BarangKeluarService
 
             $supplierId = $this->getSupplierIdFromSortingResult($sortingResultId);
 
+            // Determine category: if selling from IDM output, use CAT_IDM; else CAT_SALE
+            $category = InventoryTransaction::CAT_SALE;
+            if ($sortingResultId) {
+                $sr = \App\Models\SortingResult::find($sortingResultId);
+                if ($sr && !is_null($sr->idm_output_id)) {
+                    $category = InventoryTransaction::CAT_IDM;
+                }
+            }
+
             return InventoryTransaction::create([
                 'transaction_date' => $data['transaction_date'] ?? now(),
                 'grade_company_id' => $data['grade_company_id'],
@@ -175,6 +184,8 @@ class BarangKeluarService
                 'quantity_change_grams' => -$weightGrams,
                 'supplier_id' => $supplierId,
                 'transaction_type' => 'SALE_OUT',
+                'category' => $category,
+                'is_revert' => false,
                 'reference_id' => null,
                 'sorting_result_id' => $sortingResultId,
                 'created_by' => $userId,
@@ -244,6 +255,8 @@ class BarangKeluarService
             'supplier_id' => $supplierId,
             'quantity_change_grams' => -$totalDeduction,
             'transaction_type' => 'TRANSFER_OUT',
+            'category' => InventoryTransaction::CAT_TRANSFER,
+            'is_revert' => false,
             'reference_id' => $transfer->id,
             'sorting_result_id' => $transfer->sorting_result_id,
             'created_by' => $userId,
@@ -262,6 +275,8 @@ class BarangKeluarService
                 'supplier_id' => $supplierId,
                 'quantity_change_grams' => abs($data['weight_grams']),
                 'transaction_type' => 'TRANSFER_IN',
+                'category' => InventoryTransaction::CAT_TRANSFER,
+                'is_revert' => false,
                 'reference_id' => $transfer->id,
                 'sorting_result_id' => $transfer->sorting_result_id,
                 'created_by' => $userId,
@@ -313,6 +328,8 @@ class BarangKeluarService
                 'supplier_id' => $supplierId,
                 'quantity_change_grams' => -$totalDeduction,
                 'transaction_type' => 'EXTERNAL_TRANSFER_OUT',
+                'category' => InventoryTransaction::CAT_EXTERNAL_TRANSFER,
+                'is_revert' => false,
                 'reference_id' => $transfer->id,
                 'sorting_result_id' => $transfer->sorting_result_id,
                 'created_by' => $userId,
@@ -326,6 +343,8 @@ class BarangKeluarService
                 'supplier_id' => $supplierId,
                 'quantity_change_grams' => abs($data['weight_grams']), // Hanya berat bersih yang masuk
                 'transaction_type' => 'EXTERNAL_TRANSFER_IN',
+                'category' => InventoryTransaction::CAT_EXTERNAL_TRANSFER,
+                'is_revert' => false,
                 'reference_id' => $transfer->id,
                 'sorting_result_id' => $transfer->sorting_result_id,
                 'created_by' => $userId,
@@ -361,6 +380,8 @@ class BarangKeluarService
                 'supplier_id' => $supplierId,
                 'quantity_change_grams' => abs($data['weight_grams']),
                 'transaction_type' => 'RECEIVE_INTERNAL_IN',
+                'category' => InventoryTransaction::CAT_RECEIVE_INTERNAL,
+                'is_revert' => false,
                 'reference_id' => $transfer->id,
                 'sorting_result_id' => $transfer->sorting_result_id,
                 'created_by' => $userId,
@@ -402,6 +423,8 @@ class BarangKeluarService
                 'supplier_id' => $supplierId,
                 'quantity_change_grams' => abs($data['weight_grams']),
                 'transaction_type' => 'RECEIVE_EXTERNAL_IN',
+                'category' => InventoryTransaction::CAT_RECEIVE_EXTERNAL,
+                'is_revert' => false,
                 'reference_id' => $transfer->id,
                 'sorting_result_id' => $transfer->sorting_result_id,
                 'created_by' => $userId,
@@ -418,6 +441,8 @@ class BarangKeluarService
                 'supplier_id' => $supplierId,
                 'quantity_change_grams' => -$totalDeduction,
                 'transaction_type' => 'RECEIVE_EXTERNAL_OUT',
+                'category' => InventoryTransaction::CAT_RECEIVE_EXTERNAL,
+                'is_revert' => false,
                 'reference_id' => $transfer->id,
                 'sorting_result_id' => $transfer->sorting_result_id,
                 'created_by' => $userId,
@@ -462,10 +487,8 @@ class BarangKeluarService
 
     public function getAvailableStock(int $gradeCompanyId, int $locationId): float
     {
-        $stock = (float) InventoryTransaction::where('grade_company_id', $gradeCompanyId)
-            ->where('location_id', $locationId)
-            ->whereNull('deleted_at')
-            ->sum('quantity_change_grams');
+        $positionService = new \App\Services\Stock\StockPositionService();
+        $stock = $positionService->getPosition($gradeCompanyId, $locationId);
 
         if ($stock < 0) {
             \Illuminate\Support\Facades\Log::warning('Negative stock detected', [
@@ -531,6 +554,8 @@ class BarangKeluarService
                 'quantity_change_grams' => -$weightGrams,
                 'supplier_id' => $supplierId,
                 'transaction_type' => 'SALE_OUT',
+                'category' => InventoryTransaction::CAT_SALE,
+                'is_revert' => false,
                 'reference_id' => null,
                 'sorting_result_id' => $sortingResultId,
                 'created_by' => $userId,
@@ -716,6 +741,8 @@ class BarangKeluarService
                 'supplier_id' => $supplierId,
                 'quantity_change_grams' => -$totalDeduction,
                 'transaction_type' => 'EXTERNAL_TRANSFER_OUT',
+                'category' => InventoryTransaction::CAT_EXTERNAL_TRANSFER,
+                'is_revert' => false,
                 'reference_id' => $transfer->id,
                 'created_by' => $userId,
             ]);
@@ -728,6 +755,8 @@ class BarangKeluarService
                 'supplier_id' => $supplierId,
                 'quantity_change_grams' => abs($data['weight_grams']),
                 'transaction_type' => 'EXTERNAL_TRANSFER_IN',
+                'category' => InventoryTransaction::CAT_EXTERNAL_TRANSFER,
+                'is_revert' => false,
                 'reference_id' => $transfer->id,
                 'created_by' => $userId,
             ]);
@@ -765,6 +794,8 @@ class BarangKeluarService
                 'supplier_id' => $supplierId,
                 'quantity_change_grams' => abs($data['weight_grams']),
                 'transaction_type' => 'RECEIVE_EXTERNAL_IN',
+                'category' => InventoryTransaction::CAT_RECEIVE_EXTERNAL,
+                'is_revert' => false,
                 'reference_id' => $transfer->id,
                 'created_by' => $userId,
             ]);
@@ -779,6 +810,8 @@ class BarangKeluarService
                 'supplier_id' => $supplierId,
                 'quantity_change_grams' => -$totalDeduction,
                 'transaction_type' => 'RECEIVE_EXTERNAL_OUT',
+                'category' => InventoryTransaction::CAT_RECEIVE_EXTERNAL,
+                'is_revert' => false,
                 'reference_id' => $transfer->id,
                 'created_by' => $userId,
             ]);
@@ -849,13 +882,13 @@ class BarangKeluarService
         $sources = \App\Models\SortingResult::with([
                 'gradeCompany',
                 'receiptItem.purchaseReceipt.supplier',
-                'idmManagement.supplier',
+                'idmOutput.idmManagement.supplier',
             ])
             ->where(function ($q) use ($outgoingType) {
-                // 1) Batch hasil Grading dengan outgoing_type yang match (penjualan/internal/external)
-                // 2) ATAU IDM-SR (synthesized dari ManajemenIDM) — auto-masuk ke semua modul barang-keluar
-                $q->where('outgoing_type', $outgoingType)
-                  ->orWhereNotNull('idm_management_id');
+                // 1) Batch hasil Grading dengan outgoing_type yang match atau null
+                // 2) ATAU IDM-SR proxy (idm_output_id IS NOT NULL)
+                $q->whereIn('outgoing_type', [$outgoingType, null])
+                  ->orWhereNotNull('idm_output_id');
             })
             ->orderBy('grading_date', 'desc')
             ->get();

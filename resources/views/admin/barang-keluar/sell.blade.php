@@ -749,13 +749,13 @@
                                                 {{ $tx->gradeCompany->name ?? '-' }}
                                             </td>
                                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                                {{ $tx->sortingResult?->idmManagement?->supplier?->name ?? '-' }}
+                                                {{ $tx->sortingResult?->idmOutput?->idmManagement?->supplier?->name ?? '-' }}
                                             </td>
                                             <td class="px-6 py-4 whitespace-nowrap text-sm">
-                                                @if($tx->sortingResult?->idmManagement)
-                                                    <a href="{{ route('manajemen-idm.show', $tx->sortingResult->idmManagement->id) }}"
+                                                @if($tx->sortingResult?->idmOutput?->idmManagement)
+                                                    <a href="{{ route('manajemen-idm.show', $tx->sortingResult->idmOutput->idmManagement->id) }}"
                                                         class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-emerald-100 text-emerald-800 hover:bg-emerald-200">
-                                                        #{{ $tx->sortingResult->idmManagement->id }}
+                                                        #{{ $tx->sortingResult->idmOutput->idmManagement->id }}
                                                     </a>
                                                 @else
                                                     <span class="text-gray-400">—</span>

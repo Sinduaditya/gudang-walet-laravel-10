@@ -1,167 +1,152 @@
 @extends('layouts.app')
 
-@section('title', 'Tracking Stok - ' . $parentGrade->name)
+@section('title', 'Grades — ' . $parentGrade->name)
 
 @section('content')
-    <div class="py-8 px-4" style="background-color: #f8f9fa;">
+<div class="bg-gray-50 min-h-screen py-8 px-4 sm:px-6 lg:px-8">
+    <div class="max-w-7xl mx-auto">
 
-        <div class="max-w-7xl mx-auto">
+        {{-- Header --}}
+        <div class="flex items-start justify-between mb-6">
+            <div>
+                <nav class="text-xs text-gray-500 mb-2">
+                    <a href="{{ route('tracking-stock.get.grade.company') }}" class="hover:text-gray-700">Tracking Stok</a>
+                    <span class="mx-1.5 text-gray-300">/</span>
+                    <span class="text-gray-700 font-medium">{{ $parentGrade->name }}</span>
+                </nav>
+                <h1 class="text-2xl font-bold text-gray-900">{{ $parentGrade->name }}</h1>
+                <p class="text-sm text-gray-500 mt-1">Daftar grade dan posisi stok per grade.</p>
+            </div>
+            <a href="{{ route('tracking-stock.get.grade.company') }}"
+                class="flex-shrink-0 px-4 py-2 bg-white border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors">
+                Kembali
+            </a>
+        </div>
 
-            <div class="flex justify-between items-center mb-6">
+        {{-- Global Stock Summary --}}
+        <div class="bg-white border border-gray-200 rounded-lg p-5 mb-6 shadow-sm">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
-                    <h1 class="text-3xl font-bold text-gray-800 mb-2">Tracking Stok</h1>
-                    <p class="text-gray-600">List Grade untuk Parent: <span
-                            class="font-semibold text-blue-600">{{ $parentGrade->name }}</span></p>
+                    <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">
+                        Stok Global — Semua Grades
+                    </p>
+                    <p class="text-3xl font-bold text-gray-900">
+                        {{ number_format($globalStock, 0, ',', '.') }}
+                        <span class="text-base font-normal text-gray-500 ml-1">gram</span>
+                    </p>
                 </div>
-                <a href="{{ route('tracking-stock.get.grade.company') }}"
-                    class="inline-flex items-center text-sm font-medium text-gray-600 hover:text-gray-800 transition-colors">
-                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                    </svg>
-                    Kembali ke Index
-                </a>
-            </div>
-
-            <!-- Global Stock Card -->
-            <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6">
-                <div class="flex items-center gap-4">
-                    <div class="p-3 bg-blue-50 rounded-full">
-                        <svg class="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-                        </svg>
-                    </div>
-                    <div>
-                        <p class="text-gray-500 text-sm font-medium uppercase tracking-wider">Stok Global (All Grades)</p>
-                        <h3 class="text-3xl font-extrabold text-gray-900 mt-1">
-                            {{ number_format($globalStock, 0, ',', '.') }} <span
-                                class="text-lg text-gray-500 font-medium">gram</span>
-                        </h3>
-                    </div>
+                <div class="text-xs text-gray-400 sm:text-right leading-relaxed">
+                    <p>Net dari seluruh transaksi inventori</p>
+                    <p class="mt-0.5">Grading + Revert &minus; Penjualan &minus; Transfer &minus; IDM Out + IDM In</p>
                 </div>
             </div>
+        </div>
 
-
-            <div class="bg-white border border-gray-200 rounded-lg p-4 mb-6 shadow-sm">
-                <form method="GET" action="{{ route('tracking-stock.parent-grades', $parentGrade->id) }}">
-                    <div class="flex flex-col lg:flex-row gap-4">
-                        <div class="flex-1">
-                            <label class="flex items-center text-sm text-gray-600 mb-2">
-                                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                        d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                                </svg>
-                                Cari Grade
-                            </label>
-                            <input type="text" name="search" value="{{ request('search') }}"
-                                placeholder="Cari berdasarkan nama grade..."
-                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm">
-                        </div>
-
-                        <div class="flex items-end gap-2">
-                            <button type="submit"
-                                class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm font-medium transition duration-200 whitespace-nowrap">
-                                Cari
-                            </button>
-
-                            <a href="{{ route('tracking-stock.parent-grades', $parentGrade->id) }}"
-                                class="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 text-sm font-medium transition duration-200 whitespace-nowrap">
-                                Reset
-                            </a>
-                        </div>
-                    </div>
-                </form>
-
-                @if (request('search'))
-                    <div class="mt-3 pt-3 border-t border-gray-200">
-                        <span class="text-sm text-gray-600">Menampilkan hasil untuk:</span>
-                        <span
-                            class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 ml-2">
-                            "{{ request('search') }}"
-                        </span>
-                    </div>
+        {{-- Search --}}
+        <div class="bg-white border border-gray-200 rounded-lg p-4 mb-4 shadow-sm">
+            <form method="GET" action="{{ route('tracking-stock.parent-grades', $parentGrade->id) }}" class="flex gap-3">
+                <input type="text" name="search" value="{{ request('search') }}"
+                    placeholder="Cari nama grade..."
+                    class="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                <button type="submit"
+                    class="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 transition-colors">
+                    Cari
+                </button>
+                @if(request('search'))
+                    <a href="{{ route('tracking-stock.parent-grades', $parentGrade->id) }}"
+                        class="px-4 py-2 bg-gray-100 text-gray-700 rounded-md text-sm font-medium hover:bg-gray-200 transition-colors">
+                        Reset
+                    </a>
                 @endif
-            </div>
+            </form>
+        </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-                @forelse($gradeCompanies as $item)
-                    {{-- Card Item --}}
-                    <div
-                        class="bg-white rounded-2xl shadow-sm hover:shadow-lg hover:-translate-y-2 transition-all duration-300">
-                        {{-- Area Gambar --}}
-                        <div class="relative p-3">
-                            <div class="bg-black rounded-xl flex items-center justify-center overflow-hidden"
-                                style="height: 200px;">
-                                @if (!empty($item->image_url))
+        {{-- Grades Table --}}
+        <div class="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Grade
+                        </th>
+                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Stok Grading
+                            <span class="ml-1 font-normal normal-case text-gray-400">(net all transaksi)</span>
+                        </th>
+                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Stok Sortir
+                            <span class="ml-1 font-normal normal-case text-gray-400">(bahan masuk sortir)</span>
+                        </th>
+                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Aksi
+                        </th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    @forelse($gradeCompanies as $item)
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-6 py-4">
+                            <div class="flex items-center gap-3">
+                                @if(!empty($item->image_url))
                                     <img src="{{ asset('storage/' . $item->image_url) }}" alt="{{ $item->name }}"
-                                        class="max-h-full max-w-full object-contain">
+                                        class="w-9 h-9 rounded-lg object-contain bg-black p-1 flex-shrink-0">
                                 @else
-                                    <img src="{{ asset('storage/sarang_walet.png') }}" alt="{{ $item->name }}"
-                                        class="max-h-full max-w-full object-contain">
+                                    <div class="w-9 h-9 rounded-lg bg-gray-100 border border-gray-200 flex items-center justify-center flex-shrink-0">
+                                        <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
+                                        </svg>
+                                    </div>
                                 @endif
+                                <span class="text-sm font-semibold text-gray-900 uppercase">{{ $item->name }}</span>
                             </div>
-                        </div>
-
-                        {{-- Nama Grade --}}
-                        <div class="text-center px-4 py-2">
-                            <h6 class="font-bold uppercase text-sm tracking-wide text-gray-800">
-                                {{ $item->name }}
-                            </h6>
-                        </div>
-
-                        {{-- Stock Breakdown Stats --}}
-                        <div class="px-4 pb-3 space-y-1.5 text-xs">
-                            <div class="flex justify-between items-center text-gray-600 bg-gray-50 p-2 rounded border border-gray-100">
-                                <span class="font-medium text-gray-500">Stok Grading:</span>
-                                <span class="font-bold text-gray-800">{{ number_format($item->total_stock, 0, ',', '.') }} gr</span>
-                            </div>
-                            <div class="flex justify-between items-center text-orange-700 bg-orange-50/50 p-2 rounded border border-orange-100">
-                                <span class="font-medium text-orange-600">Stok Sortir:</span>
-                                <span class="font-bold text-orange-800">{{ number_format($item->sort_stock, 0, ',', '.') }} gr</span>
-                            </div>
-                        </div>
-
-                        <div class="border-t border-gray-200 mx-4"></div>
-
-                        {{-- Tombol Aksi --}}
-                        <div class="px-4 py-4">
-                            <div class="flex flex-col gap-2">
+                        </td>
+                        <td class="px-6 py-4 text-right">
+                            <span class="text-sm font-bold {{ $item->total_stock > 0 ? 'text-gray-900' : 'text-gray-400' }}">
+                                {{ number_format($item->total_stock, 0, ',', '.') }}
+                            </span>
+                            <span class="text-xs text-gray-400 ml-1">gr</span>
+                        </td>
+                        <td class="px-6 py-4 text-right">
+                            <span class="text-sm font-bold {{ $item->sort_stock > 0 ? 'text-orange-700' : 'text-gray-400' }}">
+                                {{ number_format($item->sort_stock, 0, ',', '.') }}
+                            </span>
+                            <span class="text-xs text-gray-400 ml-1">gr</span>
+                        </td>
+                        <td class="px-6 py-4 text-right">
+                            <div class="flex justify-end gap-2">
                                 <a href="{{ route('tracking-stock.detail', $item->id) }}"
-                                    class="w-full text-center py-2.5 px-4 text-sm font-medium bg-blue-500 text-white rounded-lg hover:bg-blue-700 transition-colors duration-200">
-                                    Detail
+                                    class="px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded-md hover:bg-blue-700 transition-colors">
+                                    Per Lokasi
                                 </a>
                                 <a href="{{ route('tracking-stock.susut', $item->id) }}"
-                                    class="w-full text-center py-2.5 px-4 text-sm font-medium bg-green-500 text-white rounded-lg hover:bg-green-700 transition-colors duration-200">
-                                    Tracking Stok
+                                    class="px-3 py-1.5 bg-white border border-gray-300 text-gray-700 text-xs font-medium rounded-md hover:bg-gray-50 transition-colors">
+                                    Susut
                                 </a>
                             </div>
-                        </div>
-                    </div>
-                @empty
-                    <div
-                        class="col-span-1 md:col-span-2 lg:col-span-5 text-center py-12 bg-white rounded-lg border border-dashed border-gray-300">
-                        <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        <p class="mt-2 text-gray-500">
-                            @if (request('search'))
-                                Tidak ada data yang cocok dengan "{{ request('search') }}".
+                        </td>
+                    </tr>
+                    @empty
+                    <tr>
+                        <td colspan="4" class="px-6 py-12 text-center text-sm text-gray-500">
+                            @if(request('search'))
+                                Tidak ada grade yang cocok dengan "{{ request('search') }}".
                             @else
-                                Data grade belum tersedia untuk parent ini.
+                                Belum ada data grade untuk parent ini.
                             @endif
-                        </p>
-                    </div>
-                @endforelse
+                        </td>
+                    </tr>
+                    @endforelse
+                </tbody>
+            </table>
+
+            @if($gradeCompanies->hasPages())
+            <div class="px-6 py-4 border-t border-gray-200 bg-gray-50">
+                {{ $gradeCompanies->appends(request()->query())->links() }}
             </div>
-
-            @if ($gradeCompanies->hasPages())
-                <div class="mt-6 flex justify-center">
-                    {{ $gradeCompanies->appends(request()->query())->links() }}
-                </div>
             @endif
-
         </div>
+
     </div>
+</div>
 @endsection

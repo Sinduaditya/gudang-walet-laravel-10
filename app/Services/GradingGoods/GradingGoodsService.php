@@ -330,6 +330,8 @@ class GradingGoodsService
             'supplier_id' => $supplierId, // <--- SIMPAN ID SUPPLIER DISINI
             'quantity_change_grams' => abs((float) $sortingResult->weight_grams),
             'transaction_type' => 'GRADING_IN',
+            'category' => InventoryTransaction::CAT_GRADING,
+            'is_revert' => false,
             'reference_id' => $sortingResult->id,
             'sorting_result_id' => $sortingResult->id,
             'outgoing_type' => $sortingResult->outgoing_type,

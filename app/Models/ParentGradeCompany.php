@@ -29,6 +29,11 @@ class ParentGradeCompany extends Model
         return $this->hasMany(GradeCompany::class);
     }
 
+    public function inventoryTransactions()
+    {
+        return $this->hasMany(InventoryTransaction::class, 'parent_grade_company_id');
+    }
+
     public function deletedBy()
     {
         return $this->belongsTo(User::class, 'deleted_by');

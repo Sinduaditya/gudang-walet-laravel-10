@@ -54,6 +54,8 @@ class FixNegativeStock extends Command
                             'location_id' => $gudangUtama->id,
                             'quantity_change_grams' => $adjustment,
                             'transaction_type' => 'ADJUSTMENT_IN',
+                            'category' => \App\Models\InventoryTransaction::CAT_ADJUSTMENT,
+                            'is_revert' => false,
                             'sorting_result_id' => null,
                             'notes' => 'Auto-fix: menutup stok minus (riwayat bug dropdown lama)',
                             'created_by' => 1,

@@ -5,6 +5,7 @@ namespace App\Services\Idm;
 use App\Models\GradeCompany;
 use App\Models\IdmDetail;
 use App\Models\IdmManagement;
+use App\Models\IdmOutput;
 use App\Models\InventoryTransaction;
 use App\Models\Location;
 use App\Models\SortingResult;
@@ -50,6 +51,7 @@ class ManajemenIdmService
     {
         $query = SortingResult::where('category_grade', $category)
             ->whereNull('idm_management_id')
+            ->whereNull('idm_output_id')
             ->with([
                 'receiptItem' => fn ($q) => $q->withTrashed(),
                 'receiptItem.purchaseReceipt' => fn ($q) => $q->withTrashed(),
@@ -140,15 +142,17 @@ class ManajemenIdmService
 
             $this->revertRegradingTransactions($mgmt);
 
-            // Soft-delete IDM-SR lama (akan dibuat ulang dengan berat baru)
-            $oldIdmSRIds = SortingResult::where('idm_management_id', $id)
-                ->whereNull('receipt_item_id')
-                ->pluck('id');
-            if ($oldIdmSRIds->isNotEmpty()) {
-                $userId = Auth::id();
-                SortingResult::whereIn('id', $oldIdmSRIds)
-                    ->update(['deleted_by' => $userId]);
-                SortingResult::whereIn('id', $oldIdmSRIds)->delete();
+            // Soft-delete IdmOutput lama + IDM-SR proxy (akan dibuat ulang dengan berat baru)
+            $userId = Auth::id();
+            $oldOutputIds = $mgmt->outputs()->pluck('id');
+            if ($oldOutputIds->isNotEmpty()) {
+                $oldProxyIds = SortingResult::whereIn('idm_output_id', $oldOutputIds)->pluck('id');
+                if ($oldProxyIds->isNotEmpty()) {
+                    SortingResult::whereIn('id', $oldProxyIds)->update(['deleted_by' => $userId]);
+                    SortingResult::whereIn('id', $oldProxyIds)->delete();
+                }
+                IdmOutput::whereIn('id', $oldOutputIds)->update(['deleted_by' => $userId]);
+                IdmOutput::whereIn('id', $oldOutputIds)->delete();
             }
 
             $mgmt->details()->delete();
@@ -195,13 +199,17 @@ class ManajemenIdmService
                 ->whereNotNull('receipt_item_id') // hanya source SR (IDM-SR punya receipt_item_id = null)
                 ->update(['idm_management_id' => null]);
 
-            // Soft-delete IDM-SR (synthesized output bins) supaya tidak jadi orphan
-            $idmSRIds = SortingResult::where('idm_management_id', $id)->pluck('id');
-            if ($idmSRIds->isNotEmpty()) {
-                $userId = Auth::id();
-                SortingResult::whereIn('id', $idmSRIds)
-                    ->update(['deleted_by' => $userId]);
-                SortingResult::whereIn('id', $idmSRIds)->delete();
+            // Soft-delete IdmOutput + IDM-SR proxy
+            $userId = Auth::id();
+            $outputIds = $mgmt->outputs()->pluck('id');
+            if ($outputIds->isNotEmpty()) {
+                $proxyIds = SortingResult::whereIn('idm_output_id', $outputIds)->pluck('id');
+                if ($proxyIds->isNotEmpty()) {
+                    SortingResult::whereIn('id', $proxyIds)->update(['deleted_by' => $userId]);
+                    SortingResult::whereIn('id', $proxyIds)->delete();
+                }
+                IdmOutput::whereIn('id', $outputIds)->update(['deleted_by' => $userId]);
+                IdmOutput::whereIn('id', $outputIds)->delete();
             }
 
             $mgmt->details()->delete();
@@ -265,14 +273,16 @@ class ManajemenIdmService
             'supplier_id'           => $supplierId,
             'quantity_change_grams' => -$initialWeight,
             'transaction_type'      => 'IDM_REGRADING_OUT',
+            'category'              => InventoryTransaction::CAT_IDM,
+            'is_revert'             => false,
             'reference_id'          => $mgmt->id,
             'created_by'            => $userId,
         ]);
 
-        // 2. Per-output: synthesize SortingResult (IDM-SR) + buat idm_detail + inventory_transaction
-        //    IDM-SR adalah batch virtual yang dibuat dari output ManajemenIDM, supaya 4 modul
-        //    barang-keluar (Penjualan, Transfer Internal, Transfer External, Receive External)
-        //    bisa pilih output IDM sebagai sumber via getGradingSourcesWithStock().
+        // 2. Per-output: buat IdmOutput + IdmDetail + IDM-SR proxy + inventory_transaction
+        //    IdmOutput = record aktual output. IDM-SR proxy = thin SortingResult yang menunjuk ke
+        //    IdmOutput, supaya sorting_result_id di inventory_transactions tetap bisa dipakai
+        //    oleh semua modul barang-keluar.
         foreach ($outputs as $name => $out) {
             IdmDetail::create([
                 'idm_management_id' => $mgmt->id,
@@ -282,16 +292,24 @@ class ManajemenIdmService
             ]);
 
             if ($out['weight'] > 0 && $out['grade_company_id']) {
-                $idmSortingResult = SortingResult::create([
-                    'grading_date'      => now(),
-                    'receipt_item_id'   => null,
+                $idmOutput = IdmOutput::create([
+                    'idm_management_id' => $mgmt->id,
                     'grade_company_id'  => $out['grade_company_id'],
                     'weight_grams'      => $out['weight'],
-                    'outgoing_type'     => null,
-                    'category_grade'    => null,
-                    'notes'             => "Auto-generated from ManajemenIDM #{$mgmt->id}",
-                    'idm_management_id' => $mgmt->id,
+                    'notes'             => "Output IDM #{$mgmt->id} — {$name}",
                     'created_by'        => $userId,
+                ]);
+
+                $idmProxy = SortingResult::create([
+                    'grading_date'    => now(),
+                    'receipt_item_id' => null,
+                    'grade_company_id' => $out['grade_company_id'],
+                    'weight_grams'    => $out['weight'],
+                    'outgoing_type'   => null,
+                    'category_grade'  => null,
+                    'notes'           => "Proxy IDM-SR untuk IdmOutput #{$idmOutput->id}",
+                    'idm_output_id'   => $idmOutput->id,
+                    'created_by'      => $userId,
                 ]);
 
                 InventoryTransaction::create([
@@ -301,8 +319,10 @@ class ManajemenIdmService
                     'supplier_id'           => $supplierId,
                     'quantity_change_grams' => $out['weight'],
                     'transaction_type'      => 'IDM_REGRADING_IN',
+                    'category'              => InventoryTransaction::CAT_IDM,
+                    'is_revert'             => false,
                     'reference_id'          => $mgmt->id,
-                    'sorting_result_id'     => $idmSortingResult->id,
+                    'sorting_result_id'     => $idmProxy->id,
                     'created_by'            => $userId,
                 ]);
             }
@@ -334,26 +354,24 @@ class ManajemenIdmService
 
     private function hasOutflow(IdmManagement $mgmt): bool
     {
-        // Filter ke IDM-SR rows yang dibuat oleh Mgmt ini saja, supaya tidak salah match
-        // dengan outflow di grade yang sama dari Grading biasa (yang bukan berasal dari Mgmt).
-        $idmSortingResultIds = SortingResult::where('idm_management_id', $mgmt->id)
-            ->pluck('id');
-
-        if ($idmSortingResultIds->isEmpty()) {
+        // Cari IDM-SR proxy via IdmOutput, bukan via idm_management_id
+        $outputIds = $mgmt->outputs()->pluck('id');
+        if ($outputIds->isEmpty()) {
             return false;
         }
 
-        // Penting: include transactions dengan reference_id = NULL.
-        // SALE_OUT / TRANSFER_OUT dari Penjualan/Transfer tidak set reference_id
-        // ke Mgmt (NULL), tapi mereka reference ke IDM-SR. Filter
-        // 'reference_id != Mgmt.id' di SQL EXCLUDE NULL values — harus
-        // explicit `orWhereNull` untuk menangkap SALE_OUT, dll.
+        $proxyIds = SortingResult::whereIn('idm_output_id', $outputIds)->pluck('id');
+        if ($proxyIds->isEmpty()) {
+            return false;
+        }
+
         return InventoryTransaction::where(function ($q) use ($mgmt) {
                 $q->where('reference_id', '!=', $mgmt->id)
                   ->orWhereNull('reference_id');
             })
-            ->whereIn('sorting_result_id', $idmSortingResultIds)
-            ->whereIn('transaction_type', self::OUTFLOW_TYPES)
+            ->whereIn('sorting_result_id', $proxyIds)
+            ->where('quantity_change_grams', '<', 0)
+            ->where('is_revert', false)
             ->exists();
     }
 

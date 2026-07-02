@@ -15,8 +15,10 @@ class SortingResult extends Model
         'grading_date', 'receipt_item_id', 'grade_company_id', 'weight_grams',
         'quantity', 'percentage_difference', 'notes', 'outgoing_type', 'category_grade',
         'created_by',
-        // idm_management_id: Di-set oleh modul IDM Management, bukan proses grading biasa
-        'idm_management_id'
+        // idm_management_id: Di-set saat grading source dikonsumsi oleh ManajemenIDM
+        'idm_management_id',
+        // idm_output_id: Di-set pada IDM-SR proxy (receipt_item_id=null, menunjuk ke idm_outputs)
+        'idm_output_id',
     ];
 
     const OUTGOING_TYPE_PENJUALAN_LANGSUNG = 'penjualan_langsung';
@@ -76,6 +78,11 @@ class SortingResult extends Model
     public function idmManagement()
     {
         return $this->belongsTo(IdmManagement::class);
+    }
+
+    public function idmOutput()
+    {
+        return $this->belongsTo(IdmOutput::class);
     }
 
     public function deletedBy()

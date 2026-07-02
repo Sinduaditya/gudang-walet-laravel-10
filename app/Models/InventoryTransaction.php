@@ -11,21 +11,41 @@ class InventoryTransaction extends Model
 {
     use HasFactory, SoftDeletes;
 
+    const SORT_IN          = 'SORT_IN';
+    const SORT_OUT         = 'SORT_OUT';
+    const SORT_GRADING_IN  = 'SORT_GRADING_IN';
+    const SORT_GRADING_OUT = 'SORT_GRADING_OUT';
+
+    const CAT_SALE              = 'SALE';
+    const CAT_TRANSFER          = 'TRANSFER';
+    const CAT_EXTERNAL_TRANSFER = 'EXTERNAL_TRANSFER';
+    const CAT_RECEIVE_EXTERNAL  = 'RECEIVE_EXTERNAL';
+    const CAT_RECEIVE_INTERNAL  = 'RECEIVE_INTERNAL';
+    const CAT_GRADING           = 'GRADING';
+    const CAT_IDM               = 'IDM';
+    const CAT_SORT              = 'SORT';
+    const CAT_ADJUSTMENT        = 'ADJUSTMENT';
+
     protected $fillable = [
         'transaction_date',
         'grade_company_id',
+        'parent_grade_company_id',
         'location_id',
         'supplier_id',
         'quantity_change_grams',
         'transaction_type',
+        'category',
+        'is_revert',
         'reference_id',
         'sorting_result_id',
         'created_by',
+        'deleted_by',
     ];
 
     protected $casts = [
         'transaction_date' => 'datetime',
         'quantity_change_grams' => 'float',
+        'is_revert' => 'boolean',
     ];
 
     /**
@@ -73,19 +93,22 @@ class InventoryTransaction extends Model
      */
     public function scopeOutgoing($query)
     {
-        return $query->whereIn('transaction_type', ['SALE_OUT', 'TRANSFER_OUT', 'IDM_TRANSFER_OUT']);
+        return $query->where('quantity_change_grams', '<', 0)->where('is_revert', false);
     }
 
-    /**
-     * Scope untuk transaksi masuk saja
-     */
     public function scopeIncoming($query)
     {
-        return $query->whereIn('transaction_type', [
-            'PURCHASE_IN', 'TRANSFER_IN', 'GRADING_IN',
-            'RECEIVE_EXTERNAL_IN', 'RECEIVE_INTERNAL_IN',
-            'EXTERNAL_TRANSFER_IN', 'ADJUSTMENT_IN'
-        ]);
+        return $query->where('quantity_change_grams', '>', 0)->where('is_revert', false);
+    }
+
+    public function scopeCategory($query, string $category)
+    {
+        return $query->where('category', $category);
+    }
+
+    public function scopeReverts($query)
+    {
+        return $query->where('is_revert', true);
     }
 
     public function supplier()
@@ -96,5 +119,10 @@ class InventoryTransaction extends Model
     public function deletedBy()
     {
         return $this->belongsTo(User::class, 'deleted_by');
+    }
+
+    public function parentGradeCompany()
+    {
+        return $this->belongsTo(ParentGradeCompany::class, 'parent_grade_company_id');
     }
 }

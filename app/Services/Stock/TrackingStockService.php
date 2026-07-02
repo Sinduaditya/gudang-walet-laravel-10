@@ -148,8 +148,7 @@ class TrackingStockService
     public function calculateIdmStock(int $gradeId): int
     {
         return (int) round(InventoryTransaction::where('grade_company_id', $gradeId)
-            ->whereNull('deleted_at')
-            ->whereIn('transaction_type', self::IDM_TRANSACTION_TYPES)
+            ->where('category', InventoryTransaction::CAT_IDM)
             ->sum('quantity_change_grams'));
     }
 
@@ -162,8 +161,7 @@ class TrackingStockService
         $results = InventoryTransaction::select('grade_company_id')
             ->selectRaw('SUM(quantity_change_grams) as total_stock')
             ->whereIn('grade_company_id', $gradeIds)
-            ->whereNull('deleted_at')
-            ->whereIn('transaction_type', self::IDM_TRANSACTION_TYPES)
+            ->where('category', InventoryTransaction::CAT_IDM)
             ->groupBy('grade_company_id')
             ->pluck('total_stock', 'grade_company_id')
             ->toArray();
@@ -185,8 +183,12 @@ class TrackingStockService
 
     public function calculateParentSortStock(int $parentId): int
     {
-        // Baca dari parent_grade_companies.stock yang selalu up-to-date oleh SortMaterialService
-        return (int) round(\App\Models\ParentGradeCompany::find($parentId)?->stock ?? 0);
+        $net = InventoryTransaction::where('parent_grade_company_id', $parentId)
+            ->whereNull('grade_company_id')
+            ->where('category', InventoryTransaction::CAT_SORT)
+            ->sum('quantity_change_grams');
+
+        return (int) round(max(0, $net));
     }
 
     // public function getStockPerLocation(int $gradeId, ?string $search = null): Collection

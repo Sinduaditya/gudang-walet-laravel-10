@@ -48,15 +48,15 @@ class PenjualanController extends Controller
                     'id'               => $source->id,
                     'name'             => $source->gradeCompany->name ?? 'Unknown',
                     'supplier_name'    => $source->receiptItem?->purchaseReceipt?->supplier?->name
-                                          ?? $source->idmManagement?->supplier?->name
+                                          ?? $source->idmOutput?->idmManagement?->supplier?->name
                                           ?? 'Unknown',
                     'supplier_id'      => $source->receiptItem?->purchaseReceipt?->supplier_id
-                                          ?? $source->idmManagement?->supplier_id
+                                          ?? $source->idmOutput?->idmManagement?->supplier_id
                                           ?? null,
                     'grading_date'     => $source->grading_date ? $source->grading_date->format('d M Y') : '-',
                     'batch_stock_grams' => $source->adjusted_weight,
                     'total_stock_grams' => $source->real_global_stock,
-                    'is_idm_output'    => !is_null($source->idm_management_id),
+                    'is_idm_output'    => !is_null($source->idm_output_id),
                 ];
             });
 
@@ -99,15 +99,15 @@ class PenjualanController extends Controller
             $penjualanTransactions = $query->paginate(10)->withQueryString();
 
             // ── RIWAYAT PENJUALAN DARI MANAJEMEN IDM ──────────────
-            // Tampilkan SALE_OUT yang bersumber dari IDM-SR (sorting_result.idm_management_id IS NOT NULL)
+            // Tampilkan SALE_OUT yang bersumber dari IDM-SR proxy (sorting_result.idm_output_id IS NOT NULL)
             $idmQuery = InventoryTransaction::where('transaction_type', 'SALE_OUT')
                 ->whereHas('sortingResult', function ($q) {
-                    $q->whereNotNull('idm_management_id');
+                    $q->whereNotNull('idm_output_id');
                 })
                 ->with([
                     'gradeCompany',
                     'location',
-                    'sortingResult.idmManagement.supplier',
+                    'sortingResult.idmOutput.idmManagement.supplier',
                 ])
                 ->orderBy('transaction_date', 'desc')
                 ->orderBy('id', 'desc');
@@ -119,7 +119,7 @@ class PenjualanController extends Controller
                 $idmQuery->whereDate('transaction_date', '<', $request->idm_end_date);
             }
             if ($request->filled('idm_supplier_id')) {
-                $idmQuery->whereHas('sortingResult.idmManagement', function ($q) use ($request) {
+                $idmQuery->whereHas('sortingResult.idmOutput.idmManagement', function ($q) use ($request) {
                     $q->where('supplier_id', $request->idm_supplier_id);
                 });
             }
@@ -304,6 +304,8 @@ class PenjualanController extends Controller
                         'quantity_change_grams' => $revertAmount,
                         'supplier_id'          => $tx->supplier_id,
                         'transaction_type'     => 'SALE_REVERT',
+                        'category'             => InventoryTransaction::CAT_SALE,
+                        'is_revert'            => true,
                         'reference_id'         => $tx->id,
                         'sorting_result_id'    => null,
                         'notes'                => 'Revert dari delete penjualan ID: ' . $id,

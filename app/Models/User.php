@@ -73,11 +73,6 @@ class User extends Authenticatable
         return $this->hasMany(InventoryTransaction::class, 'created_by');
     }
 
-    public function createdSales()
-    {
-        return $this->hasMany(Sale::class, 'created_by');
-    }
-
     public function createdStockTransfers()
     {
         return $this->hasMany(StockTransfer::class, 'created_by');

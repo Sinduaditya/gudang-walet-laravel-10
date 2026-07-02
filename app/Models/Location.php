@@ -27,11 +27,6 @@ class Location extends Model
         return $this->hasMany(InventoryTransaction::class);
     }
 
-    public function saleItems()
-    {
-        return $this->hasMany(SaleItem::class, 'from_location_id');
-    }
-
     public function stockTransfersFrom()
     {
         return $this->hasMany(StockTransfer::class, 'from_location_id');
@@ -57,7 +52,6 @@ class Location extends Model
     {
         return $this->stockTransfersFrom()->exists()
             || $this->stockTransfersTo()->exists()
-            || $this->inventoryTransactions()->exists()
-            || $this->saleItems()->exists();
+            || $this->inventoryTransactions()->exists();
     }
 }
