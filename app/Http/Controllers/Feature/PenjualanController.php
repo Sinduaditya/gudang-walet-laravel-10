@@ -288,14 +288,29 @@ class PenjualanController extends Controller
                         ->with('error', 'Transaksi sudah dihapus sebelumnya.');
                 }
 
-                // Validasi: Transaksi tidak boleh dihapus jika SortingResult dijadikan input untuk IDM
+                // Validasi 1: Direct check via sorting_result_id
                 if ($tx->sorting_result_id) {
                     $sr = \App\Models\SortingResult::find($tx->sorting_result_id);
                     if ($sr && !is_null($sr->idm_management_id)) {
-                        // Grading ini sudah dijadikan input untuk IDM — tidak boleh dihapus transaksinya
                         return redirect()->route('barang.keluar.sell.form')
                             ->with('error', 'Tidak dapat menghapus penjualan dari grading yang sedang di-regrading di Manajemen IDM #' . $sr->idm_management_id . '. Batalkan proses IDM terlebih dahulu.');
                     }
+                }
+
+                // Validasi 2: Check apakah grade ini sedang digunakan sebagai input di IDM mana pun
+                $lockedByIdm = \App\Models\SortingResult::where('grade_company_id', $tx->grade_company_id)
+                    ->whereNotNull('idm_management_id')
+                    ->whereNull('deleted_at')
+                    ->exists();
+
+                if ($lockedByIdm) {
+                    $lockedIdm = \App\Models\SortingResult::where('grade_company_id', $tx->grade_company_id)
+                        ->whereNotNull('idm_management_id')
+                        ->whereNull('deleted_at')
+                        ->first();
+
+                    return redirect()->route('barang.keluar.sell.form')
+                        ->with('error', 'Tidak dapat menghapus penjualan — grade ini sedang di-regrading di Manajemen IDM #' . $lockedIdm->idm_management_id . '. Batalkan proses IDM terlebih dahulu.');
                 }
 
                 // FIFO reversal: SALE_OUT boleh dihapus (regular grading ATAU dari IDM-SR).
