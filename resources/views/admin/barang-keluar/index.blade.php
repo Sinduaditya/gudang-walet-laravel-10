@@ -45,9 +45,14 @@
                     </div>
                 </a>
 
-                {{-- Transfer Internal --}}
+                {{-- Transfer Eksternal --}}
                 <a href="{{ route('barang.keluar.transfer.step1') }}"
-                    class="group bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md hover:border-purple-300 transition-all duration-200 p-5">
+                    class="group bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md hover:border-purple-300 transition-all duration-200 p-5 relative">
+                    <div class="absolute top-3 right-3">
+                        <span class="inline-block bg-purple-100 text-purple-700 text-xs font-semibold px-2.5 py-1 rounded">
+                            EKSTERNAL
+                        </span>
+                    </div>
                     <div class="flex items-start gap-4 mb-4">
                         <div class="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center flex-shrink-0 group-hover:bg-purple-600 transition-colors duration-200">
                             <svg class="w-5 h-5 text-purple-600 group-hover:text-white transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -56,17 +61,22 @@
                         </div>
                         <div class="flex-1">
                             <h3 class="font-bold text-gray-900 text-sm group-hover:text-purple-600 transition-colors">Pindah ke Gudang Lain</h3>
-                            <p class="text-xs text-gray-500 mt-1">Transfer ke lokasi internal seperti IDM atau DMK</p>
+                            <p class="text-xs text-gray-500 mt-1">Transfer antar lokasi gudang (IDM, DMK, atau gudang lain)</p>
                         </div>
                     </div>
                     <div class="text-xs text-gray-400 bg-gray-50 rounded px-2 py-1.5 inline-block">
-                        Barang tetap milik perusahaan
+                        Barang pindah ke lokasi gudang yang berbeda
                     </div>
                 </a>
 
-                {{-- Transfer External --}}
+                {{-- Transfer Internal (Jasa Cuci) --}}
                 <a href="{{ route('barang.keluar.external-transfer.step1') }}"
-                    class="group bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md hover:border-orange-300 transition-all duration-200 p-5">
+                    class="group bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md hover:border-orange-300 transition-all duration-200 p-5 relative">
+                    <div class="absolute top-3 right-3">
+                        <span class="inline-block bg-orange-100 text-orange-700 text-xs font-semibold px-2.5 py-1 rounded">
+                            INTERNAL
+                        </span>
+                    </div>
                     <div class="flex items-start gap-4 mb-4">
                         <div class="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center flex-shrink-0 group-hover:bg-orange-600 transition-colors duration-200">
                             <svg class="w-5 h-5 text-orange-600 group-hover:text-white transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -75,11 +85,11 @@
                         </div>
                         <div class="flex-1">
                             <h3 class="font-bold text-gray-900 text-sm group-hover:text-orange-600 transition-colors">Kirim ke Jasa Cuci</h3>
-                            <p class="text-xs text-gray-500 mt-1">Kirim barang untuk proses pencucian eksternal</p>
+                            <p class="text-xs text-gray-500 mt-1">Kirim barang untuk proses pencucian (layanan in-house)</p>
                         </div>
                     </div>
                     <div class="text-xs text-gray-400 bg-gray-50 rounded px-2 py-1.5 inline-block">
-                        Stok tercatat sebagai "sedang di cuci"
+                        Barang tetap di bawah kontrol perusahaan
                     </div>
                 </a>
 
