@@ -354,7 +354,7 @@ class ManajemenIdmService
 
     private function hasOutflow(IdmManagement $mgmt): bool
     {
-        // Cari IDM-SR proxy via IdmOutput, bukan via idm_management_id
+        // Cari IDM-SR proxy via IdmOutput
         $outputIds = $mgmt->outputs()->pluck('id');
         if ($outputIds->isEmpty()) {
             return false;
@@ -365,13 +365,18 @@ class ManajemenIdmService
             return false;
         }
 
-        return InventoryTransaction::where(function ($q) use ($mgmt) {
+        // Check apakah ada transaksi outgoing dari IDM-SR proxy
+        // Exclude: IDM_REGRADING_OUT (reference_id = mgmt->id)
+        // Include: SALE_OUT, TRANSFER_OUT, dll dari proxy
+        return InventoryTransaction::whereIn('sorting_result_id', $proxyIds)
+            ->where('quantity_change_grams', '<', 0)  // Hanya outgoing
+            ->where('is_revert', false)                 // Bukan revert
+            ->where(function ($q) use ($mgmt) {
+                // Exclude IDM_REGRADING_OUT (reference_id = mgmt id)
                 $q->where('reference_id', '!=', $mgmt->id)
                   ->orWhereNull('reference_id');
             })
-            ->whereIn('sorting_result_id', $proxyIds)
-            ->where('quantity_change_grams', '<', 0)
-            ->where('is_revert', false)
+            ->whereNull('deleted_at')                   // Only active txs
             ->exists();
     }
 
