@@ -288,12 +288,31 @@ class PenjualanController extends Controller
                         ->with('error', 'Transaksi sudah dihapus sebelumnya.');
                 }
 
-                // Validasi: Grading tidak boleh dihapus jika sudah dijadikan input untuk regrading IDM
-                if ($tx->transaction_type === 'SALE_OUT' && $tx->sorting_result_id) {
+                // Validasi: Transaksi tidak boleh dihapus jika SortingResult memiliki transaksi "locking" dari proses upstream
+                if ($tx->sorting_result_id) {
                     $sr = \App\Models\SortingResult::find($tx->sorting_result_id);
-                    if ($sr && !is_null($sr->idm_management_id)) {
-                        return redirect()->route('barang.keluar.sell.form')
-                            ->with('error', 'Tidak dapat menghapus penjualan dari grading yang sedang di-regrading di Manajemen IDM. Batalkan proses IDM terlebih dahulu.');
+                    if ($sr) {
+                        // Check: apakah SortingResult ini menjadi input IDM? (transaksi IDM_REGRADING_IN ada)
+                        $hasIdmLock = \App\Models\InventoryTransaction::where('sorting_result_id', $sr->id)
+                            ->where('transaction_type', 'IDM_REGRADING_IN')
+                            ->whereNull('deleted_at')
+                            ->exists();
+
+                        if ($hasIdmLock) {
+                            return redirect()->route('barang.keluar.sell.form')
+                                ->with('error', 'Tidak dapat menghapus transaksi dari grading yang sedang di-regrading di Manajemen IDM. Batalkan proses IDM terlebih dahulu.');
+                        }
+
+                        // Check: apakah ada transaksi "lock" lainnya yang mencegah penghapusan
+                        $lockingTransactions = \App\Models\InventoryTransaction::where('sorting_result_id', $sr->id)
+                            ->whereIn('transaction_type', ['IDM_REGRADING_IN', 'TRANSFER_OUT'])
+                            ->whereNull('deleted_at')
+                            ->exists();
+
+                        if ($lockingTransactions && $tx->transaction_type !== 'TRANSFER_OUT') {
+                            return redirect()->route('barang.keluar.sell.form')
+                                ->with('error', 'Tidak dapat menghapus transaksi dari grading yang sedang diproses di tingkat yang lebih atas. Batalkan proses yang lebih atas terlebih dahulu.');
+                        }
                     }
                 }
 
