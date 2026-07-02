@@ -25,7 +25,7 @@ class ReceiveExternalExport implements FromQuery, WithHeadings, WithMapping, Sho
     public function query()
     {
         $query = InventoryTransaction::where('transaction_type', 'RECEIVE_EXTERNAL_IN')
-            ->with(['gradeCompany', 'location', 'stockTransfer.fromLocation', 'sortingResult.receiptItem.purchaseReceipt.supplier'])
+            ->with(['gradeCompany', 'location', 'stockTransfer.fromLocation', 'sortingResult.receiptItem.purchaseReceipt.supplier', 'sortingResult.idmOutput.idmManagement.supplier'])
             ->whereHas('stockTransfer.fromLocation', function ($q) {
                 $q->where('is_jasa_cuci', true);
             })
@@ -35,8 +35,13 @@ class ReceiveExternalExport implements FromQuery, WithHeadings, WithMapping, Sho
             $query->where('grade_company_id', $this->filters['grade_id']);
         }
         if (!empty($this->filters['supplier_id'])) {
-            $query->whereHas('sortingResult.receiptItem.purchaseReceipt.supplier', function ($q) {
-                $q->where('id', $this->filters['supplier_id']);
+            $supplierId = $this->filters['supplier_id'];
+            $query->where(function ($q) use ($supplierId) {
+                $q->whereHas('sortingResult.receiptItem.purchaseReceipt', function ($q2) use ($supplierId) {
+                    $q2->where('supplier_id', $supplierId);
+                })->orWhereHas('sortingResult.idmOutput.idmManagement', function ($q2) use ($supplierId) {
+                    $q2->where('supplier_id', $supplierId);
+                });
             });
         }
         if (!empty($this->filters['start_date'])) {
@@ -58,7 +63,7 @@ class ReceiveExternalExport implements FromQuery, WithHeadings, WithMapping, Sho
     {
         return [
             \Carbon\Carbon::parse($tx->transaction_date)->format('d/m/Y'),
-            $tx->sortingResult->receiptItem->purchaseReceipt->supplier->name ?? '-',
+            $tx->sortingResult->receiptItem->purchaseReceipt->supplier->name ?? $tx->sortingResult->idmOutput->idmManagement->supplier->name ?? '-',
             $tx->gradeCompany->name ?? '-',
             $tx->stockTransfer->fromLocation->name ?? '-',
             number_format(abs($tx->quantity_change_grams), 2, ',', '.'),

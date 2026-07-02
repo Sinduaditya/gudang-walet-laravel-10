@@ -25,7 +25,7 @@ class PenjualanExport implements FromQuery, WithHeadings, WithMapping, ShouldAut
     public function query()
     {
         $query = InventoryTransaction::where('transaction_type', 'SALE_OUT')
-            ->with(['gradeCompany', 'location', 'sortingResult.receiptItem.purchaseReceipt.supplier'])
+            ->with(['gradeCompany', 'location', 'sortingResult.receiptItem.purchaseReceipt.supplier', 'sortingResult.idmOutput.idmManagement.supplier'])
             ->orderBy('transaction_date', 'desc');
 
         if (!empty($this->filters['start_date'])) {
@@ -35,8 +35,13 @@ class PenjualanExport implements FromQuery, WithHeadings, WithMapping, ShouldAut
             $query->whereDate('transaction_date', '<=', $this->filters['end_date']);
         }
         if (!empty($this->filters['supplier_id'])) {
-            $query->whereHas('sortingResult.receiptItem.purchaseReceipt', function ($q) {
-                $q->where('supplier_id', $this->filters['supplier_id']);
+            $supplierId = $this->filters['supplier_id'];
+            $query->where(function ($q) use ($supplierId) {
+                $q->whereHas('sortingResult.receiptItem.purchaseReceipt', function ($q2) use ($supplierId) {
+                    $q2->where('supplier_id', $supplierId);
+                })->orWhereHas('sortingResult.idmOutput.idmManagement', function ($q2) use ($supplierId) {
+                    $q2->where('supplier_id', $supplierId);
+                });
             });
         }
         if (!empty($this->filters['grade_company_id'])) {
@@ -56,7 +61,7 @@ class PenjualanExport implements FromQuery, WithHeadings, WithMapping, ShouldAut
         return [
             \Carbon\Carbon::parse($tx->transaction_date)->format('d/m/Y'),
             $tx->gradeCompany->name ?? '-',
-            $tx->sortingResult->receiptItem->purchaseReceipt->supplier->name ?? '-',
+            $tx->sortingResult->receiptItem->purchaseReceipt->supplier->name ?? $tx->sortingResult->idmOutput->idmManagement->supplier->name ?? '-',
             $tx->location->name ?? '-',
             number_format(abs($tx->quantity_change_grams), 2, ',', '.'),
             '#' . $tx->id,

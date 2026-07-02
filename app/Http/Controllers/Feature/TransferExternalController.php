@@ -64,7 +64,7 @@ class TransferExternalController extends Controller
             $grades = \App\Models\GradeCompany::all();
 
             $query = InventoryTransaction::where('transaction_type', 'EXTERNAL_TRANSFER_OUT')
-                ->with(['gradeCompany', 'location', 'stockTransfer.fromLocation', 'stockTransfer.toLocation', 'sortingResult.receiptItem.purchaseReceipt.supplier'])
+                ->with(['gradeCompany', 'location', 'stockTransfer.fromLocation', 'stockTransfer.toLocation', 'sortingResult.receiptItem.purchaseReceipt.supplier', 'sortingResult.idmOutput.idmManagement.supplier'])
                 ->orderBy('transaction_date', 'desc');
 
             // Apply Filters
@@ -75,8 +75,13 @@ class TransferExternalController extends Controller
                 $query->whereDate('transaction_date', '<=', $request->end_date);
             }
             if ($request->filled('supplier_id')) {
-                $query->whereHas('sortingResult.receiptItem.purchaseReceipt', function ($q) use ($request) {
-                    $q->where('supplier_id', $request->supplier_id);
+                $supplierId = $request->supplier_id;
+                $query->where(function ($q) use ($supplierId) {
+                    $q->whereHas('sortingResult.receiptItem.purchaseReceipt', function ($q2) use ($supplierId) {
+                        $q2->where('supplier_id', $supplierId);
+                    })->orWhereHas('sortingResult.idmOutput.idmManagement', function ($q2) use ($supplierId) {
+                        $q2->where('supplier_id', $supplierId);
+                    });
                 });
             }
             if ($request->filled('grade_company_id')) {

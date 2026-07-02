@@ -40,7 +40,8 @@ class ReceiveExternalController extends Controller
                     'gradeCompany',
                     'location',
                     'stockTransfer.fromLocation',
-                    'sortingResult.receiptItem.purchaseReceipt.supplier'
+                    'sortingResult.receiptItem.purchaseReceipt.supplier',
+                    'sortingResult.idmOutput.idmManagement.supplier'
                 ])
                 ->whereHas('stockTransfer.fromLocation', function($q) {
                     $q->where('is_jasa_cuci', true);
@@ -51,8 +52,13 @@ class ReceiveExternalController extends Controller
             }
 
             if ($request->filled('supplier_id')) {
-                $query->whereHas('sortingResult.receiptItem.purchaseReceipt.supplier', function($q) use ($request) {
-                    $q->where('id', $request->supplier_id);
+                $supplierId = $request->supplier_id;
+                $query->where(function ($q) use ($supplierId) {
+                    $q->whereHas('sortingResult.receiptItem.purchaseReceipt', function ($q2) use ($supplierId) {
+                        $q2->where('supplier_id', $supplierId);
+                    })->orWhereHas('sortingResult.idmOutput.idmManagement', function ($q2) use ($supplierId) {
+                        $q2->where('supplier_id', $supplierId);
+                    });
                 });
             }
 

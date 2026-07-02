@@ -27,7 +27,7 @@ class TransferInternalExport implements FromQuery, WithHeadings, WithMapping, Sh
         $query = StockTransfer::whereHas('transactions', function ($q) {
                 $q->where('transaction_type', 'TRANSFER_OUT');
             })
-            ->with(['gradeCompany', 'fromLocation', 'toLocation', 'sortingResult.receiptItem.purchaseReceipt.supplier'])
+            ->with(['gradeCompany', 'fromLocation', 'toLocation', 'sortingResult.receiptItem.purchaseReceipt.supplier', 'sortingResult.idmOutput.idmManagement.supplier'])
             ->orderBy('transfer_date', 'desc');
 
         if (!empty($this->filters['start_date'])) {
@@ -37,8 +37,13 @@ class TransferInternalExport implements FromQuery, WithHeadings, WithMapping, Sh
             $query->whereDate('transfer_date', '<=', $this->filters['end_date']);
         }
         if (!empty($this->filters['supplier_id'])) {
-            $query->whereHas('sortingResult.receiptItem.purchaseReceipt', function ($q) {
-                $q->where('supplier_id', $this->filters['supplier_id']);
+            $supplierId = $this->filters['supplier_id'];
+            $query->where(function ($q) use ($supplierId) {
+                $q->whereHas('sortingResult.receiptItem.purchaseReceipt', function ($q2) use ($supplierId) {
+                    $q2->where('supplier_id', $supplierId);
+                })->orWhereHas('sortingResult.idmOutput.idmManagement', function ($q2) use ($supplierId) {
+                    $q2->where('supplier_id', $supplierId);
+                });
             });
         }
         if (!empty($this->filters['grade_company_id'])) {
@@ -61,7 +66,7 @@ class TransferInternalExport implements FromQuery, WithHeadings, WithMapping, Sh
         return [
             \Carbon\Carbon::parse($transfer->transfer_date)->format('d/m/Y'),
             $transfer->gradeCompany->name ?? '-',
-            $transfer->sortingResult->receiptItem->purchaseReceipt->supplier->name ?? '-',
+            $transfer->sortingResult->receiptItem->purchaseReceipt->supplier->name ?? $transfer->sortingResult->idmOutput->idmManagement->supplier->name ?? '-',
             $from . ' → ' . $to,
             number_format($transfer->weight_grams, 2, ',', '.'),
             number_format($transfer->susut_grams ?? 0, 2, ',', '.'),

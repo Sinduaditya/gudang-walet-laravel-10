@@ -73,7 +73,7 @@ class PenjualanController extends Controller
                 ->whereDoesntHave('sortingResult', function ($q) {
                     $q->whereNotNull('idm_output_id');
                 })
-                ->with(['gradeCompany', 'location', 'sortingResult.receiptItem.purchaseReceipt.supplier'])
+                ->with(['gradeCompany', 'location', 'sortingResult.receiptItem.purchaseReceipt.supplier', 'sortingResult.idmOutput.idmManagement.supplier'])
                 ->orderBy('transaction_date', 'desc')
                 ->orderBy('id', 'desc');
 
@@ -84,8 +84,13 @@ class PenjualanController extends Controller
                 $query->whereDate('transaction_date', '<=', $request->end_date);
             }
             if ($request->filled('supplier_id')) {
-                $query->whereHas('sortingResult.receiptItem.purchaseReceipt', function ($q) use ($request) {
-                    $q->where('supplier_id', $request->supplier_id);
+                $supplierId = $request->supplier_id;
+                $query->where(function ($q) use ($supplierId) {
+                    $q->whereHas('sortingResult.receiptItem.purchaseReceipt', function ($q2) use ($supplierId) {
+                        $q2->where('supplier_id', $supplierId);
+                    })->orWhereHas('sortingResult.idmOutput.idmManagement', function ($q2) use ($supplierId) {
+                        $q2->where('supplier_id', $supplierId);
+                    });
                 });
             }
             if ($request->filled('grade_company_id')) {

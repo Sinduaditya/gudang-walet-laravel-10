@@ -472,7 +472,7 @@
                                                 {{ $transfer->gradeCompany->name ?? '-' }}
                                             </td>
                                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                                {{ $transfer->sortingResult->receiptItem->purchaseReceipt->supplier->name ?? '-' }}
+                                                {{ $transfer->sortingResult->receiptItem->purchaseReceipt->supplier->name ?? $transfer->sortingResult->idmOutput->idmManagement->supplier->name ?? '-' }}
                                             </td>
                                             <td class="px-6 py-4 whitespace-nowrap text-sm">
                                                 <div class="flex items-center">
