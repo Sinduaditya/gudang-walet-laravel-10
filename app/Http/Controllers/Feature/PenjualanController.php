@@ -283,6 +283,8 @@ class PenjualanController extends Controller
             return DB::transaction(function () use ($id) {
                 $tx = InventoryTransaction::lockForUpdate()->findOrFail($id);
 
+                \Log::info("TX found: type=" . $tx->transaction_type . ", sorting_result_id=" . ($tx->sorting_result_id ?? 'NULL') . ", grade=" . $tx->grade_company_id);
+
                 if ($tx->deleted_at) {
                     return redirect()->route('barang.keluar.sell.form')
                         ->with('error', 'Transaksi sudah dihapus sebelumnya.');
@@ -291,10 +293,15 @@ class PenjualanController extends Controller
                 // Validasi 1: Direct check via sorting_result_id
                 if ($tx->sorting_result_id) {
                     $sr = \App\Models\SortingResult::find($tx->sorting_result_id);
+                    \Log::info("Check 1 - SR found: " . ($sr ? 'YES' : 'NO') . ", idm_management_id=" . ($sr ? ($sr->idm_management_id ?? 'NULL') : 'N/A'));
+
                     if ($sr && !is_null($sr->idm_management_id)) {
+                        \Log::info("CHECK 1 BLOCKED: SR has idm_management_id");
                         return redirect()->route('barang.keluar.sell.form')
                             ->with('error', 'Tidak dapat menghapus penjualan dari grading yang sedang di-regrading di Manajemen IDM #' . $sr->idm_management_id . '. Batalkan proses IDM terlebih dahulu.');
                     }
+                } else {
+                    \Log::info("Check 1 SKIPPED: sorting_result_id is NULL");
                 }
 
                 // Validasi 2: Check apakah grade ini sedang digunakan sebagai input di IDM mana pun
@@ -303,12 +310,15 @@ class PenjualanController extends Controller
                     ->whereNull('deleted_at')
                     ->exists();
 
+                \Log::info("Check 2 - Grade-based IDM lock: " . ($lockedByIdm ? 'LOCKED' : 'FREE'));
+
                 if ($lockedByIdm) {
                     $lockedIdm = \App\Models\SortingResult::where('grade_company_id', $tx->grade_company_id)
                         ->whereNotNull('idm_management_id')
                         ->whereNull('deleted_at')
                         ->first();
 
+                    \Log::info("CHECK 2 BLOCKED: Grade locked by IDM #" . $lockedIdm->idm_management_id);
                     return redirect()->route('barang.keluar.sell.form')
                         ->with('error', 'Tidak dapat menghapus penjualan — grade ini sedang di-regrading di Manajemen IDM #' . $lockedIdm->idm_management_id . '. Batalkan proses IDM terlebih dahulu.');
                 }
