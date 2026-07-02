@@ -260,6 +260,12 @@ class GradingGoodsService
 
                 // ✅ Guard: Cek apakah ada transaksi keluar yang menggunakan grading ini
                 foreach ($sortingResults as $sorting) {
+                    // Check 1: IDM lock — grading tidak boleh dihapus jika sedang di-regrade di IDM
+                    if (!is_null($sorting->idm_management_id)) {
+                        throw new Exception('Tidak dapat menghapus grading yang sedang di-regrading di Manajemen IDM #' . $sorting->idm_management_id . '. Batalkan proses IDM terlebih dahulu.');
+                    }
+
+                    // Check 2: Outgoing transactions — grading tidak boleh dihapus jika sudah punya transaksi keluar
                     $hasOutgoing = InventoryTransaction::where('sorting_result_id', $sorting->id)
                         ->where('transaction_type', '!=', 'GRADING_IN')
                         ->exists();
