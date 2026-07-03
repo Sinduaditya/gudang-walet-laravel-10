@@ -25,6 +25,7 @@ class GradeCompanyRequest extends FormRequest
             'name' => 'required|string|max:255',
             'image_url' => 'nullable|image|mimes:jpg,jpeg,png|max:2048',
             'description' => 'nullable|string',
+            'parent_grade_company_id' => 'nullable|exists:parent_grade_companies,id',
         ];
     }
 

@@ -27,7 +27,9 @@ use App\Http\Controllers\Master\BulkAssignmentController;
 // Authentication Routes
 Route::middleware('guest')->group(function () {
     Route::get('/', [LoginController::class, 'showLoginForm'])->name('login');
-    Route::post('/', [LoginController::class, 'submitLogin'])->name('login.submit');
+    Route::post('/', [LoginController::class, 'submitLogin'])
+        ->middleware('throttle:login')
+        ->name('login.submit');
 });
 
 Route::middleware(['auth'])->group(function () {

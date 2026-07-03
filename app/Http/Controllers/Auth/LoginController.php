@@ -36,33 +36,16 @@ class LoginController extends Controller
      */
     public function submitLogin(LoginRequest $request)
     {
-        // // Rate limiting untuk mencegah brute force
-        // $key = 'login.' . $request->ip();
-
-        // if (cache()->has($key) && cache()->get($key) >= 20) {
-        //     return back()->withErrors([
-        //         'email' => 'Terlalu banyak percobaan login. Silakan coba lagi dalam 15 menit.'
-        //     ])->withInput();
-        // }
-
-        // Get validated data
         $credentials = $request->only('email', 'password');
         $remember = $request->boolean('remember');
 
         try {
             $this->authService->login($credentials, $remember);
 
-            // // Clear login attempts on success
-            // cache()->forget($key);
-
             return redirect()->intended(route('dashboard'))
                 ->with('success', 'Login berhasil. Selamat datang!');
 
         } catch (\Exception $e) {
-            // Increment login attempts
-            // $attempts = cache()->get($key, 0) + 1;
-            // cache()->put($key, $attempts, now()->addMinutes(15));
-
             return back()
                 ->withErrors(['email' => $e->getMessage()])
                 ->withInput($request->except('password'));

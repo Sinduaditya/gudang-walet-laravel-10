@@ -4,6 +4,7 @@ namespace App\Services\GradeCompany;
 
 use App\Exports\GradeCompanyExport;
 use App\Models\GradeCompany;
+use App\Models\InventoryTransaction;
 use Illuminate\Support\Facades\Storage;
 use Maatwebsite\Excel\Facades\Excel;
 
@@ -15,7 +16,8 @@ class GradeCompanyService
 
         if ($search) {
             $query->where(function ($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%");
+                $q->where('name', 'like', "%{$search}%")
+                    ->orWhere('description', 'like', "%{$search}%");
             });
         }
 
@@ -33,6 +35,10 @@ class GradeCompanyService
             $data['name'] = strtoupper($data['name']);
         }
 
+        if (empty($data['parent_grade_company_id'])) {
+            $data['parent_grade_company_id'] = null;
+        }
+
         $image = $data['image_url'] ?? null;
         if ($image instanceof \Illuminate\Http\UploadedFile) {
             $data['image_url'] = $image->store('grade-company', 'public');
@@ -47,6 +53,10 @@ class GradeCompanyService
     {
         if (isset($data['name'])) {
             $data['name'] = strtoupper($data['name']);
+        }
+
+        if (array_key_exists('parent_grade_company_id', $data) && empty($data['parent_grade_company_id'])) {
+            $data['parent_grade_company_id'] = null;
         }
 
         $gradeCompany = $this->getById($id);
@@ -101,6 +111,34 @@ class GradeCompanyService
         }
 
         return GradeCompany::whereIn('id', $gradeCompanyIds)->update(['parent_grade_company_id' => $parentGradeId]);
+    }
+
+    /**
+     * Cek apakah grade company punya stock aktif (net quantity != 0 di ledger).
+     * Dipakai buat block perubahan parent_grade_company_id — reassign/unassign
+     * grade yang masih ada stock bikin "Global Budgeting" pool (BarangKeluarService)
+     * & TrackingStockService::calculateParentGlobalStock() berubah retroaktif
+     * antar parent, walau histori transaksinya kejadian di bawah parent lama.
+     */
+    public function hasActiveStock(int $gradeId): bool
+    {
+        $net = (float) InventoryTransaction::where('grade_company_id', $gradeId)
+            ->whereNull('deleted_at')
+            ->sum('quantity_change_grams');
+
+        return round($net, 2) !== 0.0;
+    }
+
+    /**
+     * Filter list grade company id, kembalikan (nama => stock) untuk yang masih
+     * punya stock aktif — dipakai buat pesan error yang jelas ke user.
+     */
+    public function getGradesWithActiveStock(array $gradeCompanyIds): \Illuminate\Support\Collection
+    {
+        return GradeCompany::whereIn('id', $gradeCompanyIds)
+            ->get()
+            ->filter(fn (GradeCompany $g) => $this->hasActiveStock($g->id))
+            ->pluck('name');
     }
 
     public function exportToExcel()

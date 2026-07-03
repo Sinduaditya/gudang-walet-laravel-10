@@ -39,7 +39,8 @@
 
                     <!-- Grade Selection -->
                     <div class="mb-4">
-                        <h2 class="text-lg font-medium text-gray-800 mb-4">Pilih Grade Company (Unassigned)</h2>
+                        <h2 class="text-lg font-medium text-gray-800 mb-4">Pilih Grade Company</h2>
+                        <p class="text-xs text-gray-500 -mt-3 mb-3">Grade yang sudah punya parent bisa dipilih juga untuk dipindah (reassign).</p>
 
                         <!-- Search (Client-side) -->
                         <div class="mb-4 flex gap-2">
@@ -62,6 +63,9 @@
                                     <th
                                         class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">
                                         Deskripsi</th>
+                                    <th
+                                        class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50">
+                                        Parent Saat Ini</th>
                                 </tr>
                             </thead>
                             <tbody class="bg-white divide-y divide-gray-200">
@@ -77,11 +81,20 @@
                                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                             {{ Str::limit($grade->description, 50) }}
                                         </td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-xs">
+                                            @if ($grade->parentGradeCompany)
+                                                <span class="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">
+                                                    {{ $grade->parentGradeCompany->name }}
+                                                </span>
+                                            @else
+                                                <span class="text-gray-400 italic">-</span>
+                                            @endif
+                                        </td>
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="3" class="px-6 py-4 text-center text-sm text-gray-500">
-                                            Tidak ada Grade Company yang belum di-assign.
+                                        <td colspan="4" class="px-6 py-4 text-center text-sm text-gray-500">
+                                            Belum ada data Grade Company.
                                         </td>
                                     </tr>
                                 @endforelse

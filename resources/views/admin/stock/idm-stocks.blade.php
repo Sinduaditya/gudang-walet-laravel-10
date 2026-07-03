@@ -37,8 +37,44 @@
                 </a>
             </div>
 
+            {{-- Filter Periode --}}
+            <div class="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-4">
+                <form method="GET" action="{{ route('tracking-stock.idm-stocks') }}" class="flex flex-col sm:flex-row gap-3 items-end">
+                    <div>
+                        <label class="block text-xs font-medium text-gray-600 mb-1">Dari Tanggal</label>
+                        <input type="date" name="start_date" value="{{ $startDate }}"
+                            class="px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-600 mb-1">Sampai Tanggal</label>
+                        <input type="date" name="end_date" value="{{ $endDate }}"
+                            class="px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <button type="submit" class="px-4 py-1.5 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 transition-colors">
+                        Terapkan
+                    </button>
+                    @if($startDate || $endDate)
+                        <a href="{{ route('tracking-stock.idm-stocks') }}" class="px-4 py-1.5 bg-gray-200 text-gray-700 rounded-md text-sm font-medium hover:bg-gray-300 transition-colors">
+                            Reset (Sepanjang Waktu)
+                        </a>
+                    @endif
+                </form>
+            </div>
+
             {{-- Summary Stats --}}
             <div class="bg-white border border-gray-200 rounded-lg shadow-sm mb-6 overflow-hidden">
+                <div class="px-5 pt-4 text-xs font-medium text-gray-500">
+                    Periode:
+                    <span class="text-gray-700 font-semibold">
+                        @if($startDate || $endDate)
+                            {{ $startDate ? \Carbon\Carbon::parse($startDate)->format('d M Y') : 'Awal' }}
+                            &mdash;
+                            {{ $endDate ? \Carbon\Carbon::parse($endDate)->format('d M Y') : 'Sekarang' }}
+                        @else
+                            Sepanjang Waktu (All Time)
+                        @endif
+                    </span>
+                </div>
                 <div class="grid grid-cols-3 divide-x divide-gray-200">
                     <div class="p-5">
                         <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Total Diproses</p>
@@ -46,7 +82,7 @@
                             {{ number_format(abs($totalIdmOut), 0, ',', '.') }}
                             <span class="text-sm font-normal text-gray-500 ml-1">gram</span>
                         </p>
-                        <p class="text-xs text-gray-400 mt-1">Berat grade asal (IDM A / IDM B) yang dikurangi saat regrading</p>
+                        <p class="text-xs text-gray-400 mt-1">Berat grade asal (IDM A / IDM B) yang dikurangi saat regrading, pada periode ini</p>
                     </div>
                     <div class="p-5">
                         <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Total Dihasilkan</p>
@@ -54,7 +90,7 @@
                             {{ number_format($totalIdmIn, 0, ',', '.') }}
                             <span class="text-sm font-normal text-gray-500 ml-1">gram</span>
                         </p>
-                        <p class="text-xs text-gray-400 mt-1">Berat output (IDM + KAKIAN + PERUTAN + ALU/AFKIR) yang ditambahkan</p>
+                        <p class="text-xs text-gray-400 mt-1">Berat output (IDM + KAKIAN + PERUTAN + ALU/AFKIR) yang ditambahkan, pada periode ini</p>
                     </div>
                     <div class="p-5">
                         <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Susut Regrading</p>
@@ -62,7 +98,7 @@
                             {{ number_format($totalSusut, 0, ',', '.') }}
                             <span class="text-sm font-normal text-gray-500 ml-1">gram</span>
                         </p>
-                        <p class="text-xs text-gray-400 mt-1">Selisih penyusutan selama proses (Diproses &minus; Dihasilkan)</p>
+                        <p class="text-xs text-gray-400 mt-1">Selisih penyusutan pada periode ini (Diproses &minus; Dihasilkan)</p>
                     </div>
                 </div>
             </div>
@@ -70,15 +106,16 @@
             {{-- Output Grade Cards --}}
             <div class="mb-8">
                 <div class="mb-3">
-                    <h2 class="text-base font-bold text-gray-800">Stok Hasil Proses</h2>
+                    <h2 class="text-base font-bold text-gray-800">Riwayat Hasil Regrading (Kumulatif)</h2>
                     <p class="text-xs text-gray-500 mt-0.5">
-                        Stok dari kategori IDM saja (IDM_REGRADING_IN/OUT). Tidak termasuk transaksi grading, transfer, penjualan.
+                        Total historis dari proses regrading (IDM_REGRADING_IN/OUT) — angka ini <strong>bukan stok real-time</strong> dan tidak berkurang saat barang keluar lewat transfer. Untuk stok akurat saat ini, klik kartu untuk buka Tracking Stok per-grade.
                     </p>
                 </div>
                 <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
                     @foreach(['IDM', 'KAKIAN', 'PERUTAN', 'ALU/AFKIR'] as $name)
                         @php $g = $byName->get($name); $style = $binStyles[$name]; @endphp
-                        <div class="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden {{ $g ? '' : 'opacity-50' }}">
+                        <a href="{{ $g ? route('tracking-stock.detail', $g->id) : '#' }}"
+                            class="block bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden {{ $g ? 'hover:border-blue-300 hover:shadow-md transition-all' : 'opacity-50 pointer-events-none' }}">
                             <div class="px-4 pt-4 pb-3">
                                 <div class="flex items-center justify-between mb-3">
                                     <div class="w-9 h-9 rounded-lg {{ $style['bg'] }} flex items-center justify-center {{ $style['text'] }}">
@@ -92,14 +129,17 @@
                                 </div>
                                 <p class="text-sm font-bold uppercase text-gray-800">{{ $name }}</p>
                                 <p class="text-xs text-gray-400 mb-2">
-                                    @if($g) Stok hasil regrading IDM @else Belum di-seed @endif
+                                    @if($g) Total diproses (kumulatif) @else Belum di-seed @endif
                                 </p>
-                                <p class="text-xl font-extrabold {{ ($g && $g->idm_stock > 0) ? 'text-green-700' : ($g ? 'text-gray-500' : 'text-gray-300') }}">
+                                <p class="text-xl font-extrabold {{ $g ? 'text-gray-700' : 'text-gray-300' }}">
                                     {{ $g ? number_format($g->idm_stock, 0, ',', '.') : '—' }}
                                     @if($g) <span class="text-xs font-normal text-gray-400">gr</span> @endif
                                 </p>
+                                @if($g)
+                                    <p class="text-xs text-blue-600 font-medium mt-2">Lihat stok real-time &rarr;</p>
+                                @endif
                             </div>
-                        </div>
+                        </a>
                     @endforeach
                 </div>
             </div>

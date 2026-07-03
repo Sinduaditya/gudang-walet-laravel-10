@@ -24,9 +24,8 @@ class GradeCompanyController extends Controller
     {
         $search = $request->input('search');
         $gradeCompany = $this->GradeCompanyService->getAll($search);
-        $parentGradeCompanies = \App\Models\ParentGradeCompany::all();
 
-        return view('admin.grade-company.index', compact('gradeCompany', 'search', 'parentGradeCompanies'));
+        return view('admin.grade-company.index', compact('gradeCompany', 'search'));
     }
 
     public function export()
@@ -43,7 +42,8 @@ class GradeCompanyController extends Controller
 
     public function create()
     {
-        return view('admin.grade-company.create');
+        $parentGradeCompanies = \App\Models\ParentGradeCompany::orderBy('name')->get();
+        return view('admin.grade-company.create', compact('parentGradeCompanies'));
     }
 
     public function store(GradeCompanyRequest $request)
@@ -55,12 +55,26 @@ class GradeCompanyController extends Controller
     public function edit(int $id)
     {
         $gradeCompany = $this->GradeCompanyService->getById($id);
-        return view('admin.grade-company.edit', compact('gradeCompany'));
+        $parentGradeCompanies = \App\Models\ParentGradeCompany::orderBy('name')->get();
+        return view('admin.grade-company.edit', compact('gradeCompany', 'parentGradeCompanies'));
     }
 
     public function update(GradeCompanyRequest $request, int $id)
     {
-        $this->GradeCompanyService->update($id, $request->validated());
+        $data = $request->validated();
+        $gradeCompany = $this->GradeCompanyService->getById($id);
+
+        $newParentId = empty($data['parent_grade_company_id']) ? null : (int) $data['parent_grade_company_id'];
+        $parentChanged = $newParentId !== $gradeCompany->parent_grade_company_id;
+
+        if ($parentChanged && $this->GradeCompanyService->hasActiveStock($id)) {
+            return back()->withInput()->with('error',
+                "Tidak dapat mengubah parent \"{$gradeCompany->name}\" — grade ini masih punya stock aktif. " .
+                "Reassign parent hanya boleh untuk grade dengan stock 0 (histori transaksi terkunci ke parent saat ini)."
+            );
+        }
+
+        $this->GradeCompanyService->update($id, $data);
         return redirect()->route('grade-company.index')->with('success', 'Grade company berhasil diperbarui.');
     }
 

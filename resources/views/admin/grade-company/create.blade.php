@@ -41,6 +41,27 @@
                     @enderror
                 </div>
 
+                <!-- Parent Grade -->
+                <div class="mb-6">
+                    <label for="parent_grade_company_id" class="block text-sm font-medium text-gray-700 mb-2">
+                        Parent Grade Company
+                    </label>
+                    <select name="parent_grade_company_id"
+                            id="parent_grade_company_id"
+                            class="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 @error('parent_grade_company_id') border-red-500 @enderror">
+                        <option value="">-- Tanpa Parent --</option>
+                        @foreach ($parentGradeCompanies as $pg)
+                            <option value="{{ $pg->id }}" {{ (int) old('parent_grade_company_id') === $pg->id ? 'selected' : '' }}>
+                                {{ $pg->name }}
+                            </option>
+                        @endforeach
+                    </select>
+                    @error('parent_grade_company_id')
+                        <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                    @enderror
+                    <p class="mt-1 text-xs text-gray-500">Opsional. Bisa diatur belakangan lewat Bulk Assign Parent.</p>
+                </div>
+
                 <!-- Gambar -->
                 <div class="mb-6">
                     <label for="image_url" class="block text-sm font-medium text-gray-700 mb-2">

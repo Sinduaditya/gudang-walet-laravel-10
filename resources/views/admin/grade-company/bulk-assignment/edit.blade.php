@@ -17,14 +17,15 @@
                 </a>
             </div>
 
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                <!-- Left Column: Assigned Grades (Remove) -->
-                <div class="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
-                    <h2 class="text-lg font-medium text-gray-800 mb-4 text-red-600">Grade yang Sudah Di-assign (Pilih untuk
-                        Unassign)</h2>
-                    <form action="{{ route('bulk-assignments.update', $parentGradeCompany->id) }}" method="POST">
-                        @csrf
-                        @method('PUT')
+            <form action="{{ route('bulk-assignments.update', $parentGradeCompany->id) }}" method="POST">
+                @csrf
+                @method('PUT')
+
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    <!-- Left Column: Assigned Grades (Remove) -->
+                    <div class="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
+                        <h2 class="text-lg font-medium text-gray-800 mb-4 text-red-600">Grade yang Sudah Di-assign (Pilih
+                            untuk Unassign)</h2>
 
                         <div class="overflow-y-auto max-h-96 mb-4 border border-gray-100 rounded">
                             <table class="min-w-full divide-y divide-gray-200">
@@ -59,30 +60,18 @@
                                 </tbody>
                             </table>
                         </div>
-
-                        <div class="flex justify-end">
-                            <button type="submit"
-                                class="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 font-medium transition duration-200 text-sm">
-                                Unassign Terpilih
-                            </button>
-                        </div>
-                    </form>
-                </div>
-
-                <!-- Right Column: Available Grades (Add) -->
-                <div class="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
-                    <h2 class="text-lg font-medium text-gray-800 mb-4 text-green-600">Grade Tersedia (Pilih untuk Assign)
-                    </h2>
-
-                    <!-- Client-side Search Input -->
-                    <div class="mb-4 flex gap-2">
-                        <input type="text" id="searchInput" placeholder="Cari Grade..."
-                            class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm font-medium transition duration-200">
                     </div>
 
-                    <form action="{{ route('bulk-assignments.update', $parentGradeCompany->id) }}" method="POST">
-                        @csrf
-                        @method('PUT')
+                    <!-- Right Column: Available Grades (Add) -->
+                    <div class="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
+                        <h2 class="text-lg font-medium text-gray-800 mb-4 text-green-600">Grade Tersedia (Pilih untuk
+                            Assign)</h2>
+
+                        <!-- Client-side Search Input -->
+                        <div class="mb-4 flex gap-2">
+                            <input type="text" id="searchInput" placeholder="Cari Grade..."
+                                class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm font-medium transition duration-200">
+                        </div>
 
                         <div class="overflow-y-auto max-h-96 mb-4 border border-gray-100 rounded">
                             <table class="min-w-full divide-y divide-gray-200">
@@ -95,6 +84,9 @@
                                         <th
                                             class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                             Nama Grade</th>
+                                        <th
+                                            class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            Parent Saat Ini</th>
                                     </tr>
                                 </thead>
                                 <tbody class="bg-white divide-y divide-gray-200">
@@ -106,10 +98,19 @@
                                             </td>
                                             <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-900 assign-name">
                                                 {{ $grade->name }}</td>
+                                            <td class="px-4 py-2 whitespace-nowrap text-xs">
+                                                @if ($grade->parentGradeCompany)
+                                                    <span class="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">
+                                                        Pindah dari: {{ $grade->parentGradeCompany->name }}
+                                                    </span>
+                                                @else
+                                                    <span class="text-gray-400 italic">Belum ada parent</span>
+                                                @endif
+                                            </td>
                                         </tr>
                                     @empty
                                         <tr>
-                                            <td colspan="2" class="px-4 py-2 text-center text-sm text-gray-500">
+                                            <td colspan="3" class="px-4 py-2 text-center text-sm text-gray-500">
                                                 Tidak ada grade tersedia.
                                             </td>
                                         </tr>
@@ -121,16 +122,16 @@
                         <div class="mb-4 text-xs text-gray-500">
                             Total {{ $availableGrades->count() }} data.
                         </div>
-
-                        <div class="flex justify-end">
-                            <button type="submit"
-                                class="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 font-medium transition duration-200 text-sm">
-                                Assign Terpilih
-                            </button>
-                        </div>
-                    </form>
+                    </div>
                 </div>
-            </div>
+
+                <div class="flex justify-end mt-6">
+                    <button type="submit"
+                        class="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 font-medium transition duration-200 text-sm">
+                        Simpan Perubahan
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 

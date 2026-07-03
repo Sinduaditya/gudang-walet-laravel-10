@@ -77,6 +77,12 @@
                         </a>
                     </li>
                     <li class="mr-2">
+                        <a href="{{ route('system-log.index', ['type' => 'idm_outputs']) }}"
+                            class="inline-block p-4 border-b-2 rounded-t-lg {{ $type == 'idm_outputs' ? 'text-blue-600 border-blue-600 active' : 'border-transparent hover:text-gray-600 hover:border-gray-300' }}">
+                            IDM Outputs
+                        </a>
+                    </li>
+                    <li class="mr-2">
                         <a href="{{ route('system-log.index', ['type' => 'sort_materials']) }}"
                             class="inline-block p-4 border-b-2 rounded-t-lg {{ $type == 'sort_materials' ? 'text-blue-600 border-blue-600 active' : 'border-transparent hover:text-gray-600 hover:border-gray-300' }}">
                             Sortir Bahan
@@ -175,6 +181,9 @@
                                             {{ $item->gradeCompany->name ?? 'Unknown Grade' }} ({{ $item->initial_weight }}g)
                                         @elseif($type == 'idm_details')
                                             {{ $item->grade_idm_name }} ({{ $item->weight }}g)
+                                        @elseif($type == 'idm_outputs')
+                                            {{ $item->gradeCompany->name ?? 'Unknown Grade' }} ({{ $item->weight_grams }}g)
+                                            <span class="text-xs text-gray-500 block">IDM Mgmt #{{ $item->idm_management_id }}</span>
                                         @elseif($type == 'sort_materials')
                                             {{ $item->description }}
                                         @elseif($type == 'stock_transfers')

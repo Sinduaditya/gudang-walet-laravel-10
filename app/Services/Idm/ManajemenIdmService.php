@@ -155,6 +155,7 @@ class ManajemenIdmService
                 IdmOutput::whereIn('id', $oldOutputIds)->delete();
             }
 
+            $mgmt->details()->update(['deleted_by' => $userId]);
             $mgmt->details()->delete();
 
             $mgmt->update(['shrinkage' => $shrinkage]);
@@ -212,7 +213,10 @@ class ManajemenIdmService
                 IdmOutput::whereIn('id', $outputIds)->delete();
             }
 
+            $mgmt->details()->update(['deleted_by' => $userId]);
             $mgmt->details()->delete();
+            $mgmt->deleted_by = $userId;
+            $mgmt->save();
             $mgmt->delete();
         });
     }

@@ -17,6 +17,7 @@ use App\Models\ReceiptItem;
 use App\Models\SortingResult;
 use App\Models\IdmManagement;
 use App\Models\IdmDetail;
+use App\Models\IdmOutput;
 
 class SystemLogController extends Controller
 {
@@ -83,11 +84,12 @@ class SystemLogController extends Controller
                     }
                 ]);
                 if ($search) {
-                    $query->where('id', 'like', "%{$search}%")
-                        ->orWhereHas('supplier', function ($q) use ($search) {
-                            $q->where('name', 'like', "%{$search}%");
-                        });
-
+                    $query->where(function ($q) use ($search) {
+                        $q->where('id', 'like', "%{$search}%")
+                            ->orWhereHas('supplier', function ($q2) use ($search) {
+                                $q2->where('name', 'like', "%{$search}%");
+                            });
+                    });
                 }
                 $data = $query->latest('deleted_at')->paginate(10);
                 break;
@@ -108,11 +110,12 @@ class SystemLogController extends Controller
                     }
                 ]);
                 if ($search) {
-                    $query->where('id', 'like', "%{$search}%")
-                        ->orWhereHas('gradeSupplier', function ($q) use ($search) {
-                            $q->where('name', 'like', "%{$search}%");
-                        });
-
+                    $query->where(function ($q) use ($search) {
+                        $q->where('id', 'like', "%{$search}%")
+                            ->orWhereHas('gradeSupplier', function ($q2) use ($search) {
+                                $q2->where('name', 'like', "%{$search}%");
+                            });
+                    });
                 }
                 $data = $query->latest('deleted_at')->paginate(10);
                 break;
@@ -126,10 +129,12 @@ class SystemLogController extends Controller
                     }
                 ]);
                 if ($search) {
-                    $query->where('id', 'like', "%{$search}%")
-                        ->orWhereHas('gradeCompany', function ($q) use ($search) {
-                            $q->where('name', 'like', "%{$search}%");
-                        });
+                    $query->where(function ($q) use ($search) {
+                        $q->where('id', 'like', "%{$search}%")
+                            ->orWhereHas('gradeCompany', function ($q2) use ($search) {
+                                $q2->where('name', 'like', "%{$search}%");
+                            });
+                    });
                 }
                 $data = $query->latest('deleted_at')->paginate(10);
                 break;
@@ -163,6 +168,24 @@ class SystemLogController extends Controller
                 $query = IdmDetail::onlyTrashed()->with('deletedBy');
                 if ($search) {
                     $query->where('grade_idm_name', 'like', "%{$search}%");
+                }
+                $data = $query->latest('deleted_at')->paginate(10);
+                break;
+
+            case 'idm_outputs':
+                $query = IdmOutput::onlyTrashed()->with([
+                    'deletedBy',
+                    'gradeCompany' => function ($query) {
+                        $query->withTrashed();
+                    }
+                ]);
+                if ($search) {
+                    $query->where(function ($q) use ($search) {
+                        $q->where('id', 'like', "%{$search}%")
+                            ->orWhereHas('gradeCompany', function ($q2) use ($search) {
+                                $q2->where('name', 'like', "%{$search}%");
+                            });
+                    });
                 }
                 $data = $query->latest('deleted_at')->paginate(10);
                 break;

@@ -54,18 +54,34 @@ class TrackingStockController extends Controller
                 $g->idm_stock = $stockMap[$g->id] ?? 0;
             }
 
-            $totalIdmIn  = InventoryTransaction::whereNull('deleted_at')
-                ->where('transaction_type', 'IDM_REGRADING_IN')
-                ->sum('quantity_change_grams');
-            $totalIdmOut = InventoryTransaction::whereNull('deleted_at')
-                ->where('transaction_type', 'IDM_REGRADING_OUT')
-                ->sum('quantity_change_grams');
+            $startDate = $request->input('start_date');
+            $endDate   = $request->input('end_date');
+
+            $totalInQuery = InventoryTransaction::whereNull('deleted_at')
+                ->where('transaction_type', 'IDM_REGRADING_IN');
+            $totalOutQuery = InventoryTransaction::whereNull('deleted_at')
+                ->where('transaction_type', 'IDM_REGRADING_OUT');
+            $mgmtQuery = IdmManagement::query();
+
+            if ($startDate) {
+                $totalInQuery->whereDate('transaction_date', '>=', $startDate);
+                $totalOutQuery->whereDate('transaction_date', '>=', $startDate);
+                $mgmtQuery->whereDate('grading_date', '>=', $startDate);
+            }
+            if ($endDate) {
+                $totalInQuery->whereDate('transaction_date', '<=', $endDate);
+                $totalOutQuery->whereDate('transaction_date', '<=', $endDate);
+                $mgmtQuery->whereDate('grading_date', '<=', $endDate);
+            }
+
+            $totalIdmIn  = $totalInQuery->sum('quantity_change_grams');
+            $totalIdmOut = $totalOutQuery->sum('quantity_change_grams');
             $totalSusut  = abs($totalIdmOut) - $totalIdmIn;
 
             // Ambil recent Manajemen IDM records, grouped by input grade
             // Limit 5 di halaman ini; full list ada di /admin/manajemen-idm
-            $totalMgmtCount = IdmManagement::count();
-            $recentRecords = IdmManagement::with(['supplier', 'gradeCompany', 'details'])
+            $totalMgmtCount = (clone $mgmtQuery)->count();
+            $recentRecords = (clone $mgmtQuery)->with(['supplier', 'gradeCompany', 'details'])
                 ->latest('id')
                 ->limit(5)
                 ->get();
@@ -82,7 +98,9 @@ class TrackingStockController extends Controller
                 'totalIdmOut',
                 'totalSusut',
                 'recentRecords',
-                'totalMgmtCount'
+                'totalMgmtCount',
+                'startDate',
+                'endDate'
             ));
         } catch (\Exception $e) {
             Log::error('TrackingStock idmStocks error: ' . $e->getMessage(), [
